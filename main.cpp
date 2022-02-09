@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -19,9 +20,9 @@ using namespace chrono;
 using namespace filesystem;
 
 int _mode = 10;
-string _setCompany = "2603.TW";
+string _setCompany = "AAPL";
 string _setWindow = "1W1";
-int _techIndex = 0;
+int _techIndex = 3;
 vector<string> _allTech = {"SMA", "WMA", "EMA", "RSI"};
 int _algoIndex = 2;
 vector<string> _allAlgo = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -39,15 +40,18 @@ vector<string> _slidingWindowsEx = {"A2A", "36M36", "36M24", "36M18", "36M12", "
 
 class CompanyInfo {
 public:
-    vector<string> allTech_;
     string companyName_;
+    vector<string> allTech_;
+    int techIndex_ = -1;
     string techType_;
-    string outputPath_;
-    string techOutputPath_;
-    string trainFilePath_;
-    string testFilePath_;
-    string trainTraditionFilePath_;
-    string testTraditionFilePath_;
+    
+    map<string, string> allResultOutputPath_;
+    map<string, string> allTechOuputPath_;
+    map<string, string> allTrainFilePath_;
+    map<string, string> allTestFilePath_;
+    map<string, string> allTrainTraditionFilePath_;
+    map<string, string> allTestTraditionFilePath_;
+    
     vector<string> slidingWindows_;
     vector<string> slidingWindowsEx_;
     int windowNumber_ = -1;
@@ -65,14 +69,23 @@ public:
     void store_date_price(path priceFilePath);
     void create_folder();
     void find_table_start_row();
-    void output_Tech();
     void store_tech_to_vector();
+    void output_Tech();
+    void set_techFile_title(ofstream &out, int techPerid);
     
-    CompanyInfo(vector<string> allTech, path filePath, string techUse, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear);
+    CompanyInfo(path pricePath, vector<string> allTech, int techIndex, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear);
 };
 
-CompanyInfo::CompanyInfo(vector<string> allTech, path filePath, string techUse, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear) : companyName_(filePath.stem().string()), techType_(techUse), outputPath_(techUse + "_result"), techOutputPath_(techType_ + "/" + companyName_), trainFilePath_(outputPath_ + "/" + companyName_ + "/train/"), testFilePath_(outputPath_ + "/" + companyName_ + "/test/"), trainTraditionFilePath_(outputPath_ + "/" + companyName_ + "/trainTradition/"), testTraditionFilePath_(outputPath_ + "/" + companyName_ + "/testTradition/"), slidingWindows_(slidingWindows), slidingWindowsEx_(slidingWindowEx), windowNumber_(int(slidingWindows.size())), testStartYear_(testStartYear), testEndYear_(testEndYear), testLength_(stod(testEndYear) - stod(testStartYear)) {
-    store_date_price(filePath);
+CompanyInfo::CompanyInfo(path pricePath, vector<string> allTech, int techIndex, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear) : companyName_(pricePath.stem().string()), allTech_(allTech), techIndex_(techIndex), techType_(allTech[techIndex]), slidingWindows_(slidingWindows), slidingWindowsEx_(slidingWindowEx), windowNumber_(int(slidingWindows.size())), testStartYear_(testStartYear), testEndYear_(testEndYear), testLength_(stod(testEndYear) - stod(testStartYear)) {
+    for (auto tech : allTech_) {
+        allResultOutputPath_[tech] = tech + "_result";
+        allTechOuputPath_[tech] = tech + "/" + companyName_;
+        allTrainFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/train/";
+        allTestFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/test/";
+        allTrainTraditionFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/trainTradition/";
+        allTestTraditionFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/testTradition/";
+    }
+    store_date_price(pricePath);
     create_folder();
     find_table_start_row();
 }
@@ -104,10 +117,10 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 void CompanyInfo::create_folder() {
     create_directories(techType_ + "/" + companyName_);
     for (auto i : slidingWindows_) {
-        create_directories(trainFilePath_ + i);
-        create_directories(testFilePath_ + i);
-        create_directories(trainTraditionFilePath_ + i);
-        create_directories(testTraditionFilePath_ + i);
+        create_directories(allTrainFilePath_[techType_] + i);
+        create_directories(allTestFilePath_[techType_] + i);
+        create_directories(allTrainTraditionFilePath_[techType_] + i);
+        create_directories(allTestTraditionFilePath_[techType_] + i);
     }
 }
 
@@ -123,7 +136,6 @@ void CompanyInfo::find_table_start_row() {
     if (longestTrainMonth == -1) {
         longestTrainMonth = 12;
     }
-    
     for (int i = testStartRow_ - 1, monthCount = 0; i >= 0; i--) {
         if (date_[i].substr(5, 2) != date_[i - 1].substr(5, 2)) {
             monthCount++;
@@ -143,24 +155,72 @@ void CompanyInfo::store_tech_to_vector() {
     cout << "calculating " << companyName_ << " " << techType_ << endl;
     vector<double> tmp;
     techTable_.push_back(tmp);
-    if (techType_ == "SMA") {
-        for (int MA = 1; MA < 257; MA++) {
-            for (int dateRow = MA - 1; dateRow < totalDays_; dateRow++) {
-                double MARangePriceSum = 0;
-                for (int i = dateRow, j = MA; j > 0; i--, j--) {
-                    MARangePriceSum += price_[i];
+    switch (techIndex_) {
+        case 0: {
+            for (int MA = 1; MA < 257; MA++) {
+                for (int dateRow = MA - 1; dateRow < totalDays_; dateRow++) {
+                    double MARangePriceSum = 0;
+                    for (int i = dateRow, j = MA; j > 0; i--, j--) {
+                        MARangePriceSum += price_[i];
+                    }
+                    tmp.push_back(MARangePriceSum / MA);
                 }
-                tmp.push_back(MARangePriceSum / MA);
+                techTable_.push_back(tmp);
+                tmp.clear();
             }
-            techTable_.push_back(tmp);
-            tmp.clear();
+            break;
         }
-    }
-    else if (techType_ == "WMA") {
-    }
-    else if (techType_ == "EMA") {
-    }
-    else if (techType_ == "RSI") {
+        case 1: {
+            break;
+        }
+        case 2: {
+            break;
+        }
+        case 3: {
+            vector<double> priceGainLoss(totalDays_ - 1);
+            for (int priceDateRow = 1; priceDateRow < totalDays_; priceDateRow++) {
+                priceGainLoss[priceDateRow - 1] = price_[priceDateRow] - price_[priceDateRow - 1];
+            }
+            for (int RSIPeriod = 1; RSIPeriod < 257; RSIPeriod++) {
+                double RSI, gain = 0, loss = 0, avgGain = 0, avgLoss = 0;
+                for (int row = 0; row < RSIPeriod; row++) {
+                    if (priceGainLoss[row] >= 0) {
+                        gain += priceGainLoss[row];
+                    }
+                    else {
+                        loss += -priceGainLoss[row];
+                    }
+                }
+                avgGain = gain / RSIPeriod;
+                avgLoss = loss / RSIPeriod;
+                RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
+                tmp.push_back(RSI);
+                double preAvgGain = avgGain, preAvgLoss = avgLoss;
+                for (int i = RSIPeriod; i < totalDays_ - 1; i++) {
+                    if (priceGainLoss[i] >= 0) {
+                        RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
+                        preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
+                        preAvgLoss = (preAvgLoss * (RSIPeriod - 1)) / RSIPeriod;
+                    }
+                    else {
+                        RSI = 100.0 - (100.0 / (1 + ((preAvgGain * (RSIPeriod - 1)) / (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]))));
+                        preAvgGain = (preAvgGain * (RSIPeriod - 1)) / RSIPeriod;
+                        preAvgLoss = (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]) / RSIPeriod;
+                    }
+                    if (isnan(RSI)) {
+                        RSI = 100;
+                    }
+                    tmp.push_back(RSI);
+                }
+                techTable_.push_back(tmp);
+                tmp.clear();
+            }
+            break;
+        }
+        default: {
+            cout << "store_tech_to_vector exception" << endl;
+            exit(1);
+        }
     }
     cout << "done calculating" << endl;
 }
@@ -168,40 +228,68 @@ void CompanyInfo::store_tech_to_vector() {
 void CompanyInfo::output_Tech() {
     store_tech_to_vector();
     cout << "saving " << techType_ << " file" << endl;
-    if (techType_ == "SMA") {
-        for (int MA = 1; MA < 257; MA++) {
-            if (MA % 10 == 0) {
-                cout << ".";
+    switch (techIndex_) {
+        case 0: {
+            for (int SMAPeriod = 1; SMAPeriod < 257; SMAPeriod++) {
+                if (SMAPeriod % 10 == 0) {
+                    cout << ".";
+                }
+                ofstream out;
+                set_techFile_title(out, SMAPeriod);
+                int techSize = (int)techTable_[SMAPeriod].size();
+                for (int i = 0, dateRow = SMAPeriod - 1; i < techSize; i++, dateRow++) {
+                    out << date_[dateRow] << "," << set_precision(techTable_[SMAPeriod][i]) << endl;
+                }
+                out.close();
             }
-            ofstream out;
-            if (MA < 10) {
-                out.open(techOutputPath_ + "/" + companyName_ + "_" + techType_ + "_00" + to_string(MA) + ".csv");
-            }
-            else if (MA >= 10 && MA < 100) {
-                out.open(techOutputPath_ + "/" + companyName_ + "_" + techType_ + "_0" + to_string(MA) + ".csv");
-            }
-            else if (MA >= 100) {
-                out.open(techOutputPath_ + "/" + companyName_ + "_" + techType_ + "_" + to_string(MA) + ".csv");
-            }
-            int techSize = (int)techTable_[MA].size();
-            for (int i = 0, dateRow = MA - 1; i < techSize; i++, dateRow++) {
-                out << date_[dateRow] << "," << set_precision(techTable_[MA][i]) << endl;
-            }
-            out.close();
+            cout << endl;
+            break;
         }
-        cout << endl;
+        case 1: {
+            break;
+        }
+        case 2: {
+            break;
+        }
+        case 3: {
+            for (int RSIPerid = 1; RSIPerid < 257; RSIPerid++) {
+                if (RSIPerid % 10 == 0) {
+                    cout << ".";
+                }
+                ofstream out;
+                set_techFile_title(out, RSIPerid);
+                int techSize = (int)techTable_[RSIPerid].size();
+                for (int i = 0, dateRow = RSIPerid; i < techSize; i++, dateRow++) {
+                    out << date_[dateRow] << "," << set_precision(techTable_[RSIPerid][i]) << endl;
+                }
+                out.close();
+            }
+            cout << endl;
+            break;
+        }
+        default: {
+            cout << "store_tech_to_vector exception" << endl;
+            exit(1);
+        }
     }
-    else if (techType_ == "WMA") {
+}
+
+void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
+    if (techPerid < 10) {
+        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_00" + to_string(techPerid) + ".csv");
     }
-    else if (techType_ == "EMA") {
+    else if (techPerid >= 10 && techPerid < 100) {
+        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_0" + to_string(techPerid) + ".csv");
     }
-    else if (techType_ == "RSI") {
+    else if (techPerid >= 100) {
+        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
 
 class TechTable {
 public:
     string companyName_;
+    int techIndex_ = -1;
     string techType_;
     int days_;
     vector<string> date_;
@@ -211,10 +299,10 @@ public:
     void create_techTable(CompanyInfo &company);
     void output_techTable();
     
-    TechTable(CompanyInfo &company);
+    TechTable(CompanyInfo &company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo &company) : companyName_(company.companyName_), techType_(company.techType_) {
+TechTable::TechTable(CompanyInfo &company, int techIndex) : companyName_(company.companyName_), techIndex_(techIndex), techType_(company.allTech_[techIndex]) {
     create_techTable(company);
 }
 
@@ -230,21 +318,21 @@ void TechTable::create_techTable(CompanyInfo &company) {
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
-    vector<path> MAFilePath;
-    MAFilePath = get_path(company.techOutputPath_);
-    int MAFilePathSize = (int)MAFilePath.size();
-    if (MAFilePathSize == 0) {
+    vector<path> techFilePath;
+    techFilePath = get_path(company.allTechOuputPath_[techType_]);
+    int techFilePathSize = (int)techFilePath.size();
+    if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
         exit(1);
     }
-    for (int i = 0; i < MAFilePathSize; i++) {
-        vector<vector<string>> MAFile = read_data(MAFilePath[i]);
-        int MAFileSize = (int)MAFile.size();
-        if (MAFileSize - days_ < 0) {
+    for (int i = 0; i < techFilePathSize; i++) {
+        vector<vector<string>> MAFile = read_data(techFilePath[i]);
+        int techFileSize = (int)MAFile.size();
+        if (techFileSize - days_ < 0) {
             cout << company.companyName_ << " MA file not old enougth" << endl;
             exit(1);
         }
-        for (int j = 0, k = MAFileSize - days_; k < MAFileSize; j++, k++) {
+        for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
             techTable_[j][i + 1] = stod(MAFile[k][1]);
         }
     }
@@ -328,7 +416,6 @@ void TestWindow::find_test_interval(CompanyInfo &company) {
             find_D_test(company);
             break;
         }
-            
         default: {
             cout << "test delimiter wrong" << endl;
             exit(1);
@@ -680,7 +767,7 @@ Particle::Particle(double totalCapitalLV, int particleType, int techVar0, int te
 }
 
 void Particle::instant_trade(CompanyInfo &company, string startDate, string endDate) {
-    TechTable table(company);
+    TechTable table(company, company.techIndex_);
     int startRow = -1, endRow = -1;
     for (int dateRow = 0; dateRow < table.days_; dateRow++) {
         if (startDate == table.date_[dateRow]) {
@@ -862,7 +949,7 @@ int main(int argc, const char *argv[]) {
     string setCompany = _setCompany;
     string setWindow = _setWindow;
     int setMode = _mode;
-    string setTech = _allTech[_techIndex];
+    int techIndex = _techIndex;
     vector<string> allTech = _allTech;
     for (int companyIndex = 0; companyIndex < companyPricePath.size(); companyIndex++) {
         path targetCompanyPricePath = companyPricePath[companyIndex];
@@ -876,9 +963,8 @@ int main(int argc, const char *argv[]) {
             companyPricePath.clear();
             companyPricePath.push_back(targetCompanyPricePath);
         }
-        CompanyInfo company(allTech, targetCompanyPricePath, setTech, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
+        CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-        Particle(TOTAL_CP_LV, _techIndex, 5, 20, 5, 20, true).instant_trade(company, "2020-01-02", "2021-06-30");
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
