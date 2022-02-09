@@ -22,7 +22,7 @@ using namespace filesystem;
 int _mode = 10;
 string _setCompany = "AAPL";
 string _setWindow = "1W1";
-int _techIndex = 3;
+int _techIndex = 0;
 vector<string> _allTech = {"SMA", "WMA", "EMA", "RSI"};
 int _algoIndex = 2;
 vector<string> _allAlgo = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -649,9 +649,21 @@ public:
     vector<int> binary_;
     vector<int> decimal_;
     
-    static bool buy_condition(int stockHold, int i, int endRow, double MAbuy1PreDay, double MAbuy2PreDay, double MAbuy1Today, double MAbuy2Today);
-    static bool sell_condition(int stockHold, int i, int endRow, double MAsell1PreDay, double MAsell2PreDay, double MAsell1Today, double MAsell2Today);
-    static void record_buy_info(TechTable &table, int i, int stockHold);
+    static bool buy_condition0(TechTable &table0, int stockHold, int i, int endRow, int buy1, int buy2) {
+        double MAbuy1PreDay = table0.techTable_[i - 1][buy1];
+        double MAbuy2PreDay = table0.techTable_[i - 1][buy2];
+        double MAbuy1Today = table0.techTable_[i][buy1];
+        double MAbuy2Today = table0.techTable_[i][buy2];
+        return stockHold == 0 && MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today && i != endRow;
+    }
+    
+    static bool sell_condition0(TechTable &table0, int stockHold, int i, int endRow, int sell1, int sell2) {
+        double MAsell1PreDay = table0.techTable_[i - 1][sell1];
+        double MAsell2PreDay = table0.techTable_[i - 1][sell2];
+        double MAsell1Today = table0.techTable_[i][sell1];
+        double MAsell2Today = table0.techTable_[i][sell2];
+        return stockHold != 0 && ((MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today) || i == endRow);
+    }
     
     MA() {
         int bitNum = 0;
@@ -663,22 +675,21 @@ public:
     }
 };
 
-bool MA::buy_condition(int stockHold, int i, int endRow, double MAbuy1PreDay, double MAbuy2PreDay, double MAbuy1Today, double MAbuy2Today) {
-    return stockHold == 0 && MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today && i != endRow;
-}
-
-bool MA::sell_condition(int stockHold, int i, int endRow, double MAsell1PreDay, double MAsell2PreDay, double MAsell1Today, double MAsell2Today) {
-    return stockHold != 0 && ((MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today) || i == endRow);
-}
-
 class RSI {
 public:
     const vector<int> bitsSize_ = {8, 7, 7};
     vector<int> binary_;
     vector<int> decimal_;
     
-    static bool buy_condition(int stockHold, int i, int endRow, double period, double overSold, double useless0, double useless1);
-    static bool sell_condition(int stockHold, int i, int endRow, double period, double overBought, double useless0, double useless1);
+    static bool buy_condition0(TechTable &table0, int stockHold, int i, int endRow, int RSIPeriod, int overSold) {
+        double RSI = table0.techTable_[i][RSIPeriod];
+        return stockHold == 0 && RSI <= overSold && i != endRow;
+    }
+    
+    static bool sell_condition0(TechTable &table0, int stockHold, int i, int endRow, int RSIPeriod, int overBought) {
+        double RSI = table0.techTable_[i][RSIPeriod];
+        return stockHold != 0 && ((RSI >= overBought) || i == endRow);
+    }
     
     RSI() {
         int bitNum = 0;
@@ -689,14 +700,6 @@ public:
         decimal_.resize(bitsSize_.size());
     }
 };
-
-bool RSI::buy_condition(int stockHold, int i, int endRow, double period, double overSold, double useless0, double useless1) {
-    return stockHold == 0 && period <= overSold && i != endRow;
-}
-
-bool RSI::sell_condition(int stockHold, int i, int endRow, double period, double overBought, double useless0, double useless1) {
-    return stockHold != 0 && ((period >= overBought) || i == endRow);
-}
 
     //class BetaMatrix {
     //public:
@@ -710,7 +713,7 @@ bool RSI::sell_condition(int stockHold, int i, int endRow, double period, double
 class Particle {
 public:
     const double totalCapitalLV_ = 0;
-    const int particleType_ = -1;
+    const int techIndex_ = -1;
     vector<int> binary_;
     vector<int> decimal_;
     double remain_ = 0;
@@ -735,39 +738,38 @@ public:
     void push_last_info(bool lastRecord);
     void check_buyNum_sellNum();
     
-    Particle(double totalCapitalLV, int particleType = -1, int techVar0 = -1, int techVar1 = -1, int techVar2 = -1, int techVar3 = -1, bool on = false);
+    Particle(double totalCapitalLV, int particleType, vector<int> variables = {}, bool on = false);
 };
 
-Particle::Particle(double totalCapitalLV, int particleType, int techVar0, int techVar1, int techVar2, int techVar3, bool on) : totalCapitalLV_(totalCapitalLV), particleType_(particleType), remain_(totalCapitalLV), isRecordOn_(on) {
-    switch (particleType_) {
+Particle::Particle(double totalCapitalLV, int techIndex, vector<int> variables, bool on) : totalCapitalLV_(totalCapitalLV), techIndex_(techIndex), remain_(totalCapitalLV), isRecordOn_(on) {
+    switch (techIndex_) {
         case 0:
         case 1:
         case 2: {
             binary_ = MA().binary_;
             decimal_ = MA().decimal_;
-            decimal_[0] = techVar0;
-            decimal_[1] = techVar1;
-            decimal_[2] = techVar2;
-            decimal_[3] = techVar3;
+            for (int i = 0; i < variables.size(); i++) {
+                decimal_[i] = variables[i];
+            }
             break;
         }
         case 3: {
             binary_ = RSI().binary_;
             decimal_ = RSI().decimal_;
-            decimal_[0] = techVar0;
-            decimal_[1] = techVar1;
-            decimal_[2] = techVar2;
+            for (int i = 0; i < variables.size(); i++) {
+                decimal_[i] = variables[i];
+            }
             break;
         }
         default: {
-            cout << "no particleType " << particleType_ << ", choose a particleType" << endl;
+            cout << "no techIndex_ " << techIndex_ << ", choose a techIndex_" << endl;
             exit(1);
         }
     }
 }
 
 void Particle::instant_trade(CompanyInfo &company, string startDate, string endDate) {
-    TechTable table(company, company.techIndex_);
+    TechTable table(company, techIndex_);
     int startRow = -1, endRow = -1;
     for (int dateRow = 0; dateRow < table.days_; dateRow++) {
         if (startDate == table.date_[dateRow]) {
@@ -798,21 +800,23 @@ void Particle::instant_trade(CompanyInfo &company, string startDate, string endD
 
 void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const string &endDate, const string &startDate) {
     string titleVariables;
+    string showVariablesInFile;
     for (auto i : decimal_) {
         titleVariables += "_";
         titleVariables += to_string(i);
+        showVariablesInFile += ",";
+        showVariablesInFile += to_string(i);
     }
-    out.open(company.companyName_ + "_" + company.techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
-    switch (particleType_) {
+    out.open(company.companyName_ + "_" + company.allTech_[techIndex_] + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
+    switch (techIndex_) {
         case 0:
         case 1:
         case 2: {
             out << "company,startDate,endDate,buy1,buy2,sell1,sell2" << endl;
-            out << company.companyName_ << "," << startDate << "," << endDate << "," << decimal_[0] << "," << decimal_[1] << "," << decimal_[2] << "," << decimal_[3] << "\n"
-            << endl;
             break;
         }
         case 3: {
+            out << "company,startDate,endDate,RSIPeriod,overBought,overSold" << endl;
             break;
         }
         default: {
@@ -820,6 +824,7 @@ void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const
             exit(1);
         }
     }
+    out << company.companyName_ << "," << startDate << "," << endDate << showVariablesInFile << "\n\n";
 }
 
 void Particle::print_trade_record(ofstream &out) {
@@ -862,15 +867,17 @@ void Particle::trade(TechTable &table, int startRow, int endRow, bool lastRecord
 }
 
 void Particle::set_buy_sell_condition(TechTable &table, bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    switch (particleType_) {
+    switch (techIndex_) {
         case 0:
         case 1:
         case 2: {
-            buyCondition = MA::buy_condition(stockHold, i, endRow, table.techTable_[i - 1][decimal_[0]], table.techTable_[i - 1][decimal_[1]], table.techTable_[i][decimal_[0]], table.techTable_[i][decimal_[1]]) && remain_ >= table.price_[i];
-            sellCondition = MA::sell_condition(stockHold, i, endRow, table.techTable_[i - 1][decimal_[2]], table.techTable_[i - 1][decimal_[3]], table.techTable_[i][decimal_[2]], table.techTable_[i][decimal_[3]]);
+            buyCondition = MA::buy_condition0(table, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= table.price_[i];
+            sellCondition = MA::sell_condition0(table, stockHold, i, endRow, decimal_[2], decimal_[3]);
             break;
         }
         case 3: {
+            buyCondition = RSI::buy_condition0(table, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= table.price_[i];
+            sellCondition = RSI::sell_condition0(table, stockHold, i, endRow, decimal_[0], decimal_[2]);
             break;
         }
         default: {
@@ -881,7 +888,7 @@ void Particle::set_buy_sell_condition(TechTable &table, bool &buyCondition, bool
 
 void Particle::push_title() {
     if (isRecordOn_) {
-        switch (particleType_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -889,6 +896,7 @@ void Particle::push_title() {
                 break;
             }
             case 3: {
+                tradeRecord_.push_back(",date,price,RSI,stockHold,remain,capital lv\n");
                 break;
             }
         }
@@ -897,7 +905,7 @@ void Particle::push_title() {
 
 void Particle::push_buy_info(TechTable &table, int stockHold, int i) {
     if (isRecordOn_) {
-        switch (particleType_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -905,6 +913,7 @@ void Particle::push_buy_info(TechTable &table, int stockHold, int i) {
                 break;
             }
             case 3: {
+                tradeRecord_.push_back("buy," + table.date_[i] + "," + set_precision(table.price_[i]) + "," + set_precision(table.techTable_[i][decimal_[0]]) + "," + to_string(stockHold) + "," + set_precision(remain_) + "," + set_precision(remain_ + stockHold * table.price_[i]) + "\n");
                 break;
             }
         }
@@ -913,7 +922,7 @@ void Particle::push_buy_info(TechTable &table, int stockHold, int i) {
 
 void Particle::push_sell_info(TechTable &table, int stockHold, int i) {
     if (isRecordOn_) {
-        switch (particleType_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -921,6 +930,7 @@ void Particle::push_sell_info(TechTable &table, int stockHold, int i) {
                 break;
             }
             case 3: {
+                tradeRecord_.push_back("sell," + table.date_[i] + "," + set_precision(table.price_[i]) + "," + set_precision(table.techTable_[i][decimal_[0]]) + "," + to_string(stockHold) + "," + set_precision(remain_) + "," + set_precision(remain_ + stockHold * table.price_[i]) + "\n\n");
                 break;
             }
         }
@@ -965,6 +975,8 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
+            //        Particle(TOTAL_CP_LV, company.techIndex_, vector<int>{5, 20, 5, 20}, true).instant_trade(company, "2020-01-02", "2021-06-30");
+            //        Particle(TOTAL_CP_LV, 3, vector<int>{1, 93, 20}, true).instant_trade(company, "2011-12-27", "2012-01-03");
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
