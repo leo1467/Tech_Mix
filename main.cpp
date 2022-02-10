@@ -20,7 +20,7 @@ using namespace chrono;
 using namespace filesystem;
 
 int _mode = 10;
-string _setCompany = "AAPL";
+string _setCompany = "2603.TW";
 string _setWindow = "1W1";
 int _techIndex = 0;
 vector<string> _allTech = {"SMA", "WMA", "EMA", "RSI"};
@@ -44,6 +44,12 @@ public:
     vector<string> allTech_;
     int techIndex_ = -1;
     string techType_;
+    vector<string> slidingWindows_;
+    vector<string> slidingWindowsEx_;
+    int windowNumber_ = -1;
+    string testStartYear_;
+    string testEndYear_;
+    double testLength_;
     
     map<string, string> allResultOutputPath_;
     map<string, string> allTechOuputPath_;
@@ -51,13 +57,7 @@ public:
     map<string, string> allTestFilePath_;
     map<string, string> allTrainTraditionFilePath_;
     map<string, string> allTestTraditionFilePath_;
-    
-    vector<string> slidingWindows_;
-    vector<string> slidingWindowsEx_;
-    int windowNumber_ = -1;
-    string testStartYear_;
-    string testEndYear_;
-    double testLength_;
+
     int totalDays_;
     vector<string> date_;
     vector<double> price_;
@@ -298,6 +298,7 @@ public:
     string companyName_;
     int techIndex_ = -1;
     string techType_;
+    
     int days_;
     vector<string> date_;
     vector<double> price_;
@@ -307,12 +308,12 @@ public:
     void create_techTable(CompanyInfo &company);
     void output_techTable();
     
-        //    TechTable(CompanyInfo &company, int techIndex);
+    TechTable(CompanyInfo &company, int techIndex);
 };
 
-    //TechTable::TechTable(CompanyInfo &company, int techIndex) : companyName_(company.companyName_), techIndex_(techIndex), techType_(company.allTech_[techIndex]) {
-    //    create_techTable(company);
-    //}
+TechTable::TechTable(CompanyInfo &company, int techIndex) : companyName_(company.companyName_), techIndex_(techIndex), techType_(company.allTech_[techIndex]) {
+    create_techTable(company);
+}
 
 void TechTable::ini_techTable(CompanyInfo &company, int techIndex) {
     companyName_ = company.companyName_;
@@ -669,11 +670,11 @@ public:
     vector<int> binary_;
     vector<int> decimal_;
     
-    static bool buy_condition0(TechTable &table0, int stockHold, int i, int endRow, int buy1, int buy2) {
-        double MAbuy1PreDay = table0.techTable_[i - 1][buy1];
-        double MAbuy2PreDay = table0.techTable_[i - 1][buy2];
-        double MAbuy1Today = table0.techTable_[i][buy1];
-        double MAbuy2Today = table0.techTable_[i][buy2];
+    static bool buy_condition0(map<string, TechTable *> &tables, int stockHold, int i, int endRow, string techType, int buy1, int buy2) {
+        double MAbuy1PreDay = tables[techType]->techTable_[i - 1][buy1];
+        double MAbuy2PreDay = tables[techType]->techTable_[i - 1][buy2];
+        double MAbuy1Today = tables[techType]->techTable_[i][buy1];
+        double MAbuy2Today = tables[techType]->techTable_[i][buy2];
         return stockHold == 0 && MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today && i != endRow;
     }
     
@@ -723,21 +724,25 @@ public:
 
 class Particle {
 public:
-    double totalCapitalLV_ = -1;
     int techIndex_ = -1;
+    string techType_ = "";
+    double totalCapitalLV_ = -1;
+    bool isRecordOn_ = false;
+    
     vector<int> binary_;
     vector<int> decimal_;
     double remain_ = 0;
     double RoR_ = 0;
     int buyNum_ = 0;
     int sellNum_ = 0;
-    bool isRecordOn_ = false;
     vector<string> tradeRecord_;
     int gen_ = 0;
     int exp_ = 0;
     int bestCnt = 0;
     
-    void ini_particle(int techIndex, double totalCapitalLV, bool on, vector<int> variables);
+    map<string, TechTable *> tables_;
+    
+    void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
     void instant_trade(CompanyInfo &company, string startDate, string endDate);
     void set_instant_trade_file(CompanyInfo &company, ofstream &out, const string &endDate, const string &startDate);
     void print_trade_record(ofstream &out);
@@ -750,18 +755,19 @@ public:
     void push_last_info(bool lastRecord);
     void check_buyNum_sellNum();
     
-    Particle(int techIndex = -1, double totalCapitalLV = -1, bool on = false, vector<int> variables = {});
+    Particle(int techIndex = -1, string techType = "", double totalCapitalLV = -1, bool on = false, vector<int> variables = {});
 };
 
-Particle::Particle(int techIndex, double totalCapitalLV, bool on, vector<int> variables) : totalCapitalLV_(totalCapitalLV), techIndex_(techIndex), remain_(totalCapitalLV), isRecordOn_(on) {
+Particle::Particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
     if (techIndex != -1) {
-        ini_particle(techIndex, totalCapitalLV, on, variables);
+        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
     }
 }
 
-void Particle::ini_particle(int techIndex, double totalCapitalLV, bool on, vector<int> variables) {
+void Particle::ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
     totalCapitalLV_ = totalCapitalLV;
     techIndex_ = techIndex;
+    techType_ = techType;
     remain_ = totalCapitalLV;
     isRecordOn_ = on;
     switch (techIndex) {
@@ -791,8 +797,8 @@ void Particle::ini_particle(int techIndex, double totalCapitalLV, bool on, vecto
 }
 
 void Particle::instant_trade(CompanyInfo &company, string startDate, string endDate) {
-    TechTable table;
-    table.ini_techTable(company, techIndex_);
+    TechTable table(company, techIndex_);
+    tables_.insert({company.techType_, &table});
     int startRow = -1, endRow = -1;
     for (int dateRow = 0; dateRow < table.days_; dateRow++) {
         if (startDate == table.date_[dateRow]) {
@@ -894,7 +900,7 @@ void Particle::set_buy_sell_condition(TechTable &table, bool &buyCondition, bool
         case 0:
         case 1:
         case 2: {
-            buyCondition = MA::buy_condition0(table, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= table.price_[i];
+            buyCondition = MA::buy_condition0(tables_, stockHold, i, endRow, techType_, decimal_[0], decimal_[1]) && remain_ >= table.price_[i];
             sellCondition = MA::sell_condition0(table, stockHold, i, endRow, decimal_[2], decimal_[3]);
             break;
         }
@@ -992,17 +998,16 @@ private:
     
 public:
     CompanyInfo &company_;
+    vector<Particle> particles_;
     
     BetaMatrix betaMatrix_;
-    vector<Particle> particles_;
     map<string, Particle> globalParticles_;
+    map<string, TechTable> tables_;
     
     int actualStartRow_ = -1;
     int actualEndRow_ = -1;
     
-    TechTable table0_;
-    
-    void set_variables_condition(CompanyInfo &company, string &targetWindow, string &startDate, string &endDate, bool &debug) {
+    void set_variables_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
         if (targetWindow.length() == startDate.length()) {
             if (endDate == "debug") {
                 debug = true;
@@ -1010,7 +1015,7 @@ public:
             endDate = startDate;
             startDate = targetWindow;
             targetWindow = "A2A";
-            company.allTrainFilePath_[company.techType_] = "";
+            company_.allTrainFilePath_[company_.techType_] = "";
         }
         else if (startDate == "debug") {
             startDate = "";
@@ -1018,18 +1023,16 @@ public:
         }
     }
     
-    Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company) {
-        set_variables_condition(company, targetWindow, startDate, endDate, debug);
-        table0_.ini_techTable(company, company.techIndex_);
+    void find_new_row(string &startDate, string &endDate) {
         if (startDate != "") {
-            for (int i = 0; i < table0_.days_; i++) {
-                if (startDate == table0_.date_[i]) {
+            for (int i = 0; i < tables_.at(company_.techType_).days_; i++) {
+                if (startDate == tables_.at(company_.techType_).date_[i]) {
                     actualStartRow_ = i;
                     break;
                 }
             }
-            for (int i = actualStartRow_; i < table0_.days_; i++) {
-                if (endDate == table0_.date_[i]) {
+            for (int i = actualStartRow_; i < tables_.at(company_.techType_).days_; i++) {
+                if (endDate == tables_.at(company_.techType_).date_[i]) {
                     actualEndRow_ = i;
                     break;
                 }
@@ -1043,16 +1046,11 @@ public:
                 exit(1);
             }
         }
-        
-        for (int i = 0; i < particleAmount_; i++) {
-            particles_.push_back(Particle(company.techIndex_, totalCapitalLV_));
-        }
-        for (int i = 0; i < 4; i++) {
-            globalParticles_.insert({"localBest", Particle(company.techIndex_, totalCapitalLV_)});
-            globalParticles_.insert({"localWorst", Particle(company.techIndex_, totalCapitalLV_)});
-            globalParticles_.insert({"globalBest", Particle(company.techIndex_, totalCapitalLV_)});
-            globalParticles_.insert({"best", Particle(company.techIndex_, totalCapitalLV_)});
-        }
+    }
+    
+    Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), particles_(particleAmount_), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
+        set_variables_condition(targetWindow, startDate, endDate, debug);
+        find_new_row(startDate, endDate);
     }
 };
 
@@ -1078,9 +1076,9 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-            //        Train train(company, "2012-01-03", "2012-12-31", "debug");
-            //        Particle(company.techIndex_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
-            //        Particle(3, TOTAL_CP_LV, true, vector<int>{1, 93, 20}).instant_trade(company, "2011-12-27", "2012-01-03");
+//        Train train(company, "2012-01-03", "2012-12-31", "debug");
+//        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
+//        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{1, 93, 20}).instant_trade(company, "2011-12-27", "2012-01-03");
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
