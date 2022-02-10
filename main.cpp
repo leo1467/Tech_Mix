@@ -78,12 +78,12 @@ public:
 
 CompanyInfo::CompanyInfo(path pricePath, vector<string> allTech, int techIndex, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear) : companyName_(pricePath.stem().string()), allTech_(allTech), techIndex_(techIndex), techType_(allTech[techIndex]), slidingWindows_(slidingWindows), slidingWindowsEx_(slidingWindowEx), windowNumber_(int(slidingWindows.size())), testStartYear_(testStartYear), testEndYear_(testEndYear), testLength_(stod(testEndYear) - stod(testStartYear)) {
     for (auto tech : allTech_) {
-        allResultOutputPath_[tech] = tech + "_result";
-        allTechOuputPath_[tech] = tech + "/" + companyName_;
-        allTrainFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/train/";
-        allTestFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/test/";
-        allTrainTraditionFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/trainTradition/";
-        allTestTraditionFilePath_[tech] = tech + "_result" + "/" + companyName_ + "/testTradition/";
+        allResultOutputPath_.insert({tech, tech + "_result"});
+        allTechOuputPath_.insert({tech, tech + "/" + companyName_});
+        allTrainFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/train/"});
+        allTestFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/test/"});
+        allTrainTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/trainTradition/"});
+        allTestTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testTradition/"});
     }
     store_date_price(pricePath);
     create_folder();
@@ -117,10 +117,10 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 void CompanyInfo::create_folder() {
     create_directories(techType_ + "/" + companyName_);
     for (auto i : slidingWindows_) {
-        create_directories(allTrainFilePath_[techType_] + i);
-        create_directories(allTestFilePath_[techType_] + i);
-        create_directories(allTrainTraditionFilePath_[techType_] + i);
-        create_directories(allTestTraditionFilePath_[techType_] + i);
+        create_directories(allTrainFilePath_.at(techType_) + i);
+        create_directories(allTestFilePath_.at(techType_) + i);
+        create_directories(allTrainTraditionFilePath_.at(techType_) + i);
+        create_directories(allTestTraditionFilePath_.at(techType_) + i);
     }
 }
 
@@ -283,13 +283,13 @@ void CompanyInfo::output_Tech() {
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
     if (techPerid < 10) {
-        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_00" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_.at(techType_) + "/" + companyName_ + "_" + techType_ + "_00" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 10 && techPerid < 100) {
-        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_0" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_.at(techType_) + "/" + companyName_ + "_" + techType_ + "_0" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 100) {
-        out.open(allTechOuputPath_[techType_] + "/" + companyName_ + "_" + techType_ + "_" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_.at(techType_) + "/" + companyName_ + "_" + techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
 
@@ -335,7 +335,7 @@ void TechTable::create_techTable(CompanyInfo &company) {
         techTable_[i].resize(257);
     }
     vector<path> techFilePath;
-    techFilePath = get_path(company.allTechOuputPath_[techType_]);
+    techFilePath = get_path(company.allTechOuputPath_.at(techType_));
     int techFilePathSize = (int)techFilePath.size();
     if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
@@ -1098,7 +1098,7 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-//        Train train(company, "2012-01-03", "2012-12-31", "debug");
+        Train train(company, "2012-01-03", "2012-12-31", "debug");
 //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
 //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         switch (setMode) {
