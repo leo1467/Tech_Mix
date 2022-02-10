@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -57,7 +58,7 @@ public:
     map<string, string> allTestFilePath_;
     map<string, string> allTrainTraditionFilePath_;
     map<string, string> allTestTraditionFilePath_;
-
+    
     int totalDays_;
     vector<string> date_;
     vector<double> price_;
@@ -667,8 +668,6 @@ void TrainWindow::print_train(CompanyInfo &company) {
 class MA {
 public:
     const vector<int> bitsSize_ = {8, 8, 8, 8};
-    vector<int> binary_;
-    vector<int> decimal_;
     
     static bool buy_condition0(map<string, TechTable> *tables, int stockHold, int i, int endRow, string techType, int buy1, int buy2) {
         double MAbuy1PreDay = tables->at(techType).techTable_[i - 1][buy1];
@@ -685,22 +684,11 @@ public:
         double MAsell2Today = tables->at(techType).techTable_[i][sell2];
         return stockHold != 0 && ((MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today) || i == endRow);
     }
-    
-    MA() {
-        int bitNum = 0;
-        for (auto i : bitsSize_) {
-            bitNum += i;
-        }
-        binary_.resize(bitNum);
-        decimal_.resize(bitsSize_.size());
-    }
 };
 
 class RSI {
 public:
     const vector<int> bitsSize_ = {8, 7, 7};
-    vector<int> binary_;
-    vector<int> decimal_;
     
     static bool buy_condition0(map<string, TechTable> *tables, int stockHold, int i, int endRow, string techType, int RSIPeriod, int overSold) {
         double RSI = tables->at(techType).techTable_[i][RSIPeriod];
@@ -711,15 +699,6 @@ public:
         double RSI = tables->at(techType).techTable_[i][RSIPeriod];
         return stockHold != 0 && ((RSI >= overBought) || i == endRow);
     }
-    
-    RSI() {
-        int bitNum = 0;
-        for (auto i : bitsSize_) {
-            bitNum += i;
-        }
-        binary_.resize(bitNum);
-        decimal_.resize(bitsSize_.size());
-    }
 };
 
 class Particle {
@@ -729,6 +708,7 @@ public:
     double totalCapitalLV_ = -1;
     bool isRecordOn_ = false;
     
+    vector<int> bitsSize_;
     vector<int> binary_;
     vector<int> decimal_;
     double remain_ = 0;
@@ -754,6 +734,9 @@ public:
     void push_sell_info(int stockHold, int i);
     void push_last_info(bool lastRecord);
     void check_buyNum_sellNum();
+    void reset(double RoR = 0);
+    void measure(vector<double> &betaMatrix);
+    void convert_bi_dec();
     
     Particle(int techIndex = -1, string techType = "", double totalCapitalLV = -1, bool on = false, vector<int> variables = {});
 };
@@ -774,25 +757,22 @@ void Particle::ini_particle(int techIndex, string techType, double totalCapitalL
         case 0:
         case 1:
         case 2: {
-            binary_ = MA().binary_;
-            decimal_ = MA().decimal_;
-            for (int i = 0; i < variables.size(); i++) {
-                decimal_[i] = variables[i];
-            }
+            bitsSize_ = MA().bitsSize_;
             break;
         }
         case 3: {
-            binary_ = RSI().binary_;
-            decimal_ = RSI().decimal_;
-            for (int i = 0; i < variables.size(); i++) {
-                decimal_[i] = variables[i];
-            }
+            bitsSize_ = RSI().bitsSize_;
             break;
         }
         default: {
             cout << "no techIndex_ " << techIndex_ << ", choose a techIndex_" << endl;
             exit(1);
         }
+    }
+    binary_.resize(accumulate(bitsSize_.begin(), bitsSize_.end(), 0));
+    decimal_.resize(bitsSize_.size());
+    for (int i = 0; i < variables.size(); i++) {
+        decimal_[i] = variables[i];
     }
 }
 
@@ -1001,14 +981,47 @@ void Particle::push_last_info(bool lastRecord) {
     }
 }
 
+void Particle::reset(double RoR) {
+    fill(binary_.begin(), binary_.end(), 0);
+    fill(decimal_.begin(), decimal_.end(), 0);
+    buyNum_ = 0;
+    sellNum_ = 0;
+    remain_ = totalCapitalLV_;
+    RoR_ = RoR;
+    tradeRecord_.clear();
+    gen_ = 0;
+    exp_ = 0;
+    isRecordOn_ = false;
+}
+
+void Particle::measure(vector<double> &betaMatrix) {
+    double r;
+    int bitSize = (int)betaMatrix.size();
+    for (int i = 0; i < bitSize; i++) {
+        r = (double)rand() / (double)RAND_MAX;
+        if (r < betaMatrix[i]) {
+            binary_[i] = 1;
+        }
+        else {
+            binary_[i] = 0;
+        }
+    }
+}
+
+void Particle::convert_bi_dec() {
+}
+
 class BetaMatrix {
 public:
-    vector<double> betaMatrix_;
+    vector<double> matrix_;
     
-    void ini();
+    void reset();
     void print(ofstream &out, bool debug);
-        //    BetaMatrix();
 };
+
+void BetaMatrix::reset() {
+    fill(matrix_.begin(), matrix_.end(), 0.5);
+}
 
 class Train {
 private:
@@ -1074,8 +1087,67 @@ public:
     
     void create_particles(bool debug) {
         for (int i = 0; i < particleAmount_; i++) {
-            particles_.push_back(Particle(company_.techIndex_, company_.techType_ , totalCapitalLV_, debug));
+            particles_.push_back(Particle(company_.techIndex_, company_.techType_, totalCapitalLV_, debug));
             particles_[i].tables_ = &tables_;
+        }
+        globalParticles_.insert({"localBest", particles_[0]});
+        globalParticles_.insert({"localWorst", particles_[0]});
+        globalParticles_.insert({"globalBest", particles_[0]});
+        globalParticles_.insert({"globalWorst", particles_[0]});
+        globalParticles_.insert({"best", particles_[0]});
+    }
+    
+    TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex) {
+        string accuallWindow = company_.slidingWindows_[windowIndex];
+        if (targetWindow != "all") {
+            accuallWindow = targetWindow;
+            windowIndex = company_.windowNumber_;
+        }
+        TrainWindow window(company_, accuallWindow);
+        if (startDate == "") {
+            window.print_train(company_);
+        }
+        if (company_.allTrainFilePath_.at(company_.techType_) == "") {
+            window.TestWindow::windowName_ = "";
+        }
+        return window;
+    }
+    
+    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex) {
+        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex++) {
+            if (startDate != "") {
+                windowIndex = company_.windowNumber_;
+                intervalIndex = (int)window.interval_.size();
+            }
+            else {
+                actualStartRow_ = window.interval_[intervalIndex];
+                actualEndRow_ = window.interval_[windowIndex + 1];
+            }
+            cout << tables_.at(company_.techType_).date_[actualStartRow_] << "~" << tables_.at(company_.techType_).date_[actualEndRow_] << endl;
+        }
+    }
+    
+    ofstream set_debug_file(bool debug) {
+        ofstream out;
+        if (debug) {
+            string delta = set_precision(delta_);
+            delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
+            string title;
+            title += "debug_";
+            title += company_.companyName_ + "_";
+            title += company_.techType_ + "_";
+            title += allAlgo_[algoIndex_] + "_";
+            title += delta + "_";
+            title += tables_.at(company_.techType_).date_[actualStartRow_] + "_";
+            title += tables_.at(company_.techType_).date_[actualEndRow_] + ".csv";
+            out.open(title);
+        }
+        return out;
+    }
+    
+    void print_debug_exp(ofstream &out, bool debug, int expCnt) {
+        if (debug) {
+            out << "exp:" << expCnt << ",==========,==========" << endl;
         }
     }
     
@@ -1083,6 +1155,28 @@ public:
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
         create_particles(debug);
+        betaMatrix_.matrix_.resize(particles_[0].binary_.size());
+        for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
+            TrainWindow window = set_window(targetWindow, startDate, windowIndex);
+            srand(343);
+            set_row_and_break_condition(window, startDate, windowIndex);
+            globalParticles_.at("best").reset();
+            ofstream out = set_debug_file(debug);
+            for (int expCnt = 0; expCnt < expNumber_; expCnt++) {
+                print_debug_exp(out, debug, expCnt);
+                globalParticles_.at("globalBest").reset();
+                betaMatrix_.reset();
+                for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
+                    globalParticles_.at("localBest").reset();
+                    globalParticles_.at("localWorst").reset(totalCapitalLV_);
+                    for (int i = 0; i < particleAmount_; i++) {
+                        particles_[i].reset();
+                        particles_[i].measure(betaMatrix_.matrix_);
+                    }
+                }
+            }
+            out.close();
+        }
     }
 };
 
@@ -1108,9 +1202,9 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-//        Train train(company, _algoIndex, _allAlgo, "2012-01-03", "2012-12-31", "debug");
-//        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
-//        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
+            //        Train train(company, _algoIndex, _allAlgo);
+            //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
+            //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
