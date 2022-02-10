@@ -1012,6 +1012,8 @@ public:
 
 class Train {
 private:
+    const int algoIndex_;
+    const vector<string> allAlgo_;
     const double delta_ = 0.0012;
     const int expNumber_ = 50;
     const int generationNumber_ = 10000;
@@ -1070,7 +1072,7 @@ public:
         }
     }
     
-    Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), particles_(particleAmount_), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
+    Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
     }
@@ -1098,7 +1100,7 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-        Train train(company, "2012-01-03", "2012-12-31", "debug");
+        Train train(company, _algoIndex, _allAlgo, "2012-01-03", "2012-12-31", "debug");
 //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
 //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         switch (setMode) {
