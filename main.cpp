@@ -740,6 +740,7 @@ public:
     void reset(double RoR = 0);
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
+    void print(ofstream &out, bool debug);
     
     Particle(int techIndex, string techType, double totalCapitalLV, bool on = false, vector<int> variables = {});
 };
@@ -1035,13 +1036,43 @@ void Particle::measure(vector<double> &betaMatrix) {
 }
 
 void Particle::convert_bi_dec() {
-    for (int variableIndex = 0, bitPosition = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeIndex = 0, variableBitPosition = bitPosition, power = bitsSize_[variableIndex] - 1; fakeIndex < bitsSize_[variableIndex]; fakeIndex++, variableBitPosition++, power--) {
+    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        for (int fakeIndex = 0, variableBitPosition = bitIndex, power = bitsSize_[variableIndex] - 1; fakeIndex < bitsSize_[variableIndex]; fakeIndex++, variableBitPosition++, power--) {
             decimal_[variableIndex] += pow(2, power) * binary_[variableBitPosition];
         }
         decimal_[variableIndex]++;
-        bitPosition += bitsSize_[variableIndex];
+        bitIndex += bitsSize_[variableIndex];
     }
+}
+
+void Particle::print(ofstream &out, bool debug) {
+    if (debug)
+        out << set_precision(RoR_) << "%,";
+    else
+        cout << set_precision(RoR_) << "%,";
+    for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        if (debug)
+            out << decimal_[variableIndex] << ",";
+        else
+            cout << decimal_[variableIndex] << ",";
+    }
+    
+    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        if (debug)
+            out << ",";
+        else
+            cout << "|";
+        for (int fakeBitIndex = 0; fakeBitIndex < bitsSize_[variableIndex]; fakeBitIndex++, bitIndex++) {
+            if (debug)
+                out << binary_[bitIndex] << ",";
+            else
+                cout << binary_[bitIndex] << ",";
+        }
+    }
+    if (debug)
+        out << endl;
+    else
+        cout << endl;
 }
 
 class BetaMatrix {
@@ -1184,6 +1215,11 @@ public:
         }
     }
     
+    void print_debug_particle(ofstream &out, int i, bool debug) {
+        if (debug)
+            particles_[i].print(out, debug);
+    }
+    
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
@@ -1205,6 +1241,9 @@ public:
                     for (int i = 0; i < particleAmount_; i++) {
                         particles_[i].reset();
                         particles_[i].measure(betaMatrix_.matrix_);
+                        particles_[i].convert_bi_dec();
+                        particles_[i].trade(actualStartRow_, actualEndRow_);
+                        print_debug_particle(out, i, debug);
                     }
                 }
             }
@@ -1235,10 +1274,12 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-        Train train(company, _algoIndex, _allAlgo);
+//        Train train(company, _algoIndex, _allAlgo);
             //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
             //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
-        Particle p(0, "SMA", TOTAL_CP_LV);
+        Particle p(3, "RSI", TOTAL_CP_LV);
+        ofstream out;
+        p.print(out, false);
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
