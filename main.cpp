@@ -1210,14 +1210,20 @@ public:
     }
     
     void print_debug_exp(ofstream &out, bool debug, int expCnt) {
-        if (debug) {
+        if (debug)
             out << "exp:" << expCnt << ",==========,==========" << endl;
-        }
     }
     
     void print_debug_particle(ofstream &out, int i, bool debug) {
         if (debug)
             particles_[i].print(out, debug);
+    }
+    
+    void store_exp_gen(int expCnt, int genCnt) {
+        for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &i) {
+            i.exp_ = expCnt;
+            i.gen_ = genCnt;
+        });
     }
     
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
@@ -1245,6 +1251,7 @@ public:
                         particles_[i].trade(actualStartRow_, actualEndRow_);
                         print_debug_particle(out, i, debug);
                     }
+                    store_exp_gen(expCnt, genCnt);
                 }
             }
             out.close();
