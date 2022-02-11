@@ -1243,6 +1243,40 @@ public:
         }
     }
     
+    void run_algo() {
+        switch (algoIndex_) {
+            case 0: {
+                if (globalParticles_.at("localBest").RoR_ > 0) {
+                        //QTS();
+                }
+                break;
+            }
+            case 1: {
+                if (globalParticles_.at("globalBest").RoR_ > 0) {
+                        //GQTS();
+                }
+                break;
+            }
+            case 2: {
+                if (globalParticles_.at("globalBest").RoR_ > 0) {
+                        //GNQTS();
+                }
+                break;
+            }
+            case 3: {
+                if (globalParticles_.at("globalBest").RoR_ > 0) {
+                        //GNQTS();
+                }
+                    //compare_and_multiply();
+                break;
+            }
+            default: {
+                cout << "wrong algo" << endl;
+                exit(1);
+            }
+        }
+    }
+    
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
@@ -1271,6 +1305,7 @@ public:
                     store_exp_gen(expCnt, genCnt);
                     update_local();
                     update_global();
+                    run_algo();
                 }
             }
             out.close();
