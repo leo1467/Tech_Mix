@@ -729,6 +729,9 @@ public:
     double delta_ = -1;
     int algoIndex_ = -1;
     vector<string> allAlgo_;
+    int expNumber_ = -1;
+    int genNumber_ = -1;
+    int particleNumber_ = -1;
     
     void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
     void instant_trade(CompanyInfo &company, string startDate, string endDate);
@@ -747,7 +750,7 @@ public:
     void convert_bi_dec();
     void print(ofstream &out, bool debug);
     string set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow);
-    void print_train_test_data(CompanyInfo &company, string outputPath, int actualStartRow, int actualEndRow);
+    void print_train_test_data(CompanyInfo &company, string windowName, string outputPath, int actualStartRow, int actualEndRow);
     
     Particle(int techIndex, string techType, double totalCapitalLV, bool on = false, vector<int> variables = {});
 };
@@ -859,7 +862,7 @@ void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const
             break;
         }
         case 3: {
-            out << "company,startDate,endDate,RSIPeriod,overBought,overSold" << endl;
+            out << "company,startDate,endDate,RSIPeriod,overSold,overBought" << endl;
             break;
         }
         default: {
@@ -1083,7 +1086,7 @@ void Particle::print(ofstream &out, bool debug) {
 }
 
 string Particle::set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
-    if (outputPath == "") {
+    if (outputPath != "") {
         if (testDeltaLoop_ > 0) {
             string folderName = windowName + "_" + to_string(delta_);
             create_directories(folderName);
@@ -1097,6 +1100,55 @@ string Particle::set_output_filePath(CompanyInfo &company, string windowName, st
         outputPath = company.techType_ + "_" + company.companyName_ + "_" + allAlgo_[algoIndex_] + "_" + delta + "_";
     }
     return outputPath + tables_->at(company.techType_).date_[actualStartRow] + "_" + tables_->at(company.techType_).date_[actualEndRow] + ".csv";
+}
+
+void Particle::print_train_test_data(CompanyInfo &company, string windowName, string outputPath, int actualStartRow, int actualEndRow) {
+    string filePath = set_output_filePath(company, windowName, outputPath, actualEndRow, actualStartRow);
+    isRecordOn_ = true;
+    remain_ = totalCapitalLV_;
+    trade(actualStartRow, actualEndRow);
+    ofstream out;
+    out.open(filePath);
+    out << "algo," << allAlgo_[algoIndex_] << endl;
+    out << "delta," << set_precision(delta_) << endl;
+    out << "exp," << expNumber_ << endl;
+    out << "gen," << genNumber_ << endl;
+    out << "p number," << particleNumber_ << endl;
+    out << endl;
+    out << "initial capital," << set_precision(totalCapitalLV_) << endl;
+    out << "final capital," << set_precision(remain_) << endl;
+    out << "final return," << set_precision(remain_ - totalCapitalLV_) << endl;
+    out << endl;
+    switch (techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            out << "buy1," << decimal_[0] << endl;
+            out << "buy1," << decimal_[1] << endl;
+            out << "buy1," << decimal_[2] << endl;
+            out << "sell2," << decimal_[3] << endl;
+            break;
+        }
+        case 3: {
+            out << "period," << decimal_[0] << endl;
+            out << "overSold," << decimal_[1] << endl;
+            out << "overBought," << decimal_[2] << endl;
+            break;
+        }
+        default: {
+            cout << "print_train_test_data exception" << endl;
+            exit(1);
+        }
+    }
+    out << "return rate," << set_precision(RoR_) << "%" << endl;
+    out << endl;
+    out << "best exp," << exp_ << endl;
+    out << "best gen," << gen_ << endl;
+    out << "best cnt," << bestCnt_ << endl;
+    out << endl;
+    print_trade_record(out);
+    out.close();
+    
 }
 
 class BetaMatrix {
@@ -1142,12 +1194,12 @@ private:
     const int algoIndex_;
     const vector<string> allAlgo_;
     const double delta_ = 0.0012;
-    const int expNumber_ = 50;
-    const int generationNumber_ = 10000;
-    const int particleAmount_ = 10;
+    const int expNumber_ = 1;
+    const int genNumber_ = 1;
+    const int particleNumber_ = 1;
     const double totalCapitalLV_ = 10000000;
     
-    const int testDeltaLoop_ = 0;
+    const int testDeltaLoop_ = 1;
     const double testDeltaGap_ = 0;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
@@ -1163,7 +1215,7 @@ public:
     int actualStartRow_ = -1;
     int actualEndRow_ = -1;
     
-    int alterdDelta_ = -1;
+    double alterdDelta_ = -1;
     int compareNew_ = 0;
     int compareOld_ = 0;
     
@@ -1181,6 +1233,7 @@ public:
             startDate = "";
             debug = true;
         }
+        alterdDelta_ = delta_;
     }
     
     void find_new_row(string &startDate, string &endDate) {
@@ -1210,13 +1263,16 @@ public:
     
     void create_particles(bool debug) {
         alterdDelta_ = delta_;
-        for (int i = 0; i < particleAmount_; i++) {
+        for (int i = 0; i < particleNumber_; i++) {
             particles_.push_back(Particle(company_.techIndex_, company_.techType_, totalCapitalLV_, debug));
             particles_[i].tables_ = &tables_;
             particles_[i].testDeltaLoop_ = testDeltaLoop_;
             particles_[i].delta_ = alterdDelta_;
             particles_[i].algoIndex_ = algoIndex_;
             particles_[i].allAlgo_ = allAlgo_;
+            particles_[i].expNumber_ = expNumber_;
+            particles_[i].genNumber_ = genNumber_;
+            particles_[i].particleNumber_ = particleNumber_;
         }
         globalParticles_.insert({"localBest", particles_[0]});
         globalParticles_.insert({"localWorst", particles_[0]});
@@ -1247,18 +1303,16 @@ public:
         return window;
     }
     
-    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex) {
-        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex++) {
-            if (startDate != "") {
-                windowIndex = company_.windowNumber_;
-                intervalIndex = (int)window.interval_.size();
-            }
-            else {
-                actualStartRow_ = window.interval_[intervalIndex];
-                actualEndRow_ = window.interval_[windowIndex + 1];
-            }
-            cout << tables_.at(company_.techType_).date_[actualStartRow_] << "~" << tables_.at(company_.techType_).date_[actualEndRow_] << endl;
+    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
+        if (startDate != "") {
+            windowIndex = company_.windowNumber_;
+            intervalIndex = (int)window.interval_.size();
         }
+        else {
+            actualStartRow_ = window.interval_[intervalIndex];
+            actualEndRow_ = window.interval_[intervalIndex + 1];
+        }
+        cout << tables_.at(company_.techType_).date_[actualStartRow_] << "~" << tables_.at(company_.techType_).date_[actualEndRow_] << endl;
     }
     
     ofstream set_debug_file(bool debug) {
@@ -1389,7 +1443,7 @@ public:
         print_debug_gen(out, genCnt, debug);
         globalParticles_.at("localBest").reset();
         globalParticles_.at("localWorst").reset(totalCapitalLV_);
-        for (int i = 0; i < particleAmount_; i++) {
+        for (int i = 0; i < particleNumber_; i++) {
             particles_[i].reset();
             particles_[i].measure(betaMatrix_.matrix_);
             particles_[i].convert_bi_dec();
@@ -1407,7 +1461,7 @@ public:
         print_debug_exp(out, expCnt, debug);
         globalParticles_.at("globalBest").reset();
         betaMatrix_.reset();
-        for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
+        for (int genCnt = 0; genCnt < genNumber_; genCnt++) {
             start_gen(out, expCnt, genCnt, debug);
         }
         update_best(0);
@@ -1445,17 +1499,19 @@ public:
         for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
             TrainWindow window = set_window(targetWindow, startDate, windowIndex);
             srand(343);
-            set_row_and_break_condition(window, startDate, windowIndex);
-            globalParticles_.at("best").reset();
-            ofstream out = set_debug_file(debug);
-            for (int expCnt = 0; expCnt < expNumber_; expCnt++) {
-                start_exp(out, expCnt, debug);
+            for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
+                set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
+                globalParticles_.at("best").reset();
+                ofstream out = set_debug_file(debug);
+                for (int expCnt = 0; expCnt < expNumber_; expCnt++) {
+                    start_exp(out, expCnt, debug);
+                }
+                out.close();
+                globalParticles_.at("best").print_train_test_data(company_, window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
+                cout << globalParticles_.at("best").RoR_ << "%" << endl;
             }
-            out.close();
-            
-            cout << globalParticles_.at("best").RoR_ << "%" << endl;
+            cout << "==========" << endl;
         }
-        cout << "==========" << endl;
     }
     
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
@@ -1493,7 +1549,7 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-//        Train train(company, _algoIndex, _allAlgo);
+        Train train(company, _algoIndex, _allAlgo, "M2M");
             //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
             //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         Particle p(3, "RSI", TOTAL_CP_LV);
