@@ -738,13 +738,34 @@ public:
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
     
-    Particle(int techIndex = -1, string techType = "", double totalCapitalLV = -1, bool on = false, vector<int> variables = {});
+    Particle(int techIndex, string techType, double totalCapitalLV, bool on = false, vector<int> variables = {});
 };
 
-Particle::Particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
-    if (techIndex != -1) {
-        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
+Particle::Particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) : techIndex_(techIndex), techType_(techType), totalCapitalLV_(totalCapitalLV), remain_(totalCapitalLV), isRecordOn_(on) {
+    switch (techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            bitsSize_ = MA().bitsSize_;
+            break;
+        }
+        case 3: {
+            bitsSize_ = RSI().bitsSize_;
+            break;
+        }
+        default: {
+            cout << "no techIndex_ " << techIndex_ << ", choose a techIndex_" << endl;
+            exit(1);
+        }
     }
+    binary_.resize(accumulate(bitsSize_.begin(), bitsSize_.end(), 0));
+    decimal_.resize(bitsSize_.size());
+    for (int i = 0; i < variables.size(); i++) {
+        decimal_[i] = variables[i];
+    }
+//    if (techIndex != -1) {
+//        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
+//    }
 }
 
 void Particle::ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
@@ -1202,7 +1223,7 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-            //        Train train(company, _algoIndex, _allAlgo);
+        Train train(company, _algoIndex, _allAlgo);
             //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
             //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         switch (setMode) {
