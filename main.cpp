@@ -721,7 +721,7 @@ public:
     vector<string> tradeRecord_;
     int gen_ = 0;
     int exp_ = 0;
-    int bestCnt = 0;
+    int bestCnt_ = 0;
     
     map<string, TechTable> *tables_ = nullptr;
     
@@ -1019,6 +1019,7 @@ void Particle::reset(double RoR) {
     gen_ = 0;
     exp_ = 0;
     isRecordOn_ = false;
+    bestCnt_ = 0;
 }
 
 void Particle::measure(vector<double> &betaMatrix) {
@@ -1366,6 +1367,30 @@ public:
         }
     }
     
+    void update_best(int renewBest) {
+        if (globalParticles_.at("globalBest").RoR_ < globalParticles_.at("globalBest").RoR_) {
+            globalParticles_.at("globalBest") = globalParticles_.at("globalBest");
+        }
+        switch (renewBest) {
+            case 0: {
+                if (globalParticles_.at("globalBest").binary_ == globalParticles_.at("best").binary_) {
+                    globalParticles_.at("best").bestCnt_++;
+                }
+                break;
+            }
+            case 1: {
+                if (globalParticles_.at("globalBest").RoR_ == globalParticles_.at("best").RoR_) {
+                    globalParticles_.at("best").bestCnt_++;
+                }
+                break;
+            }
+            default: {
+                cout << "" << endl;
+                exit(1);
+            }
+        }
+    }
+    
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
@@ -1383,6 +1408,7 @@ public:
                 betaMatrix_.reset();
                 start_gen(out, expCnt, debug);
             }
+            update_best(0);
             out.close();
         }
     }
