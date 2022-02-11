@@ -1365,6 +1365,16 @@ public:
         print_debug_beta(out, debug);
     }
     
+    void start_exp(ofstream &out, int expCnt, bool debug) {
+        print_debug_exp(out, expCnt, debug);
+        globalParticles_.at("globalBest").reset();
+        betaMatrix_.reset();
+        for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
+            start_gen(out, expCnt, genCnt, debug);
+        }
+        update_best(0);
+    }
+    
     void update_best(int renewBest) {
         if (globalParticles_.at("globalBest").RoR_ < globalParticles_.at("globalBest").RoR_) {
             globalParticles_.at("globalBest") = globalParticles_.at("globalBest");
@@ -1401,14 +1411,8 @@ public:
             globalParticles_.at("best").reset();
             ofstream out = set_debug_file(debug);
             for (int expCnt = 0; expCnt < expNumber_; expCnt++) {
-                print_debug_exp(out, expCnt, debug);
-                globalParticles_.at("globalBest").reset();
-                betaMatrix_.reset();
-                for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
-                    start_gen(out, expCnt, genCnt, debug);
-                }
+                start_exp(out, expCnt, debug);
             }
-            update_best(0);
             out.close();
         }
     }
