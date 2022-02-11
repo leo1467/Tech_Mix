@@ -1346,6 +1346,26 @@ public:
         }
     }
     
+    void start_gen(ofstream &out, int expCnt, bool debug) {
+        for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
+            print_debug_gen(out, genCnt, debug);
+            globalParticles_.at("localBest").reset();
+            globalParticles_.at("localWorst").reset(totalCapitalLV_);
+            for (int i = 0; i < particleAmount_; i++) {
+                particles_[i].reset();
+                particles_[i].measure(betaMatrix_.matrix_);
+                particles_[i].convert_bi_dec();
+                particles_[i].trade(actualStartRow_, actualEndRow_);
+                print_debug_particle(out, i, debug);
+            }
+            store_exp_gen(expCnt, genCnt);
+            update_local();
+            update_global();
+            run_algo();
+            print_debug_beta(out, debug);
+        }
+    }
+    
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
@@ -1361,24 +1381,7 @@ public:
                 print_debug_exp(out, expCnt, debug);
                 globalParticles_.at("globalBest").reset();
                 betaMatrix_.reset();
-                for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
-                    print_debug_gen(out, genCnt, debug);
-                    globalParticles_.at("localBest").reset();
-                    globalParticles_.at("localWorst").reset(totalCapitalLV_);
-                    for (int i = 0; i < particleAmount_; i++) {
-                        particles_[i].reset();
-                        particles_[i].measure(betaMatrix_.matrix_);
-                        particles_[i].convert_bi_dec();
-                        particles_[i].trade(actualStartRow_, actualEndRow_);
-                        print_debug_particle(out, i, debug);
-                    }
-                    store_exp_gen(expCnt, genCnt);
-                    update_local();
-                    update_global();
-                    run_algo();
-                    print_debug_beta(out, debug);
-                }
-                
+                start_gen(out, expCnt, debug);
             }
             out.close();
         }
