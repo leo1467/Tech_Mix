@@ -709,8 +709,11 @@ public:
     bool isRecordOn_ = false;
     
     vector<int> bitsSize_;
+    int bitsNum_ = 0;
     vector<int> binary_;
+    int variableNum_ = 0;
     vector<int> decimal_;
+    
     double remain_ = 0;
     double RoR_ = 0;
     int buyNum_ = 0;
@@ -720,7 +723,7 @@ public:
     int exp_ = 0;
     int bestCnt = 0;
     
-    map<string, TechTable> *tables_;
+    map<string, TechTable> *tables_ = nullptr;
     
     void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
     void instant_trade(CompanyInfo &company, string startDate, string endDate);
@@ -758,14 +761,16 @@ Particle::Particle(int techIndex, string techType, double totalCapitalLV, bool o
             exit(1);
         }
     }
-    binary_.resize(accumulate(bitsSize_.begin(), bitsSize_.end(), 0));
-    decimal_.resize(bitsSize_.size());
+    bitsNum_ = accumulate(bitsSize_.begin(), bitsSize_.end(), 0);
+    binary_.resize(bitsNum_);
+    variableNum_ = (int)bitsSize_.size();
+    decimal_.resize(variableNum_);
     for (int i = 0; i < variables.size(); i++) {
         decimal_[i] = variables[i];
     }
-//    if (techIndex != -1) {
-//        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
-//    }
+        //    if (techIndex != -1) {
+        //        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
+        //    }
 }
 
 void Particle::ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
@@ -1030,6 +1035,13 @@ void Particle::measure(vector<double> &betaMatrix) {
 }
 
 void Particle::convert_bi_dec() {
+    for (int variableIndex = 0, bitPosition = 0; variableIndex < variableNum_; variableIndex++) {
+        for (int fakeIndex = 0, variableBitPosition = bitPosition, power = bitsSize_[variableIndex] - 1; fakeIndex < bitsSize_[variableIndex]; fakeIndex++, variableBitPosition++, power--) {
+            decimal_[variableIndex] += pow(2, power) * binary_[variableBitPosition];
+        }
+        decimal_[variableIndex]++;
+        bitPosition += bitsSize_[variableIndex];
+    }
 }
 
 class BetaMatrix {
@@ -1226,6 +1238,7 @@ int main(int argc, const char *argv[]) {
         Train train(company, _algoIndex, _allAlgo);
             //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
             //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
+        Particle p(0, "SMA", TOTAL_CP_LV);
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
