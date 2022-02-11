@@ -1199,7 +1199,7 @@ private:
     const int particleNumber_ = 1;
     const double totalCapitalLV_ = 10000000;
     
-    const int testDeltaLoop_ = 1;
+    const int testDeltaLoop_ = 0;
     const double testDeltaGap_ = 0;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
@@ -1220,18 +1220,17 @@ public:
     int compareOld_ = 0;
     
     void set_variables_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
-        if (targetWindow.length() == startDate.length()) {
-            if (endDate == "debug") {
-                debug = true;
-            }
-            endDate = startDate;
-            startDate = targetWindow;
-            targetWindow = "A2A";
-            company_.allTrainFilePath_.at(company_.techType_) = "";
-        }
-        else if (startDate == "debug") {
-            startDate = "";
+        if (startDate == "debug" || endDate == "debug") {
             debug = true;
+            company_.allTrainFilePath_.at(company_.techType_) = "";
+            if (targetWindow.length() == startDate.length()) {
+                endDate = startDate;
+                startDate = targetWindow;
+                targetWindow = "A2A";
+            }
+            else {
+                startDate = "";
+            }
         }
         alterdDelta_ = delta_;
     }
@@ -1549,7 +1548,7 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _slidingWindows, _slidingWindowsEx, _testStartYear, _testEndYear);
         cout << company.companyName_ << endl;
-        Train train(company, _algoIndex, _allAlgo, "M2M");
+        Train train(company, _algoIndex, _allAlgo, "M2M", "debug");
             //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
             //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
         Particle p(3, "RSI", TOTAL_CP_LV);
