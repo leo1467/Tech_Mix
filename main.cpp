@@ -1220,10 +1220,27 @@ public:
     }
     
     void store_exp_gen(int expCnt, int genCnt) {
-        for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &i) {
-            i.exp_ = expCnt;
-            i.gen_ = genCnt;
+        for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &p) {
+            p.exp_ = expCnt;
+            p.gen_ = genCnt;
         });
+    }
+    
+    void update_local() {
+        for (auto p : particles_) {
+            if (p.RoR_ > globalParticles_.at("localBest").RoR_) {
+                globalParticles_.at("localBest") = p;
+            }
+            if (p.RoR_ < globalParticles_.at("localWorst").RoR_) {
+                globalParticles_.at("localWorst") = p;
+            }
+        }
+    }
+    
+    void update_global() {
+        if (globalParticles_.at("localBest").RoR_ > globalParticles_.at("globalBest").RoR_) {
+            globalParticles_.at("globalBest") = globalParticles_.at("localBest");
+        }
     }
     
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
@@ -1252,6 +1269,8 @@ public:
                         print_debug_particle(out, i, debug);
                     }
                     store_exp_gen(expCnt, genCnt);
+                    update_local();
+                    update_global();
                 }
             }
             out.close();
