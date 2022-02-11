@@ -1240,9 +1240,14 @@ public:
         return out;
     }
     
-    void print_debug_exp(ofstream &out, bool debug, int expCnt) {
+    void print_debug_exp(ofstream &out, int expCnt, bool debug) {
         if (debug)
             out << "exp:" << expCnt << ",==========,==========" << endl;
+    }
+    
+    void print_debug_gen(ofstream &out, int genCnt, bool debug) {
+        if (debug)
+            out << "gen:" << genCnt << ",=====" << endl;
     }
     
     void print_debug_particle(ofstream &out, int i, bool debug) {
@@ -1353,10 +1358,11 @@ public:
             globalParticles_.at("best").reset();
             ofstream out = set_debug_file(debug);
             for (int expCnt = 0; expCnt < expNumber_; expCnt++) {
-                print_debug_exp(out, debug, expCnt);
+                print_debug_exp(out, expCnt, debug);
                 globalParticles_.at("globalBest").reset();
                 betaMatrix_.reset();
                 for (int genCnt = 0; genCnt < generationNumber_; genCnt++) {
+                    print_debug_gen(out, genCnt, debug);
                     globalParticles_.at("localBest").reset();
                     globalParticles_.at("localWorst").reset(totalCapitalLV_);
                     for (int i = 0; i < particleAmount_; i++) {
@@ -1372,6 +1378,7 @@ public:
                     run_algo();
                     print_debug_beta(out, debug);
                 }
+                
             }
             out.close();
         }
