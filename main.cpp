@@ -1122,6 +1122,7 @@ private:
     const int generationNumber_ = 10000;
     const int particleAmount_ = 10;
     const double totalCapitalLV_ = 10000000;
+    const int testDeltaLoop_ = 0;
     
 public:
     CompanyInfo &company_;
@@ -1414,7 +1415,10 @@ public:
                 start_exp(out, expCnt, debug);
             }
             out.close();
+            
+            cout << globalParticles_.at("best").RoR_ << "%" << endl;
         }
+        cout << "==========" << endl;
     }
 };
 
