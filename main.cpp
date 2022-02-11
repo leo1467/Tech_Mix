@@ -1046,29 +1046,28 @@ void Particle::convert_bi_dec() {
 }
 
 void Particle::print(ofstream &out, bool debug) {
-    if (debug)
-        out << set_precision(RoR_) << "%,";
-    else
-        cout << set_precision(RoR_) << "%,";
-    for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        if (debug)
-            out << decimal_[variableIndex] << ",";
-        else
-            cout << decimal_[variableIndex] << ",";
-    }
-    
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        if (debug)
-            out << ",";
-        else
-            cout << "|";
         for (int fakeBitIndex = 0; fakeBitIndex < bitsSize_[variableIndex]; fakeBitIndex++, bitIndex++) {
             if (debug)
                 out << binary_[bitIndex] << ",";
             else
                 cout << binary_[bitIndex] << ",";
         }
+        if (debug)
+            out << ",";
+        else
+            cout << "|";
     }
+    for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        if (debug)
+            out << decimal_[variableIndex] << ",";
+        else
+            cout << decimal_[variableIndex] << ",";
+    }
+    if (debug)
+        out << set_precision(RoR_) << "%,";
+    else
+        cout << set_precision(RoR_) << "%,";
     if (debug)
         out << endl;
     else
@@ -1077,6 +1076,8 @@ void Particle::print(ofstream &out, bool debug) {
 
 class BetaMatrix {
 public:
+    int variableNum_;
+    vector<int> bitsSize_;
     vector<double> matrix_;
     
     void reset();
@@ -1085,6 +1086,30 @@ public:
 
 void BetaMatrix::reset() {
     fill(matrix_.begin(), matrix_.end(), 0.5);
+}
+
+void BetaMatrix::print(ofstream &out, bool debug) {
+    if (debug)
+        out << "beta matrix" << endl;
+    else
+        cout << "beta matrix" << endl;
+    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        for (int fakeBitIndex = 0; fakeBitIndex < bitsSize_[variableIndex]; fakeBitIndex++, bitIndex++) {
+            if (debug)
+                out << matrix_[bitIndex] << ",";
+            else
+                cout << matrix_[bitIndex] << ",";
+        }
+        if (debug)
+            out << ",";
+        else
+            cout << "|";
+    }
+    if (debug)
+        out << endl;
+    else
+        cout << endl;
+        
 }
 
 class Train {
@@ -1159,6 +1184,12 @@ public:
         globalParticles_.insert({"globalBest", particles_[0]});
         globalParticles_.insert({"globalWorst", particles_[0]});
         globalParticles_.insert({"best", particles_[0]});
+    }
+    
+    void create_betaMatrix() {
+        betaMatrix_.variableNum_ = particles_[0].variableNum_;
+        betaMatrix_.bitsSize_ = particles_[0].bitsSize_;
+        betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
     }
     
     TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex) {
@@ -1277,11 +1308,44 @@ public:
         }
     }
     
+    void print_debug_beta(ofstream &out, bool debug) {
+        if (debug) {
+            switch (algoIndex_) {
+                case 0: {
+                    out << "local best" << endl;
+                    globalParticles_.at("localBest").print(out, debug);
+                    out << "local worst" << endl;
+                    globalParticles_.at("localWorst").print(out, debug);
+                    break;
+                }
+                case 1:
+                case 2: {
+                    out << "global best" << endl;
+                    globalParticles_.at("globalBest").print(out, debug);
+                    out << "local worst" << endl;
+                    globalParticles_.at("localWorst").print(out, debug);
+                    break;
+                }
+                case 3: {
+                    out << "global best" << endl;
+                    globalParticles_.at("globalBest").print(out, debug);
+                    out << "local best" << endl;
+                    globalParticles_.at("localBest").print(out, debug);
+                    out << "local worst" << endl;
+                    globalParticles_.at("localWorst").print(out, debug);
+                    out << delta_ << endl;
+                    break;
+                }
+            }
+            betaMatrix_.print(out, debug);
+        }
+    }
+    
     Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
         create_particles(debug);
-        betaMatrix_.matrix_.resize(particles_[0].binary_.size());
+        create_betaMatrix();
         for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
             TrainWindow window = set_window(targetWindow, startDate, windowIndex);
             srand(343);
@@ -1306,6 +1370,7 @@ public:
                     update_local();
                     update_global();
                     run_algo();
+                    print_debug_beta(out, debug);
                 }
             }
             out.close();
