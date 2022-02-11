@@ -714,6 +714,8 @@ public:
     int variableNum_ = 0;
     vector<int> decimal_;
     
+    map<string, TechTable> *tables_ = nullptr;
+    
     double remain_ = 0;
     double RoR_ = 0;
     int buyNum_ = 0;
@@ -723,7 +725,10 @@ public:
     int exp_ = 0;
     int bestCnt_ = 0;
     
-    map<string, TechTable> *tables_ = nullptr;
+    int testDeltaLoop_ = -1;
+    double delta_ = -1;
+    int algoIndex_ = -1;
+    vector<string> allAlgo_;
     
     void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
     void instant_trade(CompanyInfo &company, string startDate, string endDate);
@@ -741,6 +746,8 @@ public:
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
     void print(ofstream &out, bool debug);
+    string set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow);
+    void print_train_test_data(CompanyInfo &company, string outputPath, int actualStartRow, int actualEndRow);
     
     Particle(int techIndex, string techType, double totalCapitalLV, bool on = false, vector<int> variables = {});
 };
@@ -1075,6 +1082,23 @@ void Particle::print(ofstream &out, bool debug) {
         cout << endl;
 }
 
+string Particle::set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
+    if (outputPath == "") {
+        if (testDeltaLoop_ > 0) {
+            string folderName = windowName + "_" + to_string(delta_);
+            create_directories(folderName);
+            outputPath = folderName;
+        }
+        outputPath += "/";
+    }
+    else {
+        string delta = set_precision(delta_);
+        delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
+        outputPath = company.techType_ + "_" + company.companyName_ + "_" + allAlgo_[algoIndex_] + "_" + delta + "_";
+    }
+    return outputPath + tables_->at(company.techType_).date_[actualStartRow] + "_" + tables_->at(company.techType_).date_[actualEndRow] + ".csv";
+}
+
 class BetaMatrix {
 public:
     int variableNum_;
@@ -1110,7 +1134,7 @@ void BetaMatrix::print(ofstream &out, bool debug) {
         out << endl;
     else
         cout << endl;
-        
+    
 }
 
 class Train {
@@ -1122,7 +1146,11 @@ private:
     const int generationNumber_ = 10000;
     const int particleAmount_ = 10;
     const double totalCapitalLV_ = 10000000;
+    
     const int testDeltaLoop_ = 0;
+    const double testDeltaGap_ = 0;
+    double multiplyUp_ = -1;
+    double multiplyDown_ = -1;
     
 public:
     CompanyInfo &company_;
@@ -1134,6 +1162,10 @@ public:
     
     int actualStartRow_ = -1;
     int actualEndRow_ = -1;
+    
+    int alterdDelta_ = -1;
+    int compareNew_ = 0;
+    int compareOld_ = 0;
     
     void set_variables_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
         if (targetWindow.length() == startDate.length()) {
@@ -1177,9 +1209,14 @@ public:
     }
     
     void create_particles(bool debug) {
+        alterdDelta_ = delta_;
         for (int i = 0; i < particleAmount_; i++) {
             particles_.push_back(Particle(company_.techIndex_, company_.techType_, totalCapitalLV_, debug));
             particles_[i].tables_ = &tables_;
+            particles_[i].testDeltaLoop_ = testDeltaLoop_;
+            particles_[i].delta_ = alterdDelta_;
+            particles_[i].algoIndex_ = algoIndex_;
+            particles_[i].allAlgo_ = allAlgo_;
         }
         globalParticles_.insert({"localBest", particles_[0]});
         globalParticles_.insert({"localWorst", particles_[0]});
@@ -1400,7 +1437,7 @@ public:
         }
     }
     
-    Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
+    void start_train(string targetWindow, string startDate, string endDate, bool debug) {
         set_variables_condition(targetWindow, startDate, endDate, debug);
         find_new_row(startDate, endDate);
         create_particles(debug);
@@ -1419,6 +1456,18 @@ public:
             cout << globalParticles_.at("best").RoR_ << "%" << endl;
         }
         cout << "==========" << endl;
+    }
+    
+    Train(CompanyInfo &company, int algoIndex, vector<string> allAlgo, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), algoIndex_(algoIndex), allAlgo_(allAlgo), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))} {
+        if (testDeltaLoop_ == 0) {
+            start_train(targetWindow, startDate, endDate, debug);
+        }
+        else {
+            for (int loop = 0; loop < testDeltaLoop_; loop++) {
+                start_train(targetWindow, startDate, endDate, debug);
+                alterdDelta_ -= testDeltaGap_;
+            }
+        }
     }
 };
 
