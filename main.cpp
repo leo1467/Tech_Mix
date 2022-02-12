@@ -27,13 +27,13 @@ public:
     string setWindow_ = "M2M";
     
     double delta_ = 0.0012;
-    int expNumber_ = 1;
-    int genNumber_ = 1;
-    int particleNumber_ = 1;
+    int expNumber_ = 50;
+    int genNumber_ = 10000;
+    int particleNumber_ = 10;
     double totalCapitalLV_ = 10000000;
     
-    int testDeltaLoop_ = 0;
-    double testDeltaGap_ = -1;
+    int testDeltaLoop_ = 1;
+    double testDeltaGap_ = 0.00001;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
     
@@ -329,13 +329,6 @@ public:
 };
 
 TechTable::TechTable(CompanyInfo *company, int techIndex) : companyName_(company->companyName_), techIndex_(techIndex), techType_(company->allTech_[techIndex]) {
-    create_techTable(company);
-}
-
-void TechTable::ini_techTable(CompanyInfo *company, int techIndex) {
-    companyName_ = company->companyName_;
-    techIndex_ = techIndex;
-    techType_ = company->allTech_[techIndex];
     create_techTable(company);
 }
 
@@ -788,39 +781,7 @@ Particle::Particle(CompanyInfo *company, const Info *info, bool on, vector<int> 
     for (int i = 0; i < variables.size(); i++) {
         decimal_[i] = variables[i];
     }
-        //    if (techIndex != -1) {
-        //        ini_particle(techIndex, techType, totalCapitalLV, on, variables);
-        //    }
 }
-
-//void Particle::ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables) {
-//    totalCapitalLV_ = totalCapitalLV;
-//    techIndex_ = techIndex;
-//    techType_ = techType;
-//    remain_ = totalCapitalLV;
-//    isRecordOn_ = on;
-//    switch (techIndex) {
-//        case 0:
-//        case 1:
-//        case 2: {
-//            bitsSize_ = MA().bitsSize_;
-//            break;
-//        }
-//        case 3: {
-//            bitsSize_ = RSI().bitsSize_;
-//            break;
-//        }
-//        default: {
-//            cout << "no techIndex_ " << techIndex_ << ", choose a techIndex_" << endl;
-//            exit(1);
-//        }
-//    }
-//    binary_.resize(accumulate(bitsSize_.begin(), bitsSize_.end(), 0));
-//    decimal_.resize(bitsSize_.size());
-//    for (int i = 0; i < variables.size(); i++) {
-//        decimal_[i] = variables[i];
-//    }
-//}
 
 void Particle::instant_trade(string startDate, string endDate) {
     map<string, TechTable> tmp{{info_->techType_, TechTable(company_, info_->techIndex_)}};
@@ -1139,7 +1100,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
         case 2: {
             out << "buy1," << decimal_[0] << endl;
             out << "buy1," << decimal_[1] << endl;
-            out << "buy1," << decimal_[2] << endl;
+            out << "sell1," << decimal_[2] << endl;
             out << "sell2," << decimal_[3] << endl;
             break;
         }
@@ -1167,8 +1128,9 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
 
 class BetaMatrix {
 public:
-    int variableNum_;
+    int variableNum_ = 0;
     vector<int> bitsSize_;
+    int bitsNum_ = 0;
     vector<double> matrix_;
     
     void reset();
@@ -1225,14 +1187,15 @@ public:
         if (startDate == "debug" || endDate == "debug") {
             debug = true;
             company_.allTrainFilePath_.at(company_.techType_) = "";
-            if (targetWindow.length() == startDate.length()) {
-                endDate = startDate;
-                startDate = targetWindow;
-                targetWindow = "A2A";
-            }
-            else {
-                startDate = "";
-            }
+        }
+        if (targetWindow.length() == startDate.length()) {
+            endDate = startDate;
+            startDate = targetWindow;
+            targetWindow = "A2A";
+            company_.allTrainFilePath_.at(company_.techType_) = "";
+        }
+        else {
+            startDate = "";
         }
     }
     
@@ -1278,6 +1241,7 @@ public:
         betaMatrix_.variableNum_ = particles_[0].variableNum_;
         betaMatrix_.bitsSize_ = particles_[0].bitsSize_;
         betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
+        betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
     }
     
     TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex) {
@@ -1369,19 +1333,19 @@ public:
         switch (info_.algoIndex_) {
             case 0: {
                 if (globalParticles_.at("localBest").RoR_ > 0) {
-                        //QTS();
+                    QTS();
                 }
                 break;
             }
             case 1: {
                 if (globalParticles_.at("globalBest").RoR_ > 0) {
-                        //GQTS();
+                    GQTS();
                 }
                 break;
             }
             case 2: {
                 if (globalParticles_.at("globalBest").RoR_ > 0) {
-                        //GNQTS();
+                    GNQTS();
                 }
                 break;
             }
@@ -1397,6 +1361,40 @@ public:
                 exit(1);
             }
         }
+    }
+    
+    void QTS() {
+        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+            if (globalParticles_.at("localBest").binary_[i] == 1) {
+                betaMatrix_.matrix_[i] += actualDelta_;
+            }
+            if (globalParticles_.at("localWorst").binary_[i] == 1) {
+                betaMatrix_.matrix_[i] -= actualDelta_;
+            }
+        }
+    }
+    
+    void GQTS() {
+        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+            if (globalParticles_.at("globalBest").binary_[i] == 1) {
+                betaMatrix_.matrix_[i] += actualDelta_;
+            }
+            if (globalParticles_.at("localWorst").binary_[i] == 1) {
+                betaMatrix_.matrix_[i] -= actualDelta_;
+            }
+        }
+    }
+    
+    void GNQTS() {
+        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+            if (globalParticles_.at("globalBest").binary_[i] == 1 && globalParticles_.at("localWorst").binary_[i] == 0 && betaMatrix_.matrix_[i] < 0.5) {
+                betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
+            }
+            if (globalParticles_.at("globalBest").binary_[i] == 0 && globalParticles_.at("localWorst").binary_[i] == 1 && betaMatrix_.matrix_[i] > 0.5) {
+                betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
+            }
+        }
+        GQTS();
     }
     
     void print_debug_beta(ofstream &out, bool debug) {
@@ -1461,8 +1459,8 @@ public:
     }
     
     void update_best(int renewBest) {
-        if (globalParticles_.at("globalBest").RoR_ < globalParticles_.at("globalBest").RoR_) {
-            globalParticles_.at("globalBest") = globalParticles_.at("globalBest");
+        if (globalParticles_.at("best").RoR_ < globalParticles_.at("globalBest").RoR_) {
+            globalParticles_.at("best") = globalParticles_.at("globalBest");
         }
         switch (renewBest) {
             case 0: {
@@ -1551,10 +1549,12 @@ int main(int argc, const char *argv[]) {
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _info.slidingWindows_, _info.slidingWindowsEx_, _info.testStartYear_, _info.testEndYear_);
         cout << company.companyName_ << endl;
 //        Train train(company, _info, setWindow);
-        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-        Particle p(&company, &_info);
-        ofstream out;
-        p.print(out, false);
+        Train train(company, _info, "2011-12-01", "2011-12-30");
+//        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+//        Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+//        Particle p(&company, &_info);
+//        ofstream out;
+//        p.print(out, false);
         switch (setMode) {
                     //            case 0: {
                     //                company.train(setWindow);
