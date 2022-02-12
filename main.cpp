@@ -321,38 +321,38 @@ public:
     vector<double> price_;
     vector<vector<double>> techTable_;
     
-    void ini_techTable(CompanyInfo &company, int techIndex);
-    void create_techTable(CompanyInfo &company);
+    void ini_techTable(CompanyInfo *company, int techIndex);
+    void create_techTable(CompanyInfo *company);
     void output_techTable();
     
-    TechTable(CompanyInfo &company, int techIndex);
+    TechTable(CompanyInfo *company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo &company, int techIndex) : companyName_(company.companyName_), techIndex_(techIndex), techType_(company.allTech_[techIndex]) {
+TechTable::TechTable(CompanyInfo *company, int techIndex) : companyName_(company->companyName_), techIndex_(techIndex), techType_(company->allTech_[techIndex]) {
     create_techTable(company);
 }
 
-void TechTable::ini_techTable(CompanyInfo &company, int techIndex) {
-    companyName_ = company.companyName_;
+void TechTable::ini_techTable(CompanyInfo *company, int techIndex) {
+    companyName_ = company->companyName_;
     techIndex_ = techIndex;
-    techType_ = company.allTech_[techIndex];
+    techType_ = company->allTech_[techIndex];
     create_techTable(company);
 }
 
-void TechTable::create_techTable(CompanyInfo &company) {
-    days_ = company.totalDays_ - company.tableStartRow_;
+void TechTable::create_techTable(CompanyInfo *company) {
+    days_ = company->totalDays_ - company->tableStartRow_;
     date_.resize(days_);
     price_.resize(days_);
-    for (int i = company.tableStartRow_, j = 0; i < company.totalDays_; i++, j++) {
-        date_[j] = company.date_[i];
-        price_[j] = company.price_[i];
+    for (int i = company->tableStartRow_, j = 0; i < company->totalDays_; i++, j++) {
+        date_[j] = company->date_[i];
+        price_[j] = company->price_[i];
     }
     techTable_.resize(days_);
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
     vector<path> techFilePath;
-    techFilePath = get_path(company.allTechOuputPath_.at(techType_));
+    techFilePath = get_path(company->allTechOuputPath_.at(techType_));
     int techFilePathSize = (int)techFilePath.size();
     if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
@@ -366,7 +366,7 @@ void TechTable::create_techTable(CompanyInfo &company) {
         vector<vector<string>> MAFile = read_data(techFilePath[i]);
         int techFileSize = (int)MAFile.size();
         if (techFileSize - days_ < 0) {
-            cout << company.companyName_ << " MA file not old enougth" << endl;
+            cout << company->companyName_ << " MA file not old enougth" << endl;
             exit(1);
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
@@ -720,6 +720,7 @@ public:
 class Particle {
 private:
     const Info *info_;
+    CompanyInfo *company_;
 public:
     vector<int> bitsSize_;
     int bitsNum_ = 0;
@@ -742,8 +743,8 @@ public:
     double actualDelta_ = -1;
     
     void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
-    void instant_trade(CompanyInfo &company, string startDate, string endDate);
-    void set_instant_trade_file(CompanyInfo &company, ofstream &out, const string &endDate, const string &startDate);
+    void instant_trade(string startDate, string endDate);
+    void set_instant_trade_file(ofstream &out, const string &endDate, const string &startDate);
     void print_trade_record(ofstream &out);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false);
@@ -757,13 +758,13 @@ public:
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
     void print(ofstream &out, bool debug);
-    string set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow);
-    void print_train_test_data(CompanyInfo &company, string windowName, string outputPath, int actualStartRow, int actualEndRow);
+    string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
+    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow);
     
-    Particle(const Info *info, bool on = false, vector<int> variables = {});
+    Particle(CompanyInfo *company, const Info *info, bool on = false, vector<int> variables = {});
 };
 
-Particle::Particle(const Info *info, bool on, vector<int> variables) : info_(info), remain_(info->totalCapitalLV_), isRecordOn_(on) {
+Particle::Particle(CompanyInfo *company, const Info *info, bool on, vector<int> variables) : company_(company), info_(info), remain_(info->totalCapitalLV_), isRecordOn_(on) {
     switch (info_->techIndex_) {
         case 0:
         case 1:
@@ -821,8 +822,8 @@ Particle::Particle(const Info *info, bool on, vector<int> variables) : info_(inf
 //    }
 //}
 
-void Particle::instant_trade(CompanyInfo &company, string startDate, string endDate) {
-    map<string, TechTable> tmp{{info_->techType_, TechTable(company, info_->techIndex_)}};
+void Particle::instant_trade(string startDate, string endDate) {
+    map<string, TechTable> tmp{{info_->techType_, TechTable(company_, info_->techIndex_)}};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
     for (int dateRow = 0; dateRow < tables_->at(info_->techType_).days_; dateRow++) {
@@ -847,12 +848,12 @@ void Particle::instant_trade(CompanyInfo &company, string startDate, string endD
     }
     trade(startRow, endRow, true);
     ofstream out;
-    set_instant_trade_file(company, out, endDate, startDate);
+    set_instant_trade_file(out, endDate, startDate);
     print_trade_record(out);
     out.close();
 }
 
-void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const string &endDate, const string &startDate) {
+void Particle::set_instant_trade_file(ofstream &out, const string &endDate, const string &startDate) {
     string titleVariables;
     string showVariablesInFile;
     for (auto i : decimal_) {
@@ -861,7 +862,7 @@ void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const
         showVariablesInFile += ",";
         showVariablesInFile += to_string(i);
     }
-    out.open(company.companyName_ + "_" + info_->techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
+    out.open(company_->companyName_ + "_" + info_->techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
     switch (info_->techIndex_) {
         case 0:
         case 1:
@@ -878,7 +879,7 @@ void Particle::set_instant_trade_file(CompanyInfo &company, ofstream &out, const
             exit(1);
         }
     }
-    out << company.companyName_ << "," << startDate << "," << endDate << showVariablesInFile << "\n\n";
+    out << company_->companyName_ << "," << startDate << "," << endDate << showVariablesInFile << "\n\n";
 }
 
 void Particle::print_trade_record(ofstream &out) {
@@ -1093,7 +1094,7 @@ void Particle::print(ofstream &out, bool debug) {
         cout << endl;
 }
 
-string Particle::set_output_filePath(CompanyInfo &company, string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
+string Particle::set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
     if (outputPath != "") {
         if (info_->testDeltaLoop_ > 0) {
             string folderName = windowName + "_" + to_string(actualDelta_);
@@ -1106,17 +1107,17 @@ string Particle::set_output_filePath(CompanyInfo &company, string windowName, st
         string delta = set_precision(actualDelta_);
         delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
         outputPath = info_->techType_ + "_";
-        outputPath += company.companyName_ + "_";
+        outputPath += company_->companyName_ + "_";
         outputPath += info_->algoType_ + "_";
         outputPath += delta + "_";
     }
-    outputPath += tables_->at(company.techType_).date_[actualStartRow] + "_";
-    outputPath += tables_->at(company.techType_).date_[actualEndRow] + ".csv";
+    outputPath += tables_->at(company_->techType_).date_[actualStartRow] + "_";
+    outputPath += tables_->at(company_->techType_).date_[actualEndRow] + ".csv";
     return outputPath;
 }
 
-void Particle::print_train_test_data(CompanyInfo &company, string windowName, string outputPath, int actualStartRow, int actualEndRow) {
-    string filePath = set_output_filePath(company, windowName, outputPath, actualEndRow, actualStartRow);
+void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow) {
+    string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
     isRecordOn_ = true;
     remain_ = info_->totalCapitalLV_;
     trade(actualStartRow, actualEndRow);
@@ -1262,7 +1263,7 @@ public:
     
     void create_particles(bool debug) {
         for (int i = 0; i < info_.particleNumber_; i++) {
-            particles_.push_back(Particle(&info_, debug));
+            particles_.push_back(Particle(&company_, &info_, debug));
             particles_[i].tables_ = &tables_;
             particles_[i].actualDelta_ = actualDelta_;
         }
@@ -1505,7 +1506,7 @@ public:
                     start_exp(out, expCnt, debug);
                 }
                 out.close();
-                globalParticles_.at("best").print_train_test_data(company_, window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
+                globalParticles_.at("best").print_train_test_data(window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
                 cout << globalParticles_.at("best").RoR_ << "%" << endl;
             }
             cout << "==========" << endl;
@@ -1513,7 +1514,7 @@ public:
         clear_STL();
     }
     
-    Train(CompanyInfo &company, const Info &info, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), info_(info), tables_{pair<string, TechTable>(company.techType_, TechTable(company, company.techIndex_))}, actualDelta_(info.delta_) {
+    Train(CompanyInfo &company, const Info &info, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), info_(info), tables_{pair<string, TechTable>(company.techType_, TechTable(&company, company.techIndex_))}, actualDelta_(info.delta_) {
         if (info_.testDeltaLoop_ == 0) {
             start_train(targetWindow, startDate, endDate, debug);
         }
@@ -1549,10 +1550,9 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _info.slidingWindows_, _info.slidingWindowsEx_, _info.testStartYear_, _info.testEndYear_);
         cout << company.companyName_ << endl;
-        Train train(company, _info, setWindow);
-            //        Particle(company.techIndex_, company.techType_, TOTAL_CP_LV, true, vector<int>{5, 20, 5, 20}).instant_trade(company, "2020-01-02", "2021-06-30");
-            //        Particle(3, _allTech[3], TOTAL_CP_LV, true, vector<int>{44, 70, 42}).instant_trade(company, "2011-12-23", "2011-12-30");
-        Particle p(&_info);
+//        Train train(company, _info, setWindow);
+        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+        Particle p(&company, &_info);
         ofstream out;
         p.print(out, false);
         switch (setMode) {
