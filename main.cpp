@@ -24,15 +24,15 @@ class Info {
 public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "M2M";
+    string setWindow_ = "all";
     
-    double delta_ = 0.0012;
-    int expNumber_ = 50;
-    int genNumber_ = 10000;
+    double delta_ = 0.00016;
+    int expNumber_ = 1;
+    int genNumber_ = 1;
     int particleNumber_ = 10;
     double totalCapitalLV_ = 10000000;
     
-    int testDeltaLoop_ = 1;
+    int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
@@ -52,8 +52,7 @@ public:
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
     
     vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
-}const _info;
-
+} const _info;
 
 class CompanyInfo {
 public:
@@ -714,6 +713,7 @@ class Particle {
 private:
     const Info *info_;
     CompanyInfo *company_;
+    
 public:
     vector<int> bitsSize_;
     int bitsNum_ = 0;
@@ -1115,6 +1115,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
             exit(1);
         }
     }
+    out << "trade," << sellNum_ << endl;
     out << "return rate," << set_precision(RoR_) << "%" << endl;
     out << endl;
     out << "best exp," << exp_ << endl;
@@ -1123,7 +1124,6 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
     out << endl;
     print_trade_record(out);
     out.close();
-    
 }
 
 class BetaMatrix {
@@ -1162,7 +1162,6 @@ void BetaMatrix::print(ofstream &out, bool debug) {
         out << endl;
     else
         cout << endl;
-    
 }
 
 class Train {
@@ -1200,7 +1199,7 @@ public:
     void update_local();
     void update_global();
     void run_algo();
-    void QTS() ;
+    void QTS();
     void GQTS();
     void GNQTS();
     void print_debug_beta(ofstream &out, bool debug);
@@ -1559,15 +1558,84 @@ public:
     Particle p_;
     vector<TechTable> tables_;
     
-    TestWindow set_window(string &actualWindow, string &targetWindow, int &windowIndex);
-//    void check_exception(vector<path> &eachTrainFilePath, CompanyInfo::TestWindow &window);
-    void set_test_output_path(string &testFileOutputPath, string &trainFilePath, bool tradition);
+    void set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition);
+    TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
+    void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
+    void set_variables(vector<vector<std::string>> &thisTrainFile);
     
-    Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition = false);
+    Test(CompanyInfo &company, const Info &info, string targetWindow = "all", bool tradition = false);
 };
 
-Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition) :company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)} {
-    
+Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)} {
+    p_.tables_ = &tables_;
+    string trainFilePath;
+    string testFileOutputPath;
+    set_test_output_path(trainFilePath, testFileOutputPath, tradition);
+    for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
+        string actualWindow = info_.slidingWindows_[windowIndex];
+        if (actualWindow != "A2A") {
+            TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
+            vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
+            int intervalSize = (int)window.interval_.size();
+            for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
+                vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
+                p_.reset();
+                set_variables(thisTrainFile);
+                p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1]);
+            }
+        }
+    }
+}
+
+void Test::set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition) {
+    trainFilePath = company_.allTrainFilePath_.at(info_.techType_);
+    testFileOutputPath = company_.allTestFilePath_.at(info_.techType_);
+    if (tradition) {
+        trainFilePath = company_.allTrainTraditionFilePath_.at(info_.techType_);
+        ;
+        testFileOutputPath = company_.allTestTraditionFilePath_.at(info_.techType_);
+        ;
+    }
+    cout << "test " << company_.companyName_ << endl;
+}
+
+void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize) {
+    if (eachTrainFilePath.size() != intervalSize) {
+        cout << window.windowName_ << " test interval number is not equal to train fle number" << endl;
+        exit(1);
+    }
+}
+
+TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &windowIndex) {
+    if (targetWindow != "all") {
+        actualWindow = targetWindow;
+        windowIndex = company_.windowNumber_;
+    }
+    TestWindow window(company_, actualWindow);
+    cout << window.windowName_ << endl;
+    return window;
+}
+
+void Test::set_variables(vector<vector<string>> &thisTrainFile) {
+    switch (info_.techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            p_.decimal_[0] = stoi(thisTrainFile[10][1]);
+            p_.decimal_[1] = stoi(thisTrainFile[11][1]);
+            p_.decimal_[2] = stoi(thisTrainFile[12][1]);
+            p_.decimal_[3] = stoi(thisTrainFile[13][1]);
+            break;
+        }
+        case 3: {
+            p_.decimal_[0] = stoi(thisTrainFile[9][1]);
+            p_.decimal_[1] = stoi(thisTrainFile[10][1]);
+            p_.decimal_[2] = stoi(thisTrainFile[11][1]);
+            break;
+        }
+        default: {
+        }
+    }
 }
 
 int main(int argc, const char *argv[]) {
@@ -1598,6 +1666,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 1: {
+                Test test(company, _info, setWindow);
                 break;
             }
             case 2: {
@@ -1607,9 +1676,10 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
-                Train train(company, _info, "2011-12-01", "2011-12-30");
-                    //        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //        Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                Train train(company, _info, "2011-12-01", "2011-12-30");
+                    //                Test test(company, _info, setWindow);
+                    //                Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                 break;
             }
         }
