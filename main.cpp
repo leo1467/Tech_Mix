@@ -320,7 +320,6 @@ public:
     vector<double> price_;
     vector<vector<double>> techTable_;
     
-    void ini_techTable(CompanyInfo *company, int techIndex);
     void create_techTable(CompanyInfo *company);
     void output_techTable();
     
@@ -358,7 +357,7 @@ void TechTable::create_techTable(CompanyInfo *company) {
         vector<vector<string>> MAFile = read_data(techFilePath[i]);
         int techFileSize = (int)MAFile.size();
         if (techFileSize - days_ < 0) {
-            cout << company->companyName_ << " MA file not old enougth" << endl;
+            cout << company->companyName_ << " tech file not old enougth" << endl;
             exit(1);
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
@@ -676,6 +675,7 @@ void TrainWindow::print_train(CompanyInfo &company) {
 class MA {
 public:
     const vector<int> bitsSize_ = {8, 8, 8, 8};
+    const vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
     
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int buy1, int buy2) {
         double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][buy1];
@@ -697,7 +697,7 @@ public:
 class RSI {
 public:
     const vector<int> bitsSize_ = {8, 7, 7};
-    
+    const vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int RSIPeriod, int overSold) {
         double RSI = (*tables)[0].techTable_[i][RSIPeriod];
         return stockHold == 0 && RSI <= overSold && i != endRow;
@@ -1238,7 +1238,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
                 start_exp(out, expCnt, debug);
             }
             out.close();
-            globalParticles_.at("best").print_train_test_data(window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
+            globalParticles_.at("best").print_train_test_data(window.windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.windowName_, actualStartRow_, actualEndRow_);
             cout << globalParticles_.at("best").RoR_ << "%" << endl;
         }
         cout << "==========" << endl;
@@ -1318,7 +1318,7 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
         window.print_train(company_);
     }
     if (company_.allTrainFilePath_.at(company_.techType_) == "") {
-        window.TestWindow::windowName_ = "";
+        window.windowName_ = "";
     }
     return window;
 }
@@ -1667,6 +1667,107 @@ public:
     }
 };
 
+class Tradition {
+public:
+    const Info &info_;
+    CompanyInfo &company_;
+    vector<TechTable> tables_;
+    vector<Particle> p_;
+    vector<vector<int>> traditionStrategy_;
+    int traditionStrategyNum_ = -1;
+    
+    void train_Tradition(string &targetWindow);
+    void create_particles();
+    void set_strategy();
+    TrainWindow set_window(string &targetWindow, int &windowIndex);
+    void set_variables(int index);
+    
+    Tradition(CompanyInfo &company, const Info &info, string targetWindow = "all");
+};
+
+Tradition::Tradition(CompanyInfo &company, const Info &info, string targetWindow) : company_(company), info_(info), tables_{TechTable(&company, company.techIndex_)} {
+    train_Tradition(targetWindow);
+    Test testTradition(company_, info_, targetWindow, true);
+}
+
+void Tradition::train_Tradition(string &targetWindow) {
+    create_particles();
+    set_strategy();
+    cout << "train " << company_.companyName_ << " tradition" << endl;
+    string outputPath;
+    for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
+        TrainWindow window = set_window(targetWindow, windowIndex);
+        outputPath = company_.allTrainTraditionFilePath_.at(info_.techType_) + window.windowName_;
+        int startRow;
+        int endRow;
+        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
+            startRow = window.interval_[intervalIndex];
+            endRow = window.interval_[intervalIndex + 1];
+            for (int i = 0; i < traditionStrategyNum_; i++) {
+                p_[i].reset();
+                set_variables(i);
+                p_[i].trade(startRow, endRow);
+            }
+            stable_sort(p_.begin(), p_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
+            p_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
+        }
+    }
+}
+
+void Tradition::create_particles() {
+    for (int i = 0; i < info_.particleNumber_; i++) {
+        p_.push_back(Particle(&company_, &info_));
+        p_[i].tables_ = &tables_;
+    }
+}
+
+void Tradition::set_strategy() {
+    switch (info_.techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            traditionStrategy_ = MA().traditionStrategy_;
+            break;
+        }
+        case 3: {
+            traditionStrategy_ = RSI().traditionStrategy_;
+            break;
+        }
+    }
+    traditionStrategyNum_ = (int)traditionStrategy_.size();
+}
+
+TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
+    string actualWindow = info_.slidingWindows_[windowIndex];
+    if (targetWindow != "all") {
+        actualWindow = targetWindow;
+        windowIndex = company_.windowNumber_;
+    }
+    TrainWindow window(company_, actualWindow);
+    cout << actualWindow << endl;
+    return window;
+}
+
+void Tradition::set_variables(int index) {
+    switch (info_.techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            p_[index].decimal_[0] = traditionStrategy_[index][0];
+            p_[index].decimal_[1] = traditionStrategy_[index][1];
+            p_[index].decimal_[2] = traditionStrategy_[index][2];
+            p_[index].decimal_[3] = traditionStrategy_[index][3];
+            break;
+        }
+        case 3: {
+            p_[index].decimal_[0] = traditionStrategy_[index][0];
+            p_[index].decimal_[1] = traditionStrategy_[index][1];
+            p_[index].decimal_[2] = traditionStrategy_[index][2];
+            break;
+        }
+    }
+}
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
@@ -1705,6 +1806,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
+                    //                Tradition tradition(company, _info);
                     //                Train train(company, _info, "2011-12-01", "2011-12-30");
                     //                Test test(company, _info, setWindow);
                     //                Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
