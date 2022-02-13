@@ -1552,6 +1552,24 @@ void Train::clear_STL() {
     betaMatrix_.matrix_.clear();
 }
 
+class Test {
+public:
+    CompanyInfo &company_;
+    const Info &info_;
+    Particle p_;
+    vector<TechTable> tables_;
+    
+    TestWindow set_window(string &actualWindow, string &targetWindow, int &windowIndex);
+//    void check_exception(vector<path> &eachTrainFilePath, CompanyInfo::TestWindow &window);
+    void set_test_output_path(string &testFileOutputPath, string &trainFilePath, bool tradition);
+    
+    Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition = false);
+};
+
+Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition) :company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)} {
+    
+}
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
