@@ -1638,6 +1638,35 @@ void Test::set_variables(vector<vector<string>> &thisTrainFile) {
     }
 }
 
+class BH {
+public:
+    double BHRoR;
+    BH(string startDate, string endDate, CompanyInfo &company, double totalCPLv) {
+        int startRow = -1;
+        int endRow = -1;
+        for (int i = 0; i < company.totalDays_; i++) {
+            if (startDate == company.date_[i]) {
+                startRow = i;
+                break;
+            }
+        }
+        for (int i = startRow; i < company.totalDays_; i++) {
+            if (endDate == company.date_[i]) {
+                endRow = i;
+                break;
+            }
+        }
+        if (startRow == -1 || endRow == -1) {
+            cout << "cant find B&H startRow or endRow" << endl;
+            exit(1);
+        }
+        int stockHold = totalCPLv / company.price_[startRow];
+        double remain = totalCPLv - stockHold * company.price_[startRow];
+        remain += stockHold * company.price_[endRow];
+        BHRoR = ((remain - totalCPLv) / totalCPLv);
+    }
+};
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
