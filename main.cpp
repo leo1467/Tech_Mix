@@ -1548,37 +1548,26 @@ int main(int argc, const char *argv[]) {
         }
         CompanyInfo company(targetCompanyPricePath, allTech, techIndex, _info.slidingWindows_, _info.slidingWindowsEx_, _info.testStartYear_, _info.testEndYear_);
         cout << company.companyName_ << endl;
-//        Train train(company, _info, setWindow);
-        Train train(company, _info, "2011-12-01", "2011-12-30");
-//        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-//        Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-//        Particle p(&company, &_info);
-//        ofstream out;
-//        p.print(out, false);
         switch (setMode) {
-                    //            case 0: {
-                    //                company.train(setWindow);
-                    //                break;
-                    //            }
-                    //            case 1: {
-                    //                company.test(setWindow);
-                    //                break;
-                    //            }
-                    //            case 2: {
-                    //                Tradition tradition(company, setWindow);
-                    //                break;
-                    //            }
-                    //            case 3: {
-                    //                IRRout outputIRR(_testYearLength, companyPricePath, _slidingWindows, setMA, TOTAL_CP_LV, _outputPath);
-                    //                break;
-                    //            }
-                    //            case 10: {
-                    //                //                company.output_MA();
-                    //                //                company.train("debug", "2020-01-02", "2021-06-30");
-                    //                //                company.train("2012-01-03", "2012-12-31");
-                    //                //                company.instant_trade("2020-01-02", "2021-06-30", 43, 236, 20, 95);
-                    //                break;
-                    //            }
+            case 0: {
+                Train train(company, _info, setWindow);
+                break;
+            }
+            case 1: {
+                break;
+            }
+            case 2: {
+                break;
+            }
+            case 3: {
+                break;
+            }
+            case 10: {
+                Train train(company, _info, "2011-12-01", "2011-12-30");
+                    //        Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //        Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                break;
+            }
         }
     }
     time_point end = steady_clock::now();
