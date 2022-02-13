@@ -1183,348 +1183,374 @@ public:
     int compareNew_ = -1;
     int compareOld_ = -1;
     
-    void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
-        if (startDate == "debug" || endDate == "debug") {
-            debug = true;
-            company_.allTrainFilePath_.at(company_.techType_) = "";
-        }
-        if (targetWindow.length() == startDate.length()) {
-            endDate = startDate;
-            startDate = targetWindow;
-            targetWindow = "A2A";
-            company_.allTrainFilePath_.at(company_.techType_) = "";
-        }
-        else {
-            startDate = "";
+    void start_train(string targetWindow, string startDate, string endDate, bool debug);
+    void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
+    void find_new_row(string &startDate, string &endDate);
+    void create_particles(bool debug);
+    void create_betaMatrix();
+    TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex);
+    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex);
+    ofstream set_debug_file(bool debug);
+    void start_exp(ofstream &out, int expCnt, bool debug);
+    void print_debug_exp(ofstream &out, int expCnt, bool debug);
+    void start_gen(ofstream &out, int expCnt, int genCnt, bool debug);
+    void print_debug_gen(ofstream &out, int genCnt, bool debug);
+    void print_debug_particle(ofstream &out, int i, bool debug);
+    void store_exp_gen(int expCnt, int genCnt);
+    void update_local();
+    void update_global();
+    void run_algo();
+    void QTS() ;
+    void GQTS();
+    void GNQTS();
+    void print_debug_beta(ofstream &out, bool debug);
+    void update_best(int renewBest);
+    void clear_STL();
+    
+    Train(CompanyInfo &company, const Info &info, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
+};
+
+Train::Train(CompanyInfo &company, const Info &info, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), info_(info), tables_{TechTable(&company, company.techIndex_)}, actualDelta_(info.delta_) {
+    if (info_.testDeltaLoop_ == 0) {
+        start_train(targetWindow, startDate, endDate, debug);
+    }
+    else {
+        for (int loop = 0; loop < info_.testDeltaLoop_; loop++) {
+            start_train(targetWindow, startDate, endDate, debug);
+            actualDelta_ = _info.delta_;
+            actualDelta_ -= info_.testDeltaGap_ * (loop + 1);
         }
     }
-    
-    void find_new_row(string &startDate, string &endDate) {
-        if (startDate != "") {
-            for (int i = 0; i < tables_[0].days_; i++) {
-                if (startDate == tables_[0].date_[i]) {
-                    actualStartRow_ = i;
-                    break;
-                }
+}
+
+void Train::start_train(string targetWindow, string startDate, string endDate, bool debug) {
+    set_variables_and_condition(targetWindow, startDate, endDate, debug);
+    find_new_row(startDate, endDate);
+    create_particles(debug);
+    create_betaMatrix();
+    for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
+        TrainWindow window = set_window(targetWindow, startDate, windowIndex);
+        srand(343);
+        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
+            set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
+            globalParticles_.at("best").reset();
+            ofstream out = set_debug_file(debug);
+            for (int expCnt = 0; expCnt < info_.expNumber_; expCnt++) {
+                start_exp(out, expCnt, debug);
             }
-            for (int i = actualStartRow_; i < tables_[0].days_; i++) {
-                if (endDate == tables_[0].date_[i]) {
-                    actualEndRow_ = i;
-                    break;
-                }
-            }
-            if (actualStartRow_ == -1) {
-                cout << "input trainStartDate is not found" << endl;
-                exit(1);
-            }
-            if (actualEndRow_ == -1) {
-                cout << "input trainEndDate is not found" << endl;
-                exit(1);
-            }
+            out.close();
+            globalParticles_.at("best").print_train_test_data(window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
+            cout << globalParticles_.at("best").RoR_ << "%" << endl;
         }
+        cout << "==========" << endl;
     }
-    
-    void create_particles(bool debug) {
-        for (int i = 0; i < info_.particleNumber_; i++) {
-            particles_.push_back(Particle(&company_, &info_, debug));
-            particles_[i].tables_ = &tables_;
-            particles_[i].actualDelta_ = actualDelta_;
-        }
-        globalParticles_.insert({"localBest", particles_[0]});
-        globalParticles_.insert({"localWorst", particles_[0]});
-        globalParticles_.insert({"globalBest", particles_[0]});
-        globalParticles_.insert({"globalWorst", particles_[0]});
-        globalParticles_.insert({"best", particles_[0]});
+    clear_STL();
+}
+
+void Train::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
+    if (startDate == "debug" || endDate == "debug") {
+        debug = true;
+        company_.allTrainFilePath_.at(company_.techType_) = "";
     }
-    
-    void create_betaMatrix() {
-        betaMatrix_.variableNum_ = particles_[0].variableNum_;
-        betaMatrix_.bitsSize_ = particles_[0].bitsSize_;
-        betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
-        betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
+    if (targetWindow.length() == startDate.length()) {
+        endDate = startDate;
+        startDate = targetWindow;
+        targetWindow = "A2A";
+        company_.allTrainFilePath_.at(company_.techType_) = "";
     }
-    
-    TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex) {
-        string accuallWindow = company_.slidingWindows_[windowIndex];
-        if (targetWindow != "all") {
-            accuallWindow = targetWindow;
-            windowIndex = company_.windowNumber_;
-        }
-        TrainWindow window(company_, accuallWindow);
-        if (startDate == "") {
-            window.print_train(company_);
-        }
-        if (company_.allTrainFilePath_.at(company_.techType_) == "") {
-            window.TestWindow::windowName_ = "";
-        }
-        return window;
+    else {
+        startDate = "";
     }
-    
-    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
-        if (startDate != "") {
-            windowIndex = company_.windowNumber_;
-            intervalIndex = (int)window.interval_.size();
-        }
-        else {
-            actualStartRow_ = window.interval_[intervalIndex];
-            actualEndRow_ = window.interval_[intervalIndex + 1];
-        }
-        cout << tables_[0].date_[actualStartRow_] << "~" << tables_[0].date_[actualEndRow_] << endl;
-    }
-    
-    ofstream set_debug_file(bool debug) {
-        ofstream out;
-        if (debug) {
-            string delta = set_precision(actualDelta_);
-            delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
-            string title;
-            title += "debug_";
-            title += company_.companyName_ + "_";
-            title += company_.techType_ + "_";
-            title += info_.algoType_ + "_";
-            title += delta + "_";
-            title += tables_[0].date_[actualStartRow_] + "_";
-            title += tables_[0].date_[actualEndRow_] + ".csv";
-            out.open(title);
-        }
-        return out;
-    }
-    
-    void print_debug_exp(ofstream &out, int expCnt, bool debug) {
-        if (debug)
-            out << "exp:" << expCnt << ",==========,==========" << endl;
-    }
-    
-    void print_debug_gen(ofstream &out, int genCnt, bool debug) {
-        if (debug)
-            out << "gen:" << genCnt << ",=====" << endl;
-    }
-    
-    void print_debug_particle(ofstream &out, int i, bool debug) {
-        if (debug)
-            particles_[i].print(out, debug);
-    }
-    
-    void store_exp_gen(int expCnt, int genCnt) {
-        for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &p) {
-            p.exp_ = expCnt;
-            p.gen_ = genCnt;
-        });
-    }
-    
-    void update_local() {
-        for (auto p : particles_) {
-            if (p.RoR_ > globalParticles_.at("localBest").RoR_) {
-                globalParticles_.at("localBest") = p;
-            }
-            if (p.RoR_ < globalParticles_.at("localWorst").RoR_) {
-                globalParticles_.at("localWorst") = p;
+}
+
+void Train::find_new_row(string &startDate, string &endDate) {
+    if (startDate != "") {
+        for (int i = 0; i < tables_[0].days_; i++) {
+            if (startDate == tables_[0].date_[i]) {
+                actualStartRow_ = i;
+                break;
             }
         }
-    }
-    
-    void update_global() {
-        if (globalParticles_.at("localBest").RoR_ > globalParticles_.at("globalBest").RoR_) {
-            globalParticles_.at("globalBest") = globalParticles_.at("localBest");
+        for (int i = actualStartRow_; i < tables_[0].days_; i++) {
+            if (endDate == tables_[0].date_[i]) {
+                actualEndRow_ = i;
+                break;
+            }
+        }
+        if (actualStartRow_ == -1) {
+            cout << "input trainStartDate is not found" << endl;
+            exit(1);
+        }
+        if (actualEndRow_ == -1) {
+            cout << "input trainEndDate is not found" << endl;
+            exit(1);
         }
     }
-    
-    void run_algo() {
+}
+
+void Train::create_particles(bool debug) {
+    for (int i = 0; i < info_.particleNumber_; i++) {
+        particles_.push_back(Particle(&company_, &info_, debug));
+        particles_[i].tables_ = &tables_;
+        particles_[i].actualDelta_ = actualDelta_;
+    }
+    globalParticles_.insert({"localBest", particles_[0]});
+    globalParticles_.insert({"localWorst", particles_[0]});
+    globalParticles_.insert({"globalBest", particles_[0]});
+    globalParticles_.insert({"globalWorst", particles_[0]});
+    globalParticles_.insert({"best", particles_[0]});
+}
+
+void Train::create_betaMatrix() {
+    betaMatrix_.variableNum_ = particles_[0].variableNum_;
+    betaMatrix_.bitsSize_ = particles_[0].bitsSize_;
+    betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
+    betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
+}
+
+TrainWindow Train::set_window(string &targetWindow, string &startDate, int &windowIndex) {
+    string accuallWindow = company_.slidingWindows_[windowIndex];
+    if (targetWindow != "all") {
+        accuallWindow = targetWindow;
+        windowIndex = company_.windowNumber_;
+    }
+    TrainWindow window(company_, accuallWindow);
+    if (startDate == "") {
+        window.print_train(company_);
+    }
+    if (company_.allTrainFilePath_.at(company_.techType_) == "") {
+        window.TestWindow::windowName_ = "";
+    }
+    return window;
+}
+
+void Train::set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
+    if (startDate != "") {
+        windowIndex = company_.windowNumber_;
+        intervalIndex = (int)window.interval_.size();
+    }
+    else {
+        actualStartRow_ = window.interval_[intervalIndex];
+        actualEndRow_ = window.interval_[intervalIndex + 1];
+    }
+    cout << tables_[0].date_[actualStartRow_] << "~" << tables_[0].date_[actualEndRow_] << endl;
+}
+
+ofstream Train::set_debug_file(bool debug) {
+    ofstream out;
+    if (debug) {
+        string delta = set_precision(actualDelta_);
+        delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
+        string title;
+        title += "debug_";
+        title += company_.companyName_ + "_";
+        title += company_.techType_ + "_";
+        title += info_.algoType_ + "_";
+        title += delta + "_";
+        title += tables_[0].date_[actualStartRow_] + "_";
+        title += tables_[0].date_[actualEndRow_] + ".csv";
+        out.open(title);
+    }
+    return out;
+}
+
+void Train::start_exp(ofstream &out, int expCnt, bool debug) {
+    print_debug_exp(out, expCnt, debug);
+    globalParticles_.at("globalBest").reset();
+    betaMatrix_.reset();
+    for (int genCnt = 0; genCnt < info_.genNumber_; genCnt++) {
+        start_gen(out, expCnt, genCnt, debug);
+    }
+    update_best(0);
+}
+
+void Train::print_debug_exp(ofstream &out, int expCnt, bool debug) {
+    if (debug)
+        out << "exp:" << expCnt << ",==========,==========" << endl;
+}
+
+void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
+    print_debug_gen(out, genCnt, debug);
+    globalParticles_.at("localBest").reset();
+    globalParticles_.at("localWorst").reset(info_.totalCapitalLV_);
+    for (int i = 0; i < info_.particleNumber_; i++) {
+        particles_[i].reset();
+        particles_[i].measure(betaMatrix_.matrix_);
+        particles_[i].convert_bi_dec();
+        particles_[i].trade(actualStartRow_, actualEndRow_);
+        print_debug_particle(out, i, debug);
+    }
+    store_exp_gen(expCnt, genCnt);
+    update_local();
+    update_global();
+    run_algo();
+    print_debug_beta(out, debug);
+}
+
+void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
+    if (debug)
+        out << "gen:" << genCnt << ",=====" << endl;
+}
+
+void Train::print_debug_particle(ofstream &out, int i, bool debug) {
+    if (debug)
+        particles_[i].print(out, debug);
+}
+
+void Train::store_exp_gen(int expCnt, int genCnt) {
+    for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &p) {
+        p.exp_ = expCnt;
+        p.gen_ = genCnt;
+    });
+}
+
+void Train::update_local() {
+    for (auto p : particles_) {
+        if (p.RoR_ > globalParticles_.at("localBest").RoR_) {
+            globalParticles_.at("localBest") = p;
+        }
+        if (p.RoR_ < globalParticles_.at("localWorst").RoR_) {
+            globalParticles_.at("localWorst") = p;
+        }
+    }
+}
+
+void Train::update_global() {
+    if (globalParticles_.at("localBest").RoR_ > globalParticles_.at("globalBest").RoR_) {
+        globalParticles_.at("globalBest") = globalParticles_.at("localBest");
+    }
+}
+
+void Train::run_algo() {
+    switch (info_.algoIndex_) {
+        case 0: {
+            if (globalParticles_.at("localBest").RoR_ > 0) {
+                QTS();
+            }
+            break;
+        }
+        case 1: {
+            if (globalParticles_.at("globalBest").RoR_ > 0) {
+                GQTS();
+            }
+            break;
+        }
+        case 2: {
+            if (globalParticles_.at("globalBest").RoR_ > 0) {
+                GNQTS();
+            }
+            break;
+        }
+        case 3: {
+            if (globalParticles_.at("globalBest").RoR_ > 0) {
+                    //GNQTS();
+            }
+                //compare_and_multiply();
+            break;
+        }
+        default: {
+            cout << "wrong algo" << endl;
+            exit(1);
+        }
+    }
+}
+
+void Train::QTS() {
+    for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+        if (globalParticles_.at("localBest").binary_[i] == 1) {
+            betaMatrix_.matrix_[i] += actualDelta_;
+        }
+        if (globalParticles_.at("localWorst").binary_[i] == 1) {
+            betaMatrix_.matrix_[i] -= actualDelta_;
+        }
+    }
+}
+
+void Train::GQTS() {
+    for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+        if (globalParticles_.at("globalBest").binary_[i] == 1) {
+            betaMatrix_.matrix_[i] += actualDelta_;
+        }
+        if (globalParticles_.at("localWorst").binary_[i] == 1) {
+            betaMatrix_.matrix_[i] -= actualDelta_;
+        }
+    }
+}
+
+void Train::GNQTS() {
+    for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
+        if (globalParticles_.at("globalBest").binary_[i] == 1 && globalParticles_.at("localWorst").binary_[i] == 0 && betaMatrix_.matrix_[i] < 0.5) {
+            betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
+        }
+        if (globalParticles_.at("globalBest").binary_[i] == 0 && globalParticles_.at("localWorst").binary_[i] == 1 && betaMatrix_.matrix_[i] > 0.5) {
+            betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
+        }
+    }
+    GQTS();
+}
+
+void Train::print_debug_beta(ofstream &out, bool debug) {
+    if (debug) {
         switch (info_.algoIndex_) {
             case 0: {
-                if (globalParticles_.at("localBest").RoR_ > 0) {
-                    QTS();
-                }
+                out << "local best" << endl;
+                globalParticles_.at("localBest").print(out, debug);
+                out << "local worst" << endl;
+                globalParticles_.at("localWorst").print(out, debug);
                 break;
             }
-            case 1: {
-                if (globalParticles_.at("globalBest").RoR_ > 0) {
-                    GQTS();
-                }
-                break;
-            }
+            case 1:
             case 2: {
-                if (globalParticles_.at("globalBest").RoR_ > 0) {
-                    GNQTS();
-                }
+                out << "global best" << endl;
+                globalParticles_.at("globalBest").print(out, debug);
+                out << "local worst" << endl;
+                globalParticles_.at("localWorst").print(out, debug);
                 break;
             }
             case 3: {
-                if (globalParticles_.at("globalBest").RoR_ > 0) {
-                        //GNQTS();
-                }
-                    //compare_and_multiply();
+                out << "global best" << endl;
+                globalParticles_.at("globalBest").print(out, debug);
+                out << "local best" << endl;
+                globalParticles_.at("localBest").print(out, debug);
+                out << "local worst" << endl;
+                globalParticles_.at("localWorst").print(out, debug);
+                out << actualDelta_ << endl;
                 break;
             }
-            default: {
-                cout << "wrong algo" << endl;
-                exit(1);
+        }
+        betaMatrix_.print(out, debug);
+    }
+}
+
+void Train::update_best(int renewBest) {
+    if (globalParticles_.at("best").RoR_ < globalParticles_.at("globalBest").RoR_) {
+        globalParticles_.at("best") = globalParticles_.at("globalBest");
+    }
+    switch (renewBest) {
+        case 0: {
+            if (globalParticles_.at("globalBest").binary_ == globalParticles_.at("best").binary_) {
+                globalParticles_.at("best").bestCnt_++;
             }
+            break;
+        }
+        case 1: {
+            if (globalParticles_.at("globalBest").RoR_ == globalParticles_.at("best").RoR_) {
+                globalParticles_.at("best").bestCnt_++;
+            }
+            break;
+        }
+        default: {
+            cout << "" << endl;
+            exit(1);
         }
     }
-    
-    void QTS() {
-        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
-            if (globalParticles_.at("localBest").binary_[i] == 1) {
-                betaMatrix_.matrix_[i] += actualDelta_;
-            }
-            if (globalParticles_.at("localWorst").binary_[i] == 1) {
-                betaMatrix_.matrix_[i] -= actualDelta_;
-            }
-        }
-    }
-    
-    void GQTS() {
-        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
-            if (globalParticles_.at("globalBest").binary_[i] == 1) {
-                betaMatrix_.matrix_[i] += actualDelta_;
-            }
-            if (globalParticles_.at("localWorst").binary_[i] == 1) {
-                betaMatrix_.matrix_[i] -= actualDelta_;
-            }
-        }
-    }
-    
-    void GNQTS() {
-        for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
-            if (globalParticles_.at("globalBest").binary_[i] == 1 && globalParticles_.at("localWorst").binary_[i] == 0 && betaMatrix_.matrix_[i] < 0.5) {
-                betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
-            }
-            if (globalParticles_.at("globalBest").binary_[i] == 0 && globalParticles_.at("localWorst").binary_[i] == 1 && betaMatrix_.matrix_[i] > 0.5) {
-                betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
-            }
-        }
-        GQTS();
-    }
-    
-    void print_debug_beta(ofstream &out, bool debug) {
-        if (debug) {
-            switch (info_.algoIndex_) {
-                case 0: {
-                    out << "local best" << endl;
-                    globalParticles_.at("localBest").print(out, debug);
-                    out << "local worst" << endl;
-                    globalParticles_.at("localWorst").print(out, debug);
-                    break;
-                }
-                case 1:
-                case 2: {
-                    out << "global best" << endl;
-                    globalParticles_.at("globalBest").print(out, debug);
-                    out << "local worst" << endl;
-                    globalParticles_.at("localWorst").print(out, debug);
-                    break;
-                }
-                case 3: {
-                    out << "global best" << endl;
-                    globalParticles_.at("globalBest").print(out, debug);
-                    out << "local best" << endl;
-                    globalParticles_.at("localBest").print(out, debug);
-                    out << "local worst" << endl;
-                    globalParticles_.at("localWorst").print(out, debug);
-                    out << actualDelta_ << endl;
-                    break;
-                }
-            }
-            betaMatrix_.print(out, debug);
-        }
-    }
-    
-    void start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
-        print_debug_gen(out, genCnt, debug);
-        globalParticles_.at("localBest").reset();
-        globalParticles_.at("localWorst").reset(info_.totalCapitalLV_);
-        for (int i = 0; i < info_.particleNumber_; i++) {
-            particles_[i].reset();
-            particles_[i].measure(betaMatrix_.matrix_);
-            particles_[i].convert_bi_dec();
-            particles_[i].trade(actualStartRow_, actualEndRow_);
-            print_debug_particle(out, i, debug);
-        }
-        store_exp_gen(expCnt, genCnt);
-        update_local();
-        update_global();
-        run_algo();
-        print_debug_beta(out, debug);
-    }
-    
-    void start_exp(ofstream &out, int expCnt, bool debug) {
-        print_debug_exp(out, expCnt, debug);
-        globalParticles_.at("globalBest").reset();
-        betaMatrix_.reset();
-        for (int genCnt = 0; genCnt < info_.genNumber_; genCnt++) {
-            start_gen(out, expCnt, genCnt, debug);
-        }
-        update_best(0);
-    }
-    
-    void update_best(int renewBest) {
-        if (globalParticles_.at("best").RoR_ < globalParticles_.at("globalBest").RoR_) {
-            globalParticles_.at("best") = globalParticles_.at("globalBest");
-        }
-        switch (renewBest) {
-            case 0: {
-                if (globalParticles_.at("globalBest").binary_ == globalParticles_.at("best").binary_) {
-                    globalParticles_.at("best").bestCnt_++;
-                }
-                break;
-            }
-            case 1: {
-                if (globalParticles_.at("globalBest").RoR_ == globalParticles_.at("best").RoR_) {
-                    globalParticles_.at("best").bestCnt_++;
-                }
-                break;
-            }
-            default: {
-                cout << "" << endl;
-                exit(1);
-            }
-        }
-    }
-    
-    void clear_STL() {
-        particles_.clear();
-        globalParticles_.clear();
-        betaMatrix_.matrix_.clear();
-    }
-    
-    void start_train(string targetWindow, string startDate, string endDate, bool debug) {
-        set_variables_and_condition(targetWindow, startDate, endDate, debug);
-        find_new_row(startDate, endDate);
-        create_particles(debug);
-        create_betaMatrix();
-        for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
-            TrainWindow window = set_window(targetWindow, startDate, windowIndex);
-            srand(343);
-            for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
-                set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
-                globalParticles_.at("best").reset();
-                ofstream out = set_debug_file(debug);
-                for (int expCnt = 0; expCnt < info_.expNumber_; expCnt++) {
-                    start_exp(out, expCnt, debug);
-                }
-                out.close();
-                globalParticles_.at("best").print_train_test_data(window.TestWindow::windowName_, company_.allTrainFilePath_.at(company_.techType_) + window.TestWindow::windowName_, actualStartRow_, actualEndRow_);
-                cout << globalParticles_.at("best").RoR_ << "%" << endl;
-            }
-            cout << "==========" << endl;
-        }
-        clear_STL();
-    }
-    
-    Train(CompanyInfo &company, const Info &info, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false) : company_(company), info_(info), tables_{TechTable(&company, company.techIndex_)}, actualDelta_(info.delta_) {
-        if (info_.testDeltaLoop_ == 0) {
-            start_train(targetWindow, startDate, endDate, debug);
-        }
-        else {
-            for (int loop = 0; loop < info_.testDeltaLoop_; loop++) {
-                start_train(targetWindow, startDate, endDate, debug);
-                actualDelta_ = _info.delta_;
-                actualDelta_ -= info_.testDeltaGap_ * (loop + 1);
-            }
-        }
-    }
-};
+}
+
+void Train::clear_STL() {
+    particles_.clear();
+    globalParticles_.clear();
+    betaMatrix_.matrix_.clear();
+}
 
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
