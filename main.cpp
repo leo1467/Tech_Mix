@@ -354,14 +354,19 @@ void TechTable::create_techTable(CompanyInfo *company) {
         if (i % 16 == 0) {
             cout << ".";
         }
-        vector<vector<string>> MAFile = read_data(techFilePath[i]);
-        int techFileSize = (int)MAFile.size();
+        vector<vector<string>> techFile = read_data(techFilePath[i]);
+        int techFileSize = (int)techFile.size();
+        if (i == 0 && techFile[techFileSize - 1][0] != date_[days_ - 1]) {
+            cout << "last date of price file and techFile are different, need to generate new techFile" << endl;
+            exit(1);
+        }
         if (techFileSize - days_ < 0) {
+            cout << endl;
             cout << company->companyName_ << " tech file not old enougth" << endl;
             exit(1);
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
-            techTable_[j][i + 1] = stod(MAFile[k][1]);
+            techTable_[j][i + 1] = stod(techFile[k][1]);
         }
     }
     cout << endl;
