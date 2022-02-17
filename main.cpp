@@ -1593,13 +1593,13 @@ Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tra
 }
 
 void Test::set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition) {
-    trainFilePath = company_.allTrainFilePath_.at(info_.techType_);
-    testFileOutputPath = company_.allTestFilePath_.at(info_.techType_);
     if (tradition) {
         trainFilePath = company_.allTrainTraditionFilePath_.at(info_.techType_);
-        ;
         testFileOutputPath = company_.allTestTraditionFilePath_.at(info_.techType_);
-        ;
+    }
+    else {
+        trainFilePath = company_.allTrainFilePath_.at(info_.techType_);
+        testFileOutputPath = company_.allTestFilePath_.at(info_.techType_);
     }
     cout << "test " << company_.companyName_ << endl;
 }
@@ -1692,7 +1692,6 @@ public:
 
 Tradition::Tradition(CompanyInfo &company, const Info &info, string targetWindow) : company_(company), info_(info), tables_{TechTable(&company, company.techIndex_)} {
     train_Tradition(targetWindow);
-    Test testTradition(company_, info_, targetWindow, true);
 }
 
 void Tradition::train_Tradition(string &targetWindow) {
@@ -1805,9 +1804,11 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 2: {
+                Tradition trainTradition(company, _info);
                 break;
             }
             case 3: {
+                Test testTradition(company, _info, setWindow, true);
                 break;
             }
             case 10: {
