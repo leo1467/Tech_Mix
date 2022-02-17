@@ -1695,8 +1695,8 @@ Tradition::Tradition(CompanyInfo &company, const Info &info, string targetWindow
 }
 
 void Tradition::train_Tradition(string &targetWindow) {
-    create_particles();
     set_strategy();
+    create_particles();
     cout << "train " << company_.companyName_ << " tradition" << endl;
     string outputPath;
     for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
@@ -1719,7 +1719,7 @@ void Tradition::train_Tradition(string &targetWindow) {
 }
 
 void Tradition::create_particles() {
-    for (int i = 0; i < info_.particleNumber_; i++) {
+    for (int i = 0; i < traditionStrategyNum_; i++) {
         p_.push_back(Particle(&company_, &info_));
         p_[i].tables_ = &tables_;
     }
