@@ -742,7 +742,7 @@ public:
     
     void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
     void instant_trade(string startDate, string endDate);
-    void set_instant_trade_file(ofstream &out, const string &endDate, const string &startDate);
+    void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
     void print_trade_record(ofstream &out);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false);
@@ -814,12 +814,12 @@ void Particle::instant_trade(string startDate, string endDate) {
     }
     trade(startRow, endRow, true);
     ofstream out;
-    set_instant_trade_file(out, endDate, startDate);
+    set_instant_trade_file(out, startDate, endDate);
     print_trade_record(out);
     out.close();
 }
 
-void Particle::set_instant_trade_file(ofstream &out, const string &endDate, const string &startDate) {
+void Particle::set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate) {
     string titleVariables;
     string showVariablesInFile;
     for (auto i : decimal_) {
@@ -1564,6 +1564,7 @@ public:
     vector<TechTable> tables_;
     
     void set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition);
+    void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
@@ -1579,15 +1580,7 @@ Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tra
     for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
         string actualWindow = info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
-            TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
-            vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
-            int intervalSize = (int)window.interval_.size();
-            for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
-                vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
-                p_.reset();
-                set_variables(thisTrainFile);
-                p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1]);
-            }
+            start_test(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
         }
     }
 }
@@ -1602,6 +1595,19 @@ void Test::set_test_output_path(string &trainFilePath, string &testFileOutputPat
         testFileOutputPath = company_.allTestFilePath_.at(info_.techType_);
     }
     cout << "test " << company_.companyName_ << endl;
+}
+
+void Test::start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex) {
+    TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
+    vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
+    int intervalSize = (int)window.interval_.size();
+    check_exception(eachTrainFilePath, window, intervalSize / 2);
+    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
+        vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
+        p_.reset();
+        set_variables(thisTrainFile);
+        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1]);
+    }
 }
 
 void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize) {
