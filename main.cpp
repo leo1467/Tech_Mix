@@ -73,6 +73,7 @@ public:
     map<string, string> allTestFilePath_;
     map<string, string> allTrainTraditionFilePath_;
     map<string, string> allTestTraditionFilePath_;
+    map<string, string> allTestHoldFilePath_;
     
     int totalDays_;
     vector<string> date_;
@@ -100,6 +101,7 @@ CompanyInfo::CompanyInfo(path pricePath, vector<string> allTech, int techIndex, 
         allTestFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/test/"});
         allTrainTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/trainTradition/"});
         allTestTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testTradition/"});
+        allTestHoldFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testHoldPerid/"});
     }
     store_date_price(pricePath);
     create_folder();
@@ -132,6 +134,7 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 
 void CompanyInfo::create_folder() {
     create_directories(techType_ + "/" + companyName_);
+    create_directories(allTestHoldFilePath_.at(techType_));
     for (auto i : slidingWindows_) {
         create_directories(allTrainFilePath_.at(techType_) + i);
         create_directories(allTestFilePath_.at(techType_) + i);
@@ -1561,17 +1564,21 @@ public:
     const Info &info_;
     Particle p_;
     vector<TechTable> tables_;
+    bool hold_;
+    ofstream holdFile_;
+    ofstream *holdFilePtr_ = nullptr;
     
     void set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
+    void set_hold_file(TestWindow & window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     
-    Test(CompanyInfo &company, const Info &info, string targetWindow = "all", bool tradition = false);
+    Test(CompanyInfo &company, const Info &info, string targetWindow = "all", bool tradition = false, bool hold = false);
 };
 
-Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)} {
+Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition, bool hold) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)}, hold_(hold) {
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
@@ -1601,19 +1608,14 @@ void Test::start_test(string &actualWindow, string &targetWindow, const string &
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
     int intervalSize = (int)window.interval_.size();
     check_exception(eachTrainFilePath, window, intervalSize / 2);
+    set_hold_file(window);
     for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
         p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1]);
     }
-}
-
-void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize) {
-    if (eachTrainFilePath.size() != intervalSize) {
-        cout << window.windowName_ << " test interval number is not equal to train fle number" << endl;
-        exit(1);
-    }
+    holdFile_.close();
 }
 
 TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &windowIndex) {
@@ -1624,6 +1626,21 @@ TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &win
     TestWindow window(company_, actualWindow);
     cout << window.windowName_ << endl;
     return window;
+}
+
+void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize) {
+    if (eachTrainFilePath.size() != intervalSize) {
+        cout << window.windowName_ << " test interval number is not equal to train fle number" << endl;
+        exit(1);
+    }
+}
+
+void Test::set_hold_file(TestWindow &window) {
+    if (hold_) {
+        holdFile_.open(company_.allTestHoldFilePath_.at(info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
+        holdFile_ << "Date,Price,Hold,buy,sell day,sell ma" << endl;
+        holdFilePtr_ = &holdFile_;
+    }
 }
 
 void Test::set_variables(vector<vector<string>> &thisTrainFile) {
@@ -1805,7 +1822,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 1: {
-                Test test(company, _info, setWindow);
+                Test test(company, _info, setWindow, false, true);
                 break;
             }
             case 2: {
@@ -1813,7 +1830,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 3: {
-                Test testTradition(company, _info, setWindow, true);
+                Test testTradition(company, _info, setWindow, true, false);
                 break;
             }
             case 10: {
@@ -1822,6 +1839,7 @@ int main(int argc, const char *argv[]) {
                     //                Test test(company, _info, setWindow);
                     //                Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                Test(company, _info, setWindow, false, false);
                 break;
             }
         }
