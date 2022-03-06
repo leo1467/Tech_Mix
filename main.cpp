@@ -27,9 +27,9 @@ public:
     string setWindow_ = "all";
     
     double delta_ = 0.00016;
-    int expNumber_ = 1;
-    int genNumber_ = 1;
-    int particleNumber_ = 10;
+    int expNum_ = 1;
+    int genNum_ = 1;
+    int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
     
     int testDeltaLoop_ = 0;
@@ -315,10 +315,6 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 class TechTable {
 public:
     CompanyInfo *company_;
-        //    string companyName_;
-        //    int techIndex_ = -1;
-        //    string techType_;
-    
     int days_;
     vector<string> date_;
     vector<double> price_;
@@ -683,7 +679,7 @@ void TrainWindow::print_train(CompanyInfo &company) {
 
 class MA {
 public:
-    const vector<int> bitsSize_ = {8, 8, 8, 8};
+    const vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
     const vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
     
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int buy1, int buy2) {
@@ -705,7 +701,7 @@ public:
 
 class RSI {
 public:
-    const vector<int> bitsSize_ = {8, 7, 7};
+    const vector<int> eachVariableBitsNum_ = {8, 7, 7};
     const vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int RSIPeriod, int overSold) {
         double RSI = (*tables)[0].techTable_[i][RSIPeriod];
@@ -723,7 +719,7 @@ private:
     CompanyInfo *company_;
     
 public:
-    vector<int> bitsSize_;
+    vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<int> binary_;
     int variableNum_ = 0;
@@ -773,11 +769,11 @@ Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : compa
         case 0:
         case 1:
         case 2: {
-            bitsSize_ = MA().bitsSize_;
+            eachVariableBitsNum_ = MA().eachVariableBitsNum_;
             break;
         }
         case 3: {
-            bitsSize_ = RSI().bitsSize_;
+            eachVariableBitsNum_ = RSI().eachVariableBitsNum_;
             break;
         }
         default: {
@@ -785,9 +781,9 @@ Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : compa
             exit(1);
         }
     }
-    bitsNum_ = accumulate(bitsSize_.begin(), bitsSize_.end(), 0);
+    bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
-    variableNum_ = (int)bitsSize_.size();
+    variableNum_ = (int)eachVariableBitsNum_.size();
     decimal_.resize(variableNum_);
     for (int i = 0; i < variables.size(); i++) {
         decimal_[i] = variables[i];
@@ -1061,17 +1057,17 @@ void Particle::measure(vector<double> &betaMatrix) {
 
 void Particle::convert_bi_dec() {
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeIndex = 0, variableBitPosition = bitIndex, power = bitsSize_[variableIndex] - 1; fakeIndex < bitsSize_[variableIndex]; fakeIndex++, variableBitPosition++, power--) {
+        for (int fakeIndex = 0, variableBitPosition = bitIndex, power = eachVariableBitsNum_[variableIndex] - 1; fakeIndex < eachVariableBitsNum_[variableIndex]; fakeIndex++, variableBitPosition++, power--) {
             decimal_[variableIndex] += pow(2, power) * binary_[variableBitPosition];
         }
         decimal_[variableIndex]++;
-        bitIndex += bitsSize_[variableIndex];
+        bitIndex += eachVariableBitsNum_[variableIndex];
     }
 }
 
 void Particle::print(ofstream &out, bool debug) {
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeBitIndex = 0; fakeBitIndex < bitsSize_[variableIndex]; fakeBitIndex++, bitIndex++) {
+        for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
             if (debug)
                 out << binary_[bitIndex] << ",";
             else
@@ -1108,9 +1104,9 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
         out.open(filePath);
         out << "algo," << company_->info_.algoType_ << endl;
         out << "delta," << set_precision(company_->info_.delta_) << endl;
-        out << "exp," << company_->info_.expNumber_ << endl;
-        out << "gen," << company_->info_.genNumber_ << endl;
-        out << "p number," << company_->info_.particleNumber_ << endl;
+        out << "exp," << company_->info_.expNum_ << endl;
+        out << "gen," << company_->info_.genNum_ << endl;
+        out << "p number," << company_->info_.particleNum_ << endl;
         out << endl;
         out << "initial capital," << set_precision(company_->info_.totalCapitalLV_) << endl;
         out << "final capital," << set_precision(remain_) << endl;
@@ -1174,7 +1170,7 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
 class BetaMatrix {
 public:
     int variableNum_ = 0;
-    vector<int> bitsSize_;
+    vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<double> matrix_;
     
@@ -1192,7 +1188,7 @@ void BetaMatrix::print(ofstream &out, bool debug) {
     else
         cout << "beta matrix" << endl;
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeBitIndex = 0; fakeBitIndex < bitsSize_[variableIndex]; fakeBitIndex++, bitIndex++) {
+        for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
             if (debug)
                 out << matrix_[bitIndex] << ",";
             else
@@ -1277,7 +1273,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
             set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
             globalP_[0].reset();
             ofstream out = set_debug_file(debug);
-            for (int expCnt = 0; expCnt < company_.info_.expNumber_; expCnt++) {
+            for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
                 start_exp(out, expCnt, debug);
             }
             out.close();
@@ -1334,7 +1330,7 @@ void Train::create_particles(bool debug) {
     Particle p(&company_, debug);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
-    for (int i = 0; i < company_.info_.particleNumber_; i++) {
+    for (int i = 0; i < company_.info_.particleNum_; i++) {
         particles_.push_back(p);
     }
     for (int i = 0; i < 5; i++) {
@@ -1344,7 +1340,7 @@ void Train::create_particles(bool debug) {
 
 void Train::create_betaMatrix() {
     betaMatrix_.variableNum_ = particles_[0].variableNum_;
-    betaMatrix_.bitsSize_ = particles_[0].bitsSize_;
+    betaMatrix_.eachVariableBitsNum_ = particles_[0].eachVariableBitsNum_;
     betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
@@ -1399,7 +1395,7 @@ void Train::start_exp(ofstream &out, int expCnt, bool debug) {
     print_debug_exp(out, expCnt, debug);
     globalP_[1].reset();
     betaMatrix_.reset();
-    for (int genCnt = 0; genCnt < company_.info_.genNumber_; genCnt++) {
+    for (int genCnt = 0; genCnt < company_.info_.genNum_; genCnt++) {
         start_gen(out, expCnt, genCnt, debug);
     }
     update_best(0);
@@ -1414,7 +1410,7 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     print_debug_gen(out, genCnt, debug);
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
-    for (int i = 0; i < company_.info_.particleNumber_; i++) {
+    for (int i = 0; i < company_.info_.particleNum_; i++) {
         particles_[i].reset();
         particles_[i].measure(betaMatrix_.matrix_);
         particles_[i].convert_bi_dec();
@@ -1736,7 +1732,7 @@ class Tradition {
 public:
     CompanyInfo &company_;
     vector<TechTable> tables_;
-    vector<Particle> p_;
+    vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
     
@@ -1764,12 +1760,12 @@ void Tradition::train_Tradition(string &targetWindow) {
             int startRow = window.interval_[intervalIndex];
             int endRow = window.interval_[intervalIndex + 1];
             for (int i = 0; i < traditionStrategyNum_; i++) {
-                p_[i].reset();
+                particles_[i].reset();
                 set_variables(i);
-                p_[i].trade(startRow, endRow);
+                particles_[i].trade(startRow, endRow);
             }
-            stable_sort(p_.begin(), p_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
-            p_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
+            stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
+            particles_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
         }
     }
 }
@@ -1794,7 +1790,7 @@ void Tradition::create_particles() {
     Particle p(&company_);
     p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++) {
-        p_.push_back(p);
+        particles_.push_back(p);
     }
 }
 
@@ -1810,8 +1806,8 @@ TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
 }
 
 void Tradition::set_variables(int index) {
-    for (int i = 0; i < p_[i].variableNum_; i++) {
-        p_[index].decimal_[i] = traditionStrategy_[index][i];
+    for (int i = 0; i < particles_[i].variableNum_; i++) {
+        particles_[index].decimal_[i] = traditionStrategy_[index][i];
     }
 }
 
