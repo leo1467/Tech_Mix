@@ -315,9 +315,9 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 class TechTable {
 public:
     CompanyInfo *company_;
-//    string companyName_;
-//    int techIndex_ = -1;
-//    string techType_;
+        //    string companyName_;
+        //    int techIndex_ = -1;
+        //    string techType_;
     
     int days_;
     vector<string> date_;
@@ -720,7 +720,6 @@ public:
 
 class Particle {
 private:
-    const Info *info_;
     CompanyInfo *company_;
     
 public:
@@ -766,11 +765,11 @@ public:
     void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
     
-    Particle(CompanyInfo *company, const Info *info, bool on = false, vector<int> variables = {});
+    Particle(CompanyInfo *company, bool on = false, vector<int> variables = {});
 };
 
-Particle::Particle(CompanyInfo *company, const Info *info, bool on, vector<int> variables) : company_(company), info_(info), remain_(info->totalCapitalLV_), isRecordOn_(on) {
-    switch (info_->techIndex_) {
+Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : company_(company), remain_(company->info_.totalCapitalLV_), isRecordOn_(on) {
+    switch (company_->info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -782,7 +781,7 @@ Particle::Particle(CompanyInfo *company, const Info *info, bool on, vector<int> 
             break;
         }
         default: {
-            cout << "no techIndex_ " << info_->techIndex_ << ", choose a techIndex_" << endl;
+            cout << "no techIndex_ " << company_->info_.techIndex_ << ", choose a techIndex_" << endl;
             exit(1);
         }
     }
@@ -835,8 +834,8 @@ void Particle::set_instant_trade_file(ofstream &out, const string &startDate, co
         showVariablesInFile += ",";
         showVariablesInFile += to_string(i);
     }
-    out.open(company_->companyName_ + "_" + info_->techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
-    switch (info_->techIndex_) {
+    out.open(company_->companyName_ + "_" + company_->info_.techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
+    switch (company_->info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -899,12 +898,12 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, ofstream *holdFi
         }
     }
     check_buyNum_sellNum();
-    RoR_ = (remain_ - info_->totalCapitalLV_) / info_->totalCapitalLV_ * 100.0;
+    RoR_ = (remain_ - company_->info_.totalCapitalLV_) / company_->info_.totalCapitalLV_ * 100.0;
     push_last_info(lastRecord);
 }
 
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    switch (info_->techIndex_) {
+    switch (company_->info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -931,7 +930,7 @@ void Particle::output_holdFile_date_price(ofstream *holdFilePtr, int i) {
 
 void Particle::push_title() {
     if (isRecordOn_) {
-        switch (info_->techIndex_) {
+        switch (company_->info_.techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -952,7 +951,7 @@ void Particle::push_buy_info(int stockHold, int i) {
         push += "buy,";
         push += (*tables_)[0].date_[i] + ",";
         push += set_precision((*tables_)[0].price_[i]) + ",";
-        switch (info_->techIndex_) {
+        switch (company_->info_.techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -986,7 +985,7 @@ void Particle::push_sell_info(int stockHold, int i) {
         push += "sell,";
         push += (*tables_)[0].date_[i] + ",";
         push += set_precision((*tables_)[0].price_[i]) + ",";
-        switch (info_->techIndex_) {
+        switch (company_->info_.techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1037,7 +1036,7 @@ void Particle::reset(double RoR) {
     fill(decimal_.begin(), decimal_.end(), 0);
     buyNum_ = 0;
     sellNum_ = 0;
-    remain_ = info_->totalCapitalLV_;
+    remain_ = company_->info_.totalCapitalLV_;
     RoR_ = RoR;
     tradeRecord_.clear();
     gen_ = 0;
@@ -1102,22 +1101,22 @@ void Particle::print(ofstream &out, bool debug) {
 void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr) {
     string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
     isRecordOn_ = true;
-    remain_ = info_->totalCapitalLV_;
+    remain_ = company_->info_.totalCapitalLV_;
     trade(actualStartRow, actualEndRow, false, holdFilePtr);
-    if (holdFilePtr == nullptr || info_->mode_ == 1) {
+    if (holdFilePtr == nullptr || company_->info_.mode_ == 1) {
         ofstream out;
         out.open(filePath);
-        out << "algo," << info_->algoType_ << endl;
-        out << "delta," << set_precision(info_->delta_) << endl;
-        out << "exp," << info_->expNumber_ << endl;
-        out << "gen," << info_->genNumber_ << endl;
-        out << "p number," << info_->particleNumber_ << endl;
+        out << "algo," << company_->info_.algoType_ << endl;
+        out << "delta," << set_precision(company_->info_.delta_) << endl;
+        out << "exp," << company_->info_.expNumber_ << endl;
+        out << "gen," << company_->info_.genNumber_ << endl;
+        out << "p number," << company_->info_.particleNumber_ << endl;
         out << endl;
-        out << "initial capital," << set_precision(info_->totalCapitalLV_) << endl;
+        out << "initial capital," << set_precision(company_->info_.totalCapitalLV_) << endl;
         out << "final capital," << set_precision(remain_) << endl;
-        out << "final return," << set_precision(remain_ - info_->totalCapitalLV_) << endl;
+        out << "final return," << set_precision(remain_ - company_->info_.totalCapitalLV_) << endl;
         out << endl;
-        switch (info_->techIndex_) {
+        switch (company_->info_.techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1152,7 +1151,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
 
 string Particle::set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
     if (outputPath != "") {
-        if (info_->testDeltaLoop_ > 0) {
+        if (company_->info_.testDeltaLoop_ > 0) {
             string folderName = windowName + "_" + to_string(actualDelta_);
             create_directories(folderName);
             outputPath = folderName;
@@ -1162,9 +1161,9 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     else {
         string delta = set_precision(actualDelta_);
         delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
-        outputPath = info_->techType_ + "_";
+        outputPath = company_->info_.techType_ + "_";
         outputPath += company_->companyName_ + "_";
-        outputPath += info_->algoType_ + "_";
+        outputPath += company_->info_.algoType_ + "_";
         outputPath += delta + "_";
     }
     outputPath += (*tables_)[0].date_[actualStartRow] + "_";
@@ -1216,7 +1215,7 @@ public:
     vector<TechTable> tables_;
     
     vector<Particle> particles_;
-    vector<Particle> globalP_; //0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
+    vector<Particle> globalP_;  //0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
     BetaMatrix betaMatrix_;
     
     int actualStartRow_ = -1;
@@ -1332,7 +1331,7 @@ void Train::find_new_row(string &startDate, string &endDate) {
 }
 
 void Train::create_particles(bool debug) {
-    Particle p(&company_, &company_.info_, debug);
+    Particle p(&company_, debug);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
     for (int i = 0; i < company_.info_.particleNumber_; i++) {
@@ -1608,13 +1607,13 @@ public:
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
-    void set_holdFile_path(TestWindow & window);
+    void set_holdFile_path(TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     
     Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false);
 };
 
-Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold) : company_(company), p_(&company, &company.info_), tables_{TechTable(&company)}, tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold) : company_(company), p_(&company), tables_{TechTable(&company)}, tradition_(tradition), hold_(hold) {
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
@@ -1678,7 +1677,7 @@ void Test::set_holdFile_path(TestWindow &window) {
         holdFilePtr_ = &holdFile_;
     }
     else if (hold_ && tradition_) {
-        //set tradition hold file path
+            //set tradition hold file path
     }
 }
 
@@ -1779,9 +1778,10 @@ void Tradition::train_Tradition(string &targetWindow) {
 }
 
 void Tradition::create_particles() {
+    Particle p(&company_);
+    p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++) {
-        p_.push_back(Particle(&company_, &company_.info_));
-        p_[i].tables_ = &tables_;
+        p_.push_back(p);
     }
 }
 
@@ -1859,7 +1859,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 2: {
-                Tradition trainTradition(company);
+                Tradition trainTradition(company, company.info_.setWindow_);
                 break;
             }
             case 3: {
@@ -1867,11 +1867,10 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
-                    //                Tradition tradition(company, _info);
-                    //                Train train(company, _info, "2011-12-01", "2011-12-30");
-                    //                Test test(company, _info, setWindow);
-                    //                Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                Tradition tradition(company);
+                    //                Train train(company "2011-12-01", "2011-12-30");
+                    //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                 break;
             }
         }
