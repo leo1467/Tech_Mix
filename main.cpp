@@ -1597,7 +1597,6 @@ void Train::clear_STL() {
 class Test {
 public:
     CompanyInfo &company_;
-    const Info &info_;
     Particle p_;
     vector<TechTable> tables_;
     bool tradition_ = false;
@@ -1612,16 +1611,16 @@ public:
     void set_holdFile_path(TestWindow & window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     
-    Test(CompanyInfo &company, const Info &info, string targetWindow = "all", bool tradition = false, bool hold = false);
+    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false);
 };
 
-Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition, bool hold) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company)}, tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold) : company_(company), p_(&company, &company.info_), tables_{TechTable(&company)}, tradition_(tradition), hold_(hold) {
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
     set_test_file_path(trainFilePath, testFileOutputPath);
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-        string actualWindow = info_.slidingWindows_[windowIndex];
+        string actualWindow = company_.info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
             start_test(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
         }
@@ -1630,12 +1629,12 @@ Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tra
 
 void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath) {
     if (tradition_) {
-        trainFilePath = company_.allTrainTraditionFilePath_.at(info_.techType_);
-        testFileOutputPath = company_.allTestTraditionFilePath_.at(info_.techType_);
+        trainFilePath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_);
+        testFileOutputPath = company_.allTestTraditionFilePath_.at(company_.info_.techType_);
     }
     else {
-        trainFilePath = company_.allTrainFilePath_.at(info_.techType_);
-        testFileOutputPath = company_.allTestFilePath_.at(info_.techType_);
+        trainFilePath = company_.allTrainFilePath_.at(company_.info_.techType_);
+        testFileOutputPath = company_.allTestFilePath_.at(company_.info_.techType_);
     }
     cout << "test " << company_.companyName_ << endl;
 }
@@ -1674,7 +1673,7 @@ void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, 
 
 void Test::set_holdFile_path(TestWindow &window) {
     if (hold_ && !tradition_) {
-        holdFile_.open(company_.allTestHoldFilePath_.at(info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
+        holdFile_.open(company_.allTestHoldFilePath_.at(company_.info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
         holdFile_ << "Date,Price,Hold,buy,sell day,sell ma" << endl;
         holdFilePtr_ = &holdFile_;
     }
@@ -1684,7 +1683,7 @@ void Test::set_holdFile_path(TestWindow &window) {
 }
 
 void Test::set_variables(vector<vector<string>> &thisTrainFile) {
-    switch (info_.techIndex_) {
+    switch (company_.info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -1858,7 +1857,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 1: {
-                Test test(company, _info, company.info_.setWindow_, false, true);
+                Test test(company, company.info_.setWindow_, false, true);
                 break;
             }
             case 2: {
@@ -1866,7 +1865,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 3: {
-                Test testTradition(company, _info, company.info_.setWindow_, true, false);
+                Test testTradition(company, company.info_.setWindow_, true, false);
                 break;
             }
             case 10: {
