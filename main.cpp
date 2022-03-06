@@ -22,7 +22,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 2;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
     
@@ -1757,15 +1757,12 @@ void Tradition::train_Tradition(string &targetWindow) {
     set_strategy();
     create_particles();
     cout << "train " << company_.companyName_ << " tradition" << endl;
-    string outputPath;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        outputPath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_) + window.windowName_;
-        int startRow;
-        int endRow;
+        string outputPath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_) + window.windowName_;
         for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
-            startRow = window.interval_[intervalIndex];
-            endRow = window.interval_[intervalIndex + 1];
+            int startRow = window.interval_[intervalIndex];
+            int endRow = window.interval_[intervalIndex + 1];
             for (int i = 0; i < traditionStrategyNum_; i++) {
                 p_[i].reset();
                 set_variables(i);
@@ -1774,14 +1771,6 @@ void Tradition::train_Tradition(string &targetWindow) {
             stable_sort(p_.begin(), p_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
             p_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
         }
-    }
-}
-
-void Tradition::create_particles() {
-    Particle p(&company_);
-    p.tables_ = &tables_;
-    for (int i = 0; i < traditionStrategyNum_; i++) {
-        p_.push_back(p);
     }
 }
 
@@ -1801,6 +1790,14 @@ void Tradition::set_strategy() {
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
 
+void Tradition::create_particles() {
+    Particle p(&company_);
+    p.tables_ = &tables_;
+    for (int i = 0; i < traditionStrategyNum_; i++) {
+        p_.push_back(p);
+    }
+}
+
 TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
     string actualWindow = company_.info_.slidingWindows_[windowIndex];
     if (targetWindow != "all") {
@@ -1813,22 +1810,8 @@ TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
 }
 
 void Tradition::set_variables(int index) {
-    switch (company_.info_.techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            p_[index].decimal_[0] = traditionStrategy_[index][0];
-            p_[index].decimal_[1] = traditionStrategy_[index][1];
-            p_[index].decimal_[2] = traditionStrategy_[index][2];
-            p_[index].decimal_[3] = traditionStrategy_[index][3];
-            break;
-        }
-        case 3: {
-            p_[index].decimal_[0] = traditionStrategy_[index][0];
-            p_[index].decimal_[1] = traditionStrategy_[index][1];
-            p_[index].decimal_[2] = traditionStrategy_[index][2];
-            break;
-        }
+    for (int i = 0; i < p_[i].variableNum_; i++) {
+        p_[index].decimal_[i] = traditionStrategy_[index][i];
     }
 }
 
