@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <bitset>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -22,13 +23,13 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 2;
+    int mode_ = 0;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
     
-    double delta_ = 0.00016;
-    int expNum_ = 1;
-    int genNum_ = 1;
+    double delta_ = 0.003;
+    int expNum_ = 50;
+    int genNum_ = 1000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
     
@@ -37,7 +38,7 @@ public:
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
     
-    int techIndex_ = 0;
+    int techIndex_ = 3;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -1062,6 +1063,10 @@ void Particle::convert_bi_dec() {
         }
         decimal_[variableIndex]++;
         bitIndex += eachVariableBitsNum_[variableIndex];
+    }
+    if (company_->info_.techIndex_ == 3) {
+        decimal_[1]--;
+        decimal_[2]--;
     }
 }
 
