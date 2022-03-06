@@ -1735,7 +1735,6 @@ public:
 
 class Tradition {
 public:
-    const Info &info_;
     CompanyInfo &company_;
     vector<TechTable> tables_;
     vector<Particle> p_;
@@ -1748,10 +1747,10 @@ public:
     TrainWindow set_window(string &targetWindow, int &windowIndex);
     void set_variables(int index);
     
-    Tradition(CompanyInfo &company, const Info &info, string targetWindow = "all");
+    Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
-Tradition::Tradition(CompanyInfo &company, const Info &info, string targetWindow) : company_(company), info_(info), tables_{TechTable(&company)} {
+Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company)} {
     train_Tradition(targetWindow);
 }
 
@@ -1762,7 +1761,7 @@ void Tradition::train_Tradition(string &targetWindow) {
     string outputPath;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        outputPath = company_.allTrainTraditionFilePath_.at(info_.techType_) + window.windowName_;
+        outputPath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_) + window.windowName_;
         int startRow;
         int endRow;
         for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
@@ -1781,13 +1780,13 @@ void Tradition::train_Tradition(string &targetWindow) {
 
 void Tradition::create_particles() {
     for (int i = 0; i < traditionStrategyNum_; i++) {
-        p_.push_back(Particle(&company_, &info_));
+        p_.push_back(Particle(&company_, &company_.info_));
         p_[i].tables_ = &tables_;
     }
 }
 
 void Tradition::set_strategy() {
-    switch (info_.techIndex_) {
+    switch (company_.info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -1803,7 +1802,7 @@ void Tradition::set_strategy() {
 }
 
 TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
-    string actualWindow = info_.slidingWindows_[windowIndex];
+    string actualWindow = company_.info_.slidingWindows_[windowIndex];
     if (targetWindow != "all") {
         actualWindow = targetWindow;
         windowIndex = company_.info_.windowNumber_;
@@ -1814,7 +1813,7 @@ TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
 }
 
 void Tradition::set_variables(int index) {
-    switch (info_.techIndex_) {
+    switch (company_.info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -1836,7 +1835,6 @@ void Tradition::set_variables(int index) {
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
-    vector<string> allTech = _info.allTech_;
     for (int companyIndex = 0; companyIndex < companyPricePath.size(); companyIndex++) {
         path targetCompanyPricePath = companyPricePath[companyIndex];
         if (_info.setCompany_ != "all") {
@@ -1861,7 +1859,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 2: {
-                Tradition trainTradition(company, _info);
+                Tradition trainTradition(company);
                 break;
             }
             case 3: {
