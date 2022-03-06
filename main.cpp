@@ -22,13 +22,13 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 10;
+    int mode_ = 1;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
     
     double delta_ = 0.00016;
-    int expNumber_ = 50;
-    int genNumber_ = 10000;
+    int expNumber_ = 1;
+    int genNumber_ = 1;
     int particleNumber_ = 10;
     double totalCapitalLV_ = 10000000;
     
@@ -83,6 +83,7 @@ public:
     vector<vector<double>> techTable_;
     int tableStartRow_ = -1;
     
+    void set_paths();
     void store_date_price(path priceFilePath);
     void create_folder();
     void find_table_start_row();
@@ -94,6 +95,13 @@ public:
 };
 
 CompanyInfo::CompanyInfo(path pricePath, vector<string> allTech, int techIndex, vector<string> slidingWindows, vector<string> slidingWindowEx, string testStartYear, string testEndYear) : companyName_(pricePath.stem().string()), allTech_(allTech), techIndex_(techIndex), techType_(allTech[techIndex]), slidingWindows_(slidingWindows), slidingWindowsEx_(slidingWindowEx), windowNumber_(int(slidingWindows.size())), testStartYear_(testStartYear), testEndYear_(testEndYear), testLength_(stod(testEndYear) - stod(testStartYear)) {
+    set_paths();
+    store_date_price(pricePath);
+    create_folder();
+    find_table_start_row();
+}
+
+void CompanyInfo::set_paths() {
     for (auto tech : allTech_) {
         allResultOutputPath_.insert({tech, tech + "_result"});
         allTechOuputPath_.insert({tech, tech + "/" + companyName_});
@@ -103,9 +111,6 @@ CompanyInfo::CompanyInfo(path pricePath, vector<string> allTech, int techIndex, 
         allTestTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testTradition/"});
         allTestHoldFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testHoldPerid/"});
     }
-    store_date_price(pricePath);
-    create_folder();
-    find_table_start_row();
 }
 
 void CompanyInfo::store_date_price(path priceFilePath) {
@@ -748,19 +753,22 @@ public:
     void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
     void print_trade_record(ofstream &out);
     void ini_buyNum_sellNum();
-    void trade(int startRow, int endRow, bool lastRecord = false);
+    void trade(int startRow, int endRow, bool lastRecord = false, ofstream *holdFilePtr = nullptr);
     void set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow);
+    void output_holdFile_date_price(ofstream *holdFilePtr, int i);
     void push_title();
     void push_buy_info(int stockHold, int i);
+    void output_holdFile_buy(std::ofstream *holdFilePtr, int i);
     void push_sell_info(int stockHold, int i);
+    void output_holdFile_sell(int endRow, std::ofstream *holdFilePtr, int i);
     void push_last_info(bool lastRecord);
     void check_buyNum_sellNum();
     void reset(double RoR = 0);
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
     void print(ofstream &out, bool debug);
+    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
-    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow);
     
     Particle(CompanyInfo *company, const Info *info, bool on = false, vector<int> variables = {});
 };
@@ -864,7 +872,7 @@ void Particle::ini_buyNum_sellNum() {
     }
 }
 
-void Particle::trade(int startRow, int endRow, bool lastRecord) {
+void Particle::trade(int startRow, int endRow, bool lastRecord, ofstream *holdFilePtr) {
     int stockHold = 0;
     push_title();
     ini_buyNum_sellNum();
@@ -872,17 +880,26 @@ void Particle::trade(int startRow, int endRow, bool lastRecord) {
     bool sellCondition = false;
     for (int i = startRow; i <= endRow; i++) {
         set_buy_sell_condition(buyCondition, sellCondition, stockHold, i, endRow);
+        output_holdFile_date_price(holdFilePtr, i);
         if (buyCondition) {
             stockHold = floor(remain_ / (*tables_)[0].price_[i]);
             remain_ = remain_ - stockHold * (*tables_)[0].price_[i];
             buyNum_++;
             push_buy_info(stockHold, i);
+            output_holdFile_buy(holdFilePtr, i);
         }
         else if (sellCondition) {
             remain_ = remain_ + (double)stockHold * (*tables_)[0].price_[i];
             stockHold = 0;
             sellNum_++;
             push_sell_info(stockHold, i);
+            output_holdFile_sell(endRow, holdFilePtr, i);
+        }
+        else if (holdFilePtr != nullptr && stockHold != 0) {
+            (*holdFilePtr) << (*tables_)[0].price_[i] << endl;
+        }
+        else if (holdFilePtr != nullptr && stockHold == 0) {
+            (*holdFilePtr) << endl;
         }
     }
     check_buyNum_sellNum();
@@ -907,6 +924,12 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
         default: {
             break;
         }
+    }
+}
+
+void Particle::output_holdFile_date_price(ofstream *holdFilePtr, int i) {
+    if (holdFilePtr != nullptr) {
+        (*holdFilePtr) << (*tables_)[0].date_[i] << "," << (*tables_)[0].price_[i] << ",";
     }
 }
 
@@ -955,6 +978,12 @@ void Particle::push_buy_info(int stockHold, int i) {
     }
 }
 
+void Particle::output_holdFile_buy(std::ofstream *holdFilePtr, int i) {
+    if (holdFilePtr != nullptr) {
+        (*holdFilePtr) << (*tables_)[0].price_[i] << "," << (*tables_)[0].price_[i] << endl;
+    }
+}
+
 void Particle::push_sell_info(int stockHold, int i) {
     if (isRecordOn_) {
         string push;
@@ -980,6 +1009,17 @@ void Particle::push_sell_info(int stockHold, int i) {
         push += set_precision(remain_) + ",";
         push += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n\n";
         tradeRecord_.push_back(push);
+    }
+}
+
+void Particle::output_holdFile_sell(int endRow, std::ofstream *holdFilePtr, int i) {
+    if (holdFilePtr != nullptr) {
+        if (i == endRow) {
+            (*holdFilePtr) << (*tables_)[0].price_[i] << ",," << (*tables_)[0].price_[i] << endl;
+        }
+        else {
+            (*holdFilePtr) << (*tables_)[0].price_[i] << ",,," << (*tables_)[0].price_[i] << endl;
+        }
     }
 }
 
@@ -1063,6 +1103,57 @@ void Particle::print(ofstream &out, bool debug) {
         cout << endl;
 }
 
+void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr) {
+    string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
+    isRecordOn_ = true;
+    remain_ = info_->totalCapitalLV_;
+    trade(actualStartRow, actualEndRow, false, holdFilePtr);
+    if (holdFilePtr == nullptr || info_->mode_ == 1) {
+        ofstream out;
+        out.open(filePath);
+        out << "algo," << info_->algoType_ << endl;
+        out << "delta," << set_precision(info_->delta_) << endl;
+        out << "exp," << info_->expNumber_ << endl;
+        out << "gen," << info_->genNumber_ << endl;
+        out << "p number," << info_->particleNumber_ << endl;
+        out << endl;
+        out << "initial capital," << set_precision(info_->totalCapitalLV_) << endl;
+        out << "final capital," << set_precision(remain_) << endl;
+        out << "final return," << set_precision(remain_ - info_->totalCapitalLV_) << endl;
+        out << endl;
+        switch (info_->techIndex_) {
+            case 0:
+            case 1:
+            case 2: {
+                out << "buy1," << decimal_[0] << endl;
+                out << "buy1," << decimal_[1] << endl;
+                out << "sell1," << decimal_[2] << endl;
+                out << "sell2," << decimal_[3] << endl;
+                break;
+            }
+            case 3: {
+                out << "period," << decimal_[0] << endl;
+                out << "overSold," << decimal_[1] << endl;
+                out << "overBought," << decimal_[2] << endl;
+                break;
+            }
+            default: {
+                cout << "print_train_test_data exception" << endl;
+                exit(1);
+            }
+        }
+        out << "trade," << sellNum_ << endl;
+        out << "return rate," << set_precision(RoR_) << "%" << endl;
+        out << endl;
+        out << "best exp," << exp_ << endl;
+        out << "best gen," << gen_ << endl;
+        out << "best cnt," << bestCnt_ << endl;
+        out << endl;
+        print_trade_record(out);
+        out.close();
+    }
+}
+
 string Particle::set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
     if (outputPath != "") {
         if (info_->testDeltaLoop_ > 0) {
@@ -1083,55 +1174,6 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     outputPath += (*tables_)[0].date_[actualStartRow] + "_";
     outputPath += (*tables_)[0].date_[actualEndRow] + ".csv";
     return outputPath;
-}
-
-void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow) {
-    string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
-    isRecordOn_ = true;
-    remain_ = info_->totalCapitalLV_;
-    trade(actualStartRow, actualEndRow);
-    ofstream out;
-    out.open(filePath);
-    out << "algo," << info_->algoType_ << endl;
-    out << "delta," << set_precision(info_->delta_) << endl;
-    out << "exp," << info_->expNumber_ << endl;
-    out << "gen," << info_->genNumber_ << endl;
-    out << "p number," << info_->particleNumber_ << endl;
-    out << endl;
-    out << "initial capital," << set_precision(info_->totalCapitalLV_) << endl;
-    out << "final capital," << set_precision(remain_) << endl;
-    out << "final return," << set_precision(remain_ - info_->totalCapitalLV_) << endl;
-    out << endl;
-    switch (info_->techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            out << "buy1," << decimal_[0] << endl;
-            out << "buy1," << decimal_[1] << endl;
-            out << "sell1," << decimal_[2] << endl;
-            out << "sell2," << decimal_[3] << endl;
-            break;
-        }
-        case 3: {
-            out << "period," << decimal_[0] << endl;
-            out << "overSold," << decimal_[1] << endl;
-            out << "overBought," << decimal_[2] << endl;
-            break;
-        }
-        default: {
-            cout << "print_train_test_data exception" << endl;
-            exit(1);
-        }
-    }
-    out << "trade," << sellNum_ << endl;
-    out << "return rate," << set_precision(RoR_) << "%" << endl;
-    out << endl;
-    out << "best exp," << exp_ << endl;
-    out << "best gen," << gen_ << endl;
-    out << "best cnt," << bestCnt_ << endl;
-    out << endl;
-    print_trade_record(out);
-    out.close();
 }
 
 class BetaMatrix {
@@ -1564,25 +1606,26 @@ public:
     const Info &info_;
     Particle p_;
     vector<TechTable> tables_;
-    bool hold_;
+    bool tradition_ = false;
+    bool hold_ = false;
     ofstream holdFile_;
     ofstream *holdFilePtr_ = nullptr;
     
-    void set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition);
+    void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
-    void set_hold_file(TestWindow & window);
+    void set_holdFile_path(TestWindow & window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     
     Test(CompanyInfo &company, const Info &info, string targetWindow = "all", bool tradition = false, bool hold = false);
 };
 
-Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition, bool hold) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)}, hold_(hold) {
+Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tradition, bool hold) : company_(company), info_(info), p_(&company, &info), tables_{TechTable(&company, company.techIndex_)}, tradition_(tradition), hold_(hold) {
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
-    set_test_output_path(trainFilePath, testFileOutputPath, tradition);
+    set_test_file_path(trainFilePath, testFileOutputPath);
     for (int windowIndex = 0; windowIndex < company_.windowNumber_; windowIndex++) {
         string actualWindow = info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
@@ -1591,8 +1634,8 @@ Test::Test(CompanyInfo &company, const Info &info, string targetWindow, bool tra
     }
 }
 
-void Test::set_test_output_path(string &trainFilePath, string &testFileOutputPath, bool tradition) {
-    if (tradition) {
+void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath) {
+    if (tradition_) {
         trainFilePath = company_.allTrainTraditionFilePath_.at(info_.techType_);
         testFileOutputPath = company_.allTestTraditionFilePath_.at(info_.techType_);
     }
@@ -1608,12 +1651,12 @@ void Test::start_test(string &actualWindow, string &targetWindow, const string &
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
     int intervalSize = (int)window.interval_.size();
     check_exception(eachTrainFilePath, window, intervalSize / 2);
-    set_hold_file(window);
+    set_holdFile_path(window);
     for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
-        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1]);
+        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdFilePtr_);
     }
     holdFile_.close();
 }
@@ -1635,11 +1678,14 @@ void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, 
     }
 }
 
-void Test::set_hold_file(TestWindow &window) {
-    if (hold_) {
+void Test::set_holdFile_path(TestWindow &window) {
+    if (hold_ && !tradition_) {
         holdFile_.open(company_.allTestHoldFilePath_.at(info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
         holdFile_ << "Date,Price,Hold,buy,sell day,sell ma" << endl;
         holdFilePtr_ = &holdFile_;
+    }
+    else if (hold_ && tradition_) {
+        //set tradition hold file path
     }
 }
 
@@ -1839,7 +1885,6 @@ int main(int argc, const char *argv[]) {
                     //                Test test(company, _info, setWindow);
                     //                Particle(&company, &_info, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, &_info, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                Test(company, _info, setWindow, false, false);
                 break;
             }
         }
