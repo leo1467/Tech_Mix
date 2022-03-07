@@ -23,7 +23,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 10;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
     
@@ -316,6 +316,8 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 class TechTable {
 public:
     CompanyInfo *company_;
+    int techIndex_;
+    string techType_;
     int days_;
     vector<string> date_;
     vector<double> price_;
@@ -324,10 +326,10 @@ public:
     void create_techTable(CompanyInfo *company);
     void output_techTable();
     
-    TechTable(CompanyInfo *company);
+    TechTable(CompanyInfo *company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo *company) : company_(company) {
+TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.allTech_[techIndex]) {
     create_techTable(company_);
 }
 
@@ -343,14 +345,13 @@ void TechTable::create_techTable(CompanyInfo *company) {
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
-    vector<path> techFilePath;
-    techFilePath = get_path(company->allTechOuputPath_.at(company_->info_.techType_));
+    vector<path> techFilePath = get_path(company->allTechOuputPath_.at(techType_));
     int techFilePathSize = (int)techFilePath.size();
     if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
         exit(1);
     }
-    cout << "reading " << company_->info_.techType_ << " files";
+    cout << "reading " << techType_ << " files";
     for (int i = 0; i < techFilePathSize; i++) {
         if (i % 16 == 0) {
             cout << ".";
@@ -792,7 +793,7 @@ Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : compa
 }
 
 void Particle::instant_trade(string startDate, string endDate) {
-    vector<TechTable> tmp = {TechTable(company_)};
+    vector<TechTable> tmp = {TechTable(company_, company_->info_.techIndex_)};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
     for (int dateRow = 0; dateRow < (*tables_)[0].days_; dateRow++) {
@@ -1253,7 +1254,7 @@ public:
     Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
 };
 
-Train::Train(CompanyInfo &company, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), tables_{TechTable(&company)}, actualDelta_(company.info_.delta_) {
+Train::Train(CompanyInfo &company, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)}, actualDelta_(company.info_.delta_) {
     if (company.info_.testDeltaLoop_ == 0) {
         start_train(targetWindow, startDate, endDate, debug);
     }
@@ -1611,10 +1612,15 @@ public:
     void set_holdFile_path(TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     
-    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false);
+    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> addtionTable = {});
 };
 
-Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold) : company_(company), p_(&company), tables_{TechTable(&company)}, tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> addtionTable) : company_(company), p_(&company), tables_{TechTable(&company, company.info_.techIndex_)}, tradition_(tradition), hold_(hold) {
+    if (addtionTable.size() != 0) {
+        for (int i = 0; i < addtionTable.size(); i++) {
+            tables_.push_back(TechTable(&company_, addtionTable[i]));
+        }
+    }
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
@@ -1750,7 +1756,7 @@ public:
     Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
-Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company)} {
+Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)} {
     train_Tradition(targetWindow);
 }
 
@@ -1851,6 +1857,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
+                Test(company, company.info_.setWindow_, false, false, vector<int>{0});
                     //                Tradition tradition(company);
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
