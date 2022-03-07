@@ -25,7 +25,7 @@ class Info {
 public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "M2M";
+    string setWindow_ = "YYY2Y";
     
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -912,6 +912,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
         case 3: {
             buyCondition = RSI::buy_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= (*tables_)[0].price_[i];
             sellCondition = RSI::sell_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[2]);
+            // buyCondition = buyCondition && !((*tables_)[1].techTable_[i][5] <= (*tables_)[1].techTable_[i][10]);
             break;
         }
         default: {
@@ -1105,7 +1106,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
     isRecordOn_ = true;
     remain_ = company_->info_.totalCapitalLV_;
     trade(actualStartRow, actualEndRow, false, holdFilePtr);
-    if (holdFilePtr == nullptr || company_->info_.mode_ == 1) {
+    if (holdFilePtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 10) {
         ofstream out;
         out.open(filePath);
         out << "algo," << company_->info_.algoType_ << endl;
@@ -1605,6 +1606,7 @@ public:
     ofstream holdFile_;
     ofstream *holdFilePtr_ = nullptr;
     
+    void add_tables(vector<int> addtionTable);
     void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
@@ -1616,11 +1618,7 @@ public:
 };
 
 Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> addtionTable) : company_(company), p_(&company), tables_{TechTable(&company, company.info_.techIndex_)}, tradition_(tradition), hold_(hold) {
-    if (addtionTable.size() != 0) {
-        for (int i = 0; i < addtionTable.size(); i++) {
-            tables_.push_back(TechTable(&company_, addtionTable[i]));
-        }
-    }
+    add_tables(addtionTable);
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
@@ -1630,6 +1628,12 @@ Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold,
         if (actualWindow != "A2A") {
             start_test(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
         }
+    }
+}
+
+void Test::add_tables(vector<int> addtionTable) {
+    for (int i = 0; i < addtionTable.size(); i++) {
+        tables_.push_back(TechTable(&company_, addtionTable[i]));
     }
 }
 
@@ -1854,7 +1858,7 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
-                Test(company, company.info_.setWindow_, false, false, vector<int>{0});
+                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                Tradition tradition(company);
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
