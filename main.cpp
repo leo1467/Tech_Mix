@@ -25,7 +25,7 @@ class Info {
 public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "all";
+    string setWindow_ = "M2M";
     
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -1689,20 +1689,17 @@ void Test::set_holdFile_path(TestWindow &window) {
 }
 
 void Test::set_variables(vector<vector<string>> &thisTrainFile) {
+    p_.decimal_[0] = stoi(thisTrainFile[10][1]);
+    p_.decimal_[1] = stoi(thisTrainFile[11][1]);
+    p_.decimal_[2] = stoi(thisTrainFile[12][1]);
     switch (company_.info_.techIndex_) {
         case 0:
         case 1:
         case 2: {
-            p_.decimal_[0] = stoi(thisTrainFile[10][1]);
-            p_.decimal_[1] = stoi(thisTrainFile[11][1]);
-            p_.decimal_[2] = stoi(thisTrainFile[12][1]);
             p_.decimal_[3] = stoi(thisTrainFile[13][1]);
             break;
         }
         case 3: {
-            p_.decimal_[0] = stoi(thisTrainFile[9][1]);
-            p_.decimal_[1] = stoi(thisTrainFile[10][1]);
-            p_.decimal_[2] = stoi(thisTrainFile[11][1]);
             break;
         }
         default: {
