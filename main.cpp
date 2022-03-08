@@ -38,7 +38,7 @@ public:
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
     
-    int techIndex_ = 3;
+    int techIndex_ = 0;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -741,26 +741,32 @@ public:
     
     double actualDelta_ = -1;
     
-    void ini_particle(int techIndex, string techType, double totalCapitalLV, bool on, vector<int> variables);
-    void instant_trade(string startDate, string endDate);
+    
+    void instant_trade(string startDate, string endDate, bool hold = false);
+    void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
+    void push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *holdInfoPtr);
+    string set_title_variables();
     void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
     void print_trade_record(ofstream &out);
+    void print_instant_trade_hold_record(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
-    void trade(int startRow, int endRow, bool lastRecord = false, ofstream *holdFilePtr = nullptr);
+    void trade(int startRow, int endRow, bool lastRecord = false, vector<string> *holdInfoPtr = nullptr);
     void set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow);
-    void output_holdFile_date_price(ofstream *holdFilePtr, int i);
-    void push_title();
-    void push_buy_info(int stockHold, int i);
-    void output_holdFile_buy(std::ofstream *holdFilePtr, int i);
-    void push_sell_info(int stockHold, int i);
-    void output_holdFile_sell(int endRow, std::ofstream *holdFilePtr, int i);
-    void push_last_info(bool lastRecord);
+    void push_holdInfo_date_price(vector<string> *holdInfoPtr, int i);
+    void push_tradeInfo_column_name();
+    void push_tradeInfo_buy(int stockHold, int i);
+    void push_holdInfo_buy(vector<string> *holdInfoPtr, int i);
+    void push_tradeInfo_sell(int stockHold, int i);
+    void push_holdInfo_sell(int endRow, vector<string> *holdInfoPtr, int i);
+    void push_holdInfo_holding(vector<string> *holdInfoPtr, int i);
+    void push_hodInfo_not_holding(vector<string> *holdInfoPtr, int i);
+    void push_tradeInfo_last(bool lastRecord);
     void check_buyNum_sellNum();
     void reset(double RoR = 0);
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
     void print(ofstream &out, bool debug);
-    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr = nullptr);
+    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
     
     Particle(CompanyInfo *company, bool on = false, vector<int> variables = {});
@@ -792,19 +798,26 @@ Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : compa
     }
 }
 
-void Particle::instant_trade(string startDate, string endDate) {
+void Particle::instant_trade(string startDate, string endDate, bool hold) {
     vector<TechTable> tmp = {TechTable(company_, company_->info_.techIndex_)};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
+    find_instant_trade_startRow_endRow(startDate, startDate, startRow, endRow);
+    vector<string> holdInfo;
+    vector<string> *holdInfoPtr = nullptr;
+    push_holdInfo_column_Name(hold, holdInfo, holdInfoPtr);
+    trade(startRow, endRow, true, holdInfoPtr);
+    ofstream out;
+    set_instant_trade_file(out, startDate, endDate);
+    print_trade_record(out);
+    out.close();
+    print_instant_trade_hold_record(hold, holdInfo, startDate, endDate);
+}
+
+void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
     for (int dateRow = 0; dateRow < (*tables_)[0].days_; dateRow++) {
         if (startDate == (*tables_)[0].date_[dateRow]) {
             startRow = dateRow;
-            break;
-        }
-    }
-    for (int dateRow = startRow; dateRow < (*tables_)[0].days_; dateRow++) {
-        if (endDate == (*tables_)[0].date_[dateRow]) {
-            endRow = dateRow;
             break;
         }
     }
@@ -812,27 +825,44 @@ void Particle::instant_trade(string startDate, string endDate) {
         cout << "instant trade startDate is not found" << endl;
         exit(1);
     }
+    for (int dateRow = startRow; dateRow < (*tables_)[0].days_; dateRow++) {
+        if (endDate == (*tables_)[0].date_[dateRow]) {
+            endRow = dateRow;
+            break;
+        }
+    }
     if (endRow == -1) {
         cout << "instant trade endDate is not found" << endl;
         exit(1);
     }
-    trade(startRow, endRow, true);
-    ofstream out;
-    set_instant_trade_file(out, startDate, endDate);
-    print_trade_record(out);
-    out.close();
+}
+
+void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *holdInfoPtr) {
+    if (hold) {
+        holdInfo.push_back("Date,Price,Hold,buy,sell date,sell " + company_->info_.techType_ + ",");
+        switch (company_->info_.techIndex_) {
+            case 0:
+            case 1:
+            case 2: {
+                holdInfo.push_back("buy 1,buy 2,sell 1,sell 2\n");
+                break;
+            }
+            case 3: {
+                holdInfo.push_back("overSold,overbought\n");
+            }
+        }
+        holdInfoPtr = &holdInfo;
+    }
 }
 
 void Particle::set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate) {
-    string titleVariables;
+    string titleVariables = set_title_variables();
     string showVariablesInFile;
     for (auto i : decimal_) {
-        titleVariables += "_";
-        titleVariables += to_string(i);
         showVariablesInFile += ",";
         showVariablesInFile += to_string(i);
     }
-    out.open(company_->companyName_ + "_" + company_->info_.techType_ + "_instantTrade_" + startDate + "_" + endDate + titleVariables + ".csv");
+    out.open(company_->companyName_ + "_" + company_->info_.techType_ + titleVariables + "_instantTrade_" + startDate + "_" + endDate + ".csv");
     switch (company_->info_.techIndex_) {
         case 0:
         case 1:
@@ -841,7 +871,7 @@ void Particle::set_instant_trade_file(ofstream &out, const string &startDate, co
             break;
         }
         case 3: {
-            out << "company,startDate,endDate,RSIPeriod,overSold,overBought" << endl;
+            out << "company,startDate,endDate,period,overSold,overBought" << endl;
             break;
         }
         default: {
@@ -852,9 +882,29 @@ void Particle::set_instant_trade_file(ofstream &out, const string &startDate, co
     out << company_->companyName_ << "," << startDate << "," << endDate << showVariablesInFile << "\n\n";
 }
 
+string Particle::set_title_variables() {
+    string titleVariables;
+    for (auto i : decimal_) {
+        titleVariables += "_";
+        titleVariables += to_string(i);
+    }
+    return titleVariables;
+}
+
 void Particle::print_trade_record(ofstream &out) {
     for (auto record : tradeRecord_) {
         out << record;
+    }
+}
+
+void Particle::print_instant_trade_hold_record(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate) {
+    if (hold) {
+        string titleVariables = set_title_variables();
+        ofstream holdFile(company_->companyName_ + "_" + company_->info_.techType_ + titleVariables + "_hold_" + startDate + "_" + endDate + ".csv");
+        for (auto info : holdInfo) {
+            holdFile << info;
+        }
+        holdFile.close();
     }
 }
 
@@ -865,39 +915,39 @@ void Particle::ini_buyNum_sellNum() {
     }
 }
 
-void Particle::trade(int startRow, int endRow, bool lastRecord, ofstream *holdFilePtr) {
+void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *holdInfoPtr) {
     int stockHold = 0;
-    push_title();
+    push_tradeInfo_column_name();
     ini_buyNum_sellNum();
     bool buyCondition = false;
     bool sellCondition = false;
     for (int i = startRow; i <= endRow; i++) {
         set_buy_sell_condition(buyCondition, sellCondition, stockHold, i, endRow);
-        output_holdFile_date_price(holdFilePtr, i);
+        push_holdInfo_date_price(holdInfoPtr, i);
         if (buyCondition) {
             stockHold = floor(remain_ / (*tables_)[0].price_[i]);
             remain_ = remain_ - stockHold * (*tables_)[0].price_[i];
             buyNum_++;
-            push_buy_info(stockHold, i);
-            output_holdFile_buy(holdFilePtr, i);
+            push_tradeInfo_buy(stockHold, i);
+            push_holdInfo_buy(holdInfoPtr, i);
         }
         else if (sellCondition) {
             remain_ = remain_ + (double)stockHold * (*tables_)[0].price_[i];
             stockHold = 0;
             sellNum_++;
-            push_sell_info(stockHold, i);
-            output_holdFile_sell(endRow, holdFilePtr, i);
+            push_tradeInfo_sell(stockHold, i);
+            push_holdInfo_sell(endRow, holdInfoPtr, i);
         }
-        else if (holdFilePtr != nullptr && stockHold != 0) {
-            (*holdFilePtr) << (*tables_)[0].price_[i] << endl;
+        else if (holdInfoPtr != nullptr && stockHold != 0) {
+            push_holdInfo_holding(holdInfoPtr, i);
         }
-        else if (holdFilePtr != nullptr && stockHold == 0) {
-            (*holdFilePtr) << endl;
+        else if (holdInfoPtr != nullptr && stockHold == 0) {
+            push_hodInfo_not_holding(holdInfoPtr, i);
         }
     }
     check_buyNum_sellNum();
     RoR_ = (remain_ - company_->info_.totalCapitalLV_) / company_->info_.totalCapitalLV_ * 100.0;
-    push_last_info(lastRecord);
+    push_tradeInfo_last(lastRecord);
 }
 
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
@@ -921,13 +971,18 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
     }
 }
 
-void Particle::output_holdFile_date_price(ofstream *holdFilePtr, int i) {
-    if (holdFilePtr != nullptr) {
-        (*holdFilePtr) << (*tables_)[0].date_[i] << "," << (*tables_)[0].price_[i] << ",";
+void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
+    if (holdInfoPtr != nullptr) {
+        string push;
+        push += (*tables_)[0].date_[i];
+        push += ",";
+        push += set_precision((*tables_)[0].price_[i]);
+        push += ",";
+        (*holdInfoPtr).push_back(push);
     }
 }
 
-void Particle::push_title() {
+void Particle::push_tradeInfo_column_name() {
     if (isRecordOn_) {
         switch (company_->info_.techIndex_) {
             case 0:
@@ -944,7 +999,7 @@ void Particle::push_title() {
     }
 }
 
-void Particle::push_buy_info(int stockHold, int i) {
+void Particle::push_tradeInfo_buy(int stockHold, int i) {
     if (isRecordOn_) {
         string push;
         push += "buy,";
@@ -972,13 +1027,23 @@ void Particle::push_buy_info(int stockHold, int i) {
     }
 }
 
-void Particle::output_holdFile_buy(std::ofstream *holdFilePtr, int i) {
-    if (holdFilePtr != nullptr) {
-        (*holdFilePtr) << (*tables_)[0].price_[i] << "," << (*tables_)[0].price_[i] << endl;
+void Particle::push_holdInfo_buy(vector<string> *holdInfoPtr, int i) {
+    if (holdInfoPtr != nullptr) {
+        string push;
+        push += set_precision((*tables_)[0].price_[i]);
+        push += ",";
+        push += set_precision((*tables_)[0].price_[i]);
+        push += ",,,";
+        for (auto variable : decimal_) {
+            push += set_precision((*tables_)[0].techTable_[i][variable]);
+            push += ",";
+        }
+        push += "\n";
+        (*holdInfoPtr).push_back(push);
     }
 }
 
-void Particle::push_sell_info(int stockHold, int i) {
+void Particle::push_tradeInfo_sell(int stockHold, int i) {
     if (isRecordOn_) {
         string push;
         push += "sell,";
@@ -1006,15 +1071,50 @@ void Particle::push_sell_info(int stockHold, int i) {
     }
 }
 
-void Particle::output_holdFile_sell(int endRow, std::ofstream *holdFilePtr, int i) {
-    if (holdFilePtr != nullptr) {
+void Particle::push_holdInfo_sell(int endRow, vector<string> *holdInfoPtr, int i) {
+    if (holdInfoPtr != nullptr) {
+        string push;
+        push += set_precision((*tables_)[0].price_[i]);
         if (i == endRow) {
-            (*holdFilePtr) << (*tables_)[0].price_[i] << ",," << (*tables_)[0].price_[i] << endl;
+            push += ",,";
+            push += set_precision((*tables_)[0].price_[i]);
+            push += ",,";
         }
         else {
-            (*holdFilePtr) << (*tables_)[0].price_[i] << ",,," << (*tables_)[0].price_[i] << endl;
+            push += ",,,";
+            push += set_precision((*tables_)[0].price_[i]);
+            push += ",";
         }
+        for (auto variable : decimal_) {
+            push += set_precision((*tables_)[0].techTable_[i][variable]);
+            push += ",";
+        }
+        push += "\n";
+        (*holdInfoPtr).push_back(push);
     }
+}
+
+void Particle::push_holdInfo_holding(vector<string> *holdInfoPtr, int i) {
+    string push;
+    push += set_precision((*tables_)[0].price_[i]);
+    push += ",,,,";
+    for (auto variable : decimal_) {
+        push += set_precision((*tables_)[0].techTable_[i][variable]);
+        push += ",";
+    }
+    push += "\n";
+    (*holdInfoPtr).push_back(push);
+}
+
+void Particle::push_hodInfo_not_holding(vector<string> *holdInfoPtr, int i) {
+    string push;
+    push += ",,,,";
+    for (auto variable : decimal_) {
+        push += set_precision((*tables_)[0].techTable_[i][variable]);
+        push += ",";
+    }
+    push += "\n";
+    (*holdInfoPtr).push_back(push);
 }
 
 void Particle::check_buyNum_sellNum() {
@@ -1024,7 +1124,7 @@ void Particle::check_buyNum_sellNum() {
     }
 }
 
-void Particle::push_last_info(bool lastRecord) {
+void Particle::push_tradeInfo_last(bool lastRecord) {
     if (isRecordOn_ && lastRecord) {
         tradeRecord_.push_back("buyNum," + to_string(buyNum_) + ",sellNum," + to_string(sellNum_) + "\nremain," + set_precision(remain_) + "\nreturn rate," + set_precision(RoR_) + "%\n");
     }
@@ -1101,12 +1201,12 @@ void Particle::print(ofstream &out, bool debug) {
         cout << endl;
 }
 
-void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, ofstream *holdFilePtr) {
+void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr) {
     string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
     isRecordOn_ = true;
     remain_ = company_->info_.totalCapitalLV_;
-    trade(actualStartRow, actualEndRow, false, holdFilePtr);
-    if (holdFilePtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 10) {
+    trade(actualStartRow, actualEndRow, false, holdInfoPtr);
+    if (holdInfoPtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 10) {
         ofstream out;
         out.open(filePath);
         out << "algo," << company_->info_.algoType_ << endl;
@@ -1659,7 +1759,7 @@ void Test::start_test(string &actualWindow, string &targetWindow, const string &
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
-        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdFilePtr_);
+//        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdFilePtr_);
     }
     holdFile_.close();
 }
@@ -1858,11 +1958,12 @@ int main(int argc, const char *argv[]) {
                 break;
             }
             case 10: {
-                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                Tradition tradition(company);
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                                   Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 break;
             }
         }
