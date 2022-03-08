@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <bitset>
 #include <chrono>
 #include <cmath>
 #include <ctime>
@@ -23,9 +22,9 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 10;
+    int mode_ = 1;
     string setCompany_ = "AAPL";
-    string setWindow_ = "YYY2Y";
+    string setWindow_ = "all";
     
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -744,11 +743,11 @@ public:
     
     void instant_trade(string startDate, string endDate, bool hold = false);
     void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
-    void push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *holdInfoPtr);
+    void push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr);
     string set_title_variables();
     void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
     void print_trade_record(ofstream &out);
-    void print_instant_trade_hold_record(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate);
+    void print_instant_trade_holdInfo(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false, vector<string> *holdInfoPtr = nullptr);
     void set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow);
@@ -811,7 +810,7 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
     set_instant_trade_file(out, startDate, endDate);
     print_trade_record(out);
     out.close();
-    print_instant_trade_hold_record(hold, holdInfo, startDate, endDate);
+    print_instant_trade_holdInfo(hold, holdInfo, startDate, endDate);
 }
 
 void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
@@ -837,8 +836,9 @@ void Particle::find_instant_trade_startRow_endRow(const string &startDate, const
     }
 }
 
-void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *holdInfoPtr) {
+void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr) {
     if (hold) {
+        holdInfo.clear();
         holdInfo.push_back("Date,Price,Hold,buy,sell date,sell " + company_->info_.techType_ + ",");
         switch (company_->info_.techIndex_) {
             case 0:
@@ -897,7 +897,7 @@ void Particle::print_trade_record(ofstream &out) {
     }
 }
 
-void Particle::print_instant_trade_hold_record(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate) {
+void Particle::print_instant_trade_holdInfo(bool hold, const vector<string> &holdInfo, const string &startDate, const string &endDate) {
     if (hold) {
         string titleVariables = set_title_variables();
         ofstream holdFile(company_->companyName_ + "_" + company_->info_.techType_ + titleVariables + "_hold_" + startDate + "_" + endDate + ".csv");
@@ -1703,16 +1703,16 @@ public:
     vector<TechTable> tables_;
     bool tradition_ = false;
     bool hold_ = false;
-    ofstream holdFile_;
-    ofstream *holdFilePtr_ = nullptr;
+    vector<string> holdInfo_;
+    vector<string> *holdInfoPtr_ = nullptr;
     
     void add_tables(vector<int> addtionTable);
     void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
-    void set_holdFile_path(TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
+    void print_test_holdInfo(TestWindow &window);
     
     Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> addtionTable = {});
 };
@@ -1754,14 +1754,14 @@ void Test::start_test(string &actualWindow, string &targetWindow, const string &
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
     int intervalSize = (int)window.interval_.size();
     check_exception(eachTrainFilePath, window, intervalSize / 2);
-    set_holdFile_path(window);
     for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
-//        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdFilePtr_);
+        p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
+        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdInfoPtr_);
+        print_test_holdInfo(window);
     }
-    holdFile_.close();
 }
 
 TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &windowIndex) {
@@ -1781,14 +1781,19 @@ void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, 
     }
 }
 
-void Test::set_holdFile_path(TestWindow &window) {
-    if (hold_ && !tradition_) {
-        holdFile_.open(company_.allTestHoldFilePath_.at(company_.info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
-        holdFile_ << "Date,Price,Hold,buy,sell day,sell ma" << endl;
-        holdFilePtr_ = &holdFile_;
-    }
-    else if (hold_ && tradition_) {
-            //set tradition hold file path
+void Test::print_test_holdInfo(TestWindow &window) {
+    if (hold_) {
+        ofstream holdFile;
+        if (!tradition_) {
+            holdFile.open(company_.allTestHoldFilePath_.at(company_.info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
+        }
+        else if (tradition_) {
+                //set tradition hold file path
+        }
+        for (auto info : holdInfo_) {
+            holdFile << info;
+        }
+        holdFile.close();
     }
 }
 
