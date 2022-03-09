@@ -1896,24 +1896,28 @@ void Tradition::set_variables(int index) {
     }
 }
 
+static CompanyInfo set_company(vector<path> &companyPricePath, vector<path>::iterator &companyPricePathIter) {
+    path targetCompanyPricePath = *companyPricePathIter;
+    if (_info.setCompany_ != "all") {
+        for (auto i : companyPricePath) {
+            if (i.stem() == _info.setCompany_) {
+                targetCompanyPricePath = i;
+                break;
+            }
+        }
+        companyPricePathIter = companyPricePath.end() - 1;
+    }
+    CompanyInfo company(_info, targetCompanyPricePath);
+    cout << company.companyName_ << endl;
+    return company;
+}
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
     try {
-        for (int companyIndex = 0; companyIndex < companyPricePath.size(); companyIndex++) {
-            path targetCompanyPricePath = companyPricePath[companyIndex];
-            if (_info.setCompany_ != "all") {
-                for (auto i : companyPricePath) {
-                    if (i.stem() == _info.setCompany_) {
-                        targetCompanyPricePath = i;
-                        break;
-                    }
-                }
-                companyPricePath.clear();
-                companyPricePath.push_back(targetCompanyPricePath);
-            }
-            CompanyInfo company(_info, targetCompanyPricePath);
-            cout << company.companyName_ << endl;
+        for (auto companyPricePathIter = companyPricePath.begin(); companyPricePathIter != companyPricePath.end(); companyPricePathIter++) {
+            CompanyInfo company = set_company(companyPricePath, companyPricePathIter);
             switch (company.info_.mode_) {
                 case 0: {
                     Train train(company, company.info_.setWindow_);
