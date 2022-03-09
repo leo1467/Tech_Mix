@@ -24,7 +24,7 @@ class Info {
 public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "5D5";
+    string setWindow_ = "M2M";
     
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -32,7 +32,7 @@ public:
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
     
-    int testDeltaLoop_ = 0;
+    int testDeltaLoop_ = 1;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
@@ -767,14 +767,14 @@ public:
     void reset(double RoR = 0);
     void measure(vector<double> &betaMatrix);
     void convert_bi_dec();
-    void print(ofstream &out, bool debug);
+    void print(ostream &out);
     void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
     
-    Particle(CompanyInfo *company, bool on = false, vector<int> variables = {});
+    Particle(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
 };
 
-Particle::Particle(CompanyInfo *company, bool on, vector<int> variables) : company_(company), remain_(company->info_.totalCapitalLV_), isRecordOn_(on) {
+Particle::Particle(CompanyInfo *company, bool isRecordOn, vector<int> variables) : company_(company), remain_(company->info_.totalCapitalLV_), isRecordOn_(isRecordOn) {
     switch (company_->info_.techIndex_) {
         case 0:
         case 1:
@@ -1165,33 +1165,17 @@ void Particle::convert_bi_dec() {
     }
 }
 
-void Particle::print(ofstream &out, bool debug) {
+void Particle::print(ostream &out = cout) {
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
         for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
-            if (debug)
-                out << binary_[bitIndex] << ",";
-            else
-                cout << binary_[bitIndex] << ",";
+            out << binary_[bitIndex] << ",";
         }
-        if (debug)
-            out << ",";
-        else
-            cout << "|";
+        out << " ,";
     }
     for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        if (debug)
-            out << decimal_[variableIndex] << ",";
-        else
-            cout << decimal_[variableIndex] << ",";
+        out << decimal_[variableIndex] << ",";
     }
-    if (debug)
-        out << set_precision(RoR_) << "%,";
-    else
-        cout << set_precision(RoR_) << "%,";
-    if (debug)
-        out << endl;
-    else
-        cout << endl;
+    out << set_precision(RoR_) << "%," << endl;
 }
 
 void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr) {
@@ -1520,7 +1504,7 @@ void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
 
 void Train::print_debug_particle(ofstream &out, int i, bool debug) {
     if (debug)
-        particles_[i].print(out, debug);
+        particles_[i].print(out);
 }
 
 void Train::store_exp_gen(int expCnt, int genCnt) {
@@ -1620,26 +1604,26 @@ void Train::print_debug_beta(ofstream &out, bool debug) {
         switch (company_.info_.algoIndex_) {
             case 0: {
                 out << "local best" << endl;
-                globalP_[3].print(out, debug);
+                globalP_[3].print(out);
                 out << "local worst" << endl;
-                globalP_[4].print(out, debug);
+                globalP_[4].print(out);
                 break;
             }
             case 1:
             case 2: {
                 out << "global best" << endl;
-                globalP_[1].print(out, debug);
+                globalP_[1].print(out);
                 out << "local worst" << endl;
-                globalP_[4].print(out, debug);
+                globalP_[4].print(out);
                 break;
             }
             case 3: {
                 out << "global best" << endl;
-                globalP_[1].print(out, debug);
+                globalP_[1].print(out);
                 out << "local best" << endl;
-                globalP_[3].print(out, debug);
+                globalP_[3].print(out);
                 out << "local worst" << endl;
-                globalP_[4].print(out, debug);
+                globalP_[4].print(out);
                 out << actualDelta_ << endl;
                 break;
             }
@@ -1948,7 +1932,7 @@ int main(int argc, const char *argv[]) {
             case 10: {
                     //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                Tradition tradition(company);
-                    //                Train train(company "2011-12-01", "2011-12-30");
+                    //                Train train(company, "2011-12-01", "2011-12-30", "debug");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
