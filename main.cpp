@@ -1786,29 +1786,17 @@ void Test::set_variables(vector<vector<string>> &thisTrainFile) {
 class BH {
    public:
     double BHRoR;
-    BH(string startDate, string endDate, CompanyInfo &company, double totalCPLv) {
-        int startRow = -1;
-        int endRow = -1;
-        for (int i = 0; i < company.totalDays_; i++) {
-            if (startDate == company.date_[i]) {
-                startRow = i;
-                break;
-            }
-        }
-        for (int i = startRow; i < company.totalDays_; i++) {
-            if (endDate == company.date_[i]) {
-                endRow = i;
-                break;
-            }
-        }
-        if (startRow == -1 || endRow == -1) {
+    BH(CompanyInfo &company, string startDate, string endDate) {
+        int startRow = (int)distance(company.date_.begin(), find(company.date_.begin(), company.date_.end(), startDate));
+        int endRow = (int)distance(company.date_.begin(), find(company.date_.begin(), company.date_.end(), endDate));
+        if (startRow == company.totalDays_ || endRow == company.totalDays_) {
             cout << "cant find B&H startRow or endRow" << endl;
             exit(1);
         }
-        int stockHold = totalCPLv / company.price_[startRow];
-        double remain = totalCPLv - stockHold * company.price_[startRow];
+        int stockHold = company.info_.totalCapitalLV_ / company.price_[startRow];
+        double remain = company.info_.totalCapitalLV_ - stockHold * company.price_[startRow];
         remain += stockHold * company.price_[endRow];
-        BHRoR = ((remain - totalCPLv) / totalCPLv);
+        BHRoR = ((remain - company.info_.totalCapitalLV_) / company.info_.totalCapitalLV_);
     }
 };
 
