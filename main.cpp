@@ -22,7 +22,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 1;
+    int mode_ = 10;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
     
@@ -607,8 +607,7 @@ void TrainWindow::find_M_train(CompanyInfo &company) {
 }
 
 void TrainWindow::find_regular_M_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow) {
-    int intervalSize = (int)TestWindow::interval_.size();
-    for (int intervalIndex = 0; intervalIndex < intervalSize; intervalIndex += 2) {
+    for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
         for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
             if (company.date_[dateRow].substr(5, 2) != company.date_[dateRow - 1].substr(5, 2)) {
                 monthCnt++;
@@ -623,8 +622,8 @@ void TrainWindow::find_regular_M_train(CompanyInfo &company, vector<int> &endRow
 }
 
 void TrainWindow::find_star_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow) {
-    int intervalSize = (int)TestWindow::interval_.size();
-    for (int intervalIndex = 0; intervalIndex < intervalSize; intervalIndex++) {
+//    int intervalSize = (int)TestWindow::interval_.size();
+    for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex++) {
         for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
             if (company.date_[dateRow].substr(5, 2) != company.date_[dateRow - 1].substr(5, 2)) {
                 monthCnt++;
@@ -645,8 +644,7 @@ void TrainWindow::find_W_train(CompanyInfo &company) {
     vector<int> startRow, endRow;
     int smallWeekDay = -1;
     int bigWeekDay = -1;
-    int intervalSize = (int)TestWindow::interval_.size();
-    for (int intervalIndex = 0; intervalIndex < intervalSize; intervalIndex += 2) {
+    for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
         for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + company.tableStartRow_, weekCnt = 0; dateRow > 0; dateRow--) {
             smallWeekDay = cal_weekday(company.date_[dateRow - 1]);
             bigWeekDay = cal_weekday(company.date_[dateRow]);
@@ -666,8 +664,7 @@ void TrainWindow::find_W_train(CompanyInfo &company) {
 
 void TrainWindow::find_D_train(CompanyInfo &company) {
     vector<int> startRow, endRow;
-    int intervalSize = (int)TestWindow::interval_.size();
-    for (int intervalIndex = 0; intervalIndex < intervalSize; intervalIndex += 2) {
+    for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
         startRow.push_back(TestWindow::interval_[intervalIndex] - TestWindow::trainLength_ + TestWindow::tableStartRow_);
         endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_);
     }
@@ -1381,7 +1378,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, startDate, windowIndex);
         srand(343);
-        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
+        for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
             set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
             globalP_[0].reset();
             ofstream out = set_debug_file(debug);
@@ -1476,7 +1473,7 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
 void Train::set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
     if (startDate != "") {
         windowIndex = company_.info_.windowNumber_;
-        intervalIndex = (int)window.interval_.size();
+        intervalIndex = window.intervalSize_;
     }
     else {
         actualStartRow_ = window.interval_[intervalIndex];
@@ -1715,7 +1712,7 @@ public:
     void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
-    void check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize);
+    void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     void print_test_holdInfo(TestWindow &window);
     
@@ -1757,9 +1754,8 @@ void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath)
 void Test::start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex) {
     TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
-    int intervalSize = (int)window.interval_.size();
-    check_exception(eachTrainFilePath, window, intervalSize / 2);
-    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < intervalSize; intervalIndex += 2, trainFileIndex++) {
+    check_exception(eachTrainFilePath, window);
+    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
@@ -1779,8 +1775,8 @@ TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &win
     return window;
 }
 
-void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window, int intervalSize) {
-    if (eachTrainFilePath.size() != intervalSize) {
+void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window) {
+    if (eachTrainFilePath.size() != window.intervalSize_ / 2) {
         cout << window.windowName_ << " test interval number is not equal to train fle number" << endl;
         exit(1);
     }
@@ -1878,7 +1874,7 @@ void Tradition::train_Tradition(string &targetWindow) {
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
         string outputPath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_) + window.windowName_;
-        for (int intervalIndex = 0; intervalIndex < window.interval_.size(); intervalIndex += 2) {
+        for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
             int startRow = window.interval_[intervalIndex];
             int endRow = window.interval_[intervalIndex + 1];
             for (int i = 0; i < traditionStrategyNum_; i++) {
@@ -1973,7 +1969,7 @@ int main(int argc, const char *argv[]) {
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                                   Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 break;
             }
         }
