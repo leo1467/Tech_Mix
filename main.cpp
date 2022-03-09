@@ -24,7 +24,7 @@ class Info {
 public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "all";
+    string setWindow_ = "5D5";
     
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -37,7 +37,7 @@ public:
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
     
-    int techIndex_ = 0;
+    int techIndex_ = 3;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -1275,34 +1275,22 @@ public:
     vector<double> matrix_;
     
     void reset();
-    void print(ofstream &out, bool debug);
+    void print(ostream &out);
 };
 
 void BetaMatrix::reset() {
     fill(matrix_.begin(), matrix_.end(), 0.5);
 }
 
-void BetaMatrix::print(ofstream &out, bool debug) {
-    if (debug)
-        out << "beta matrix" << endl;
-    else
-        cout << "beta matrix" << endl;
+void BetaMatrix::print(ostream &out = cout) {
+    out << "beta matrix" << endl;
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
         for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
-            if (debug)
-                out << matrix_[bitIndex] << ",";
-            else
-                cout << matrix_[bitIndex] << ",";
+            out << matrix_[bitIndex] << ",";
         }
-        if (debug)
-            out << ",";
-        else
-            cout << "|";
+        out << " ,";
     }
-    if (debug)
-        out << endl;
-    else
-        cout << endl;
+    out << endl;
 }
 
 class Train {
@@ -1656,7 +1644,7 @@ void Train::print_debug_beta(ofstream &out, bool debug) {
                 break;
             }
         }
-        betaMatrix_.print(out, debug);
+        betaMatrix_.print(out);
     }
 }
 
@@ -1963,7 +1951,7 @@ int main(int argc, const char *argv[]) {
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 break;
             }
         }
