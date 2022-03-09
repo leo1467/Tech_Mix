@@ -563,12 +563,12 @@ public:
 TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(company, window) {
     if (TestWindow::windowName_ != "A2A") {
         find_train_interval();
+        for (auto &i : interval_) {
+            i -= tableStartRow_;
+        }
     }
     else {
         interval_ = TestWindow::interval_;
-    }
-    for (auto &i : interval_) {
-        i -= tableStartRow_;
     }
 }
 
