@@ -399,6 +399,7 @@ public:
     int testLength_ = -1;
     char windowType_;
     vector<int> interval_;
+    int intervalSize_;
     
     void find_test_interval(CompanyInfo &company);
     void find_M_test(CompanyInfo &company);
@@ -406,16 +407,21 @@ public:
     void find_D_test(CompanyInfo &company);
     void print_test(CompanyInfo &company);
     
-    TestWindow(CompanyInfo company, string window);
+    TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo company, string window) : windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[distance(company.info_.slidingWindows_.begin(), find(company.info_.slidingWindows_.begin(), company.info_.slidingWindows_.end(), windowName_))]), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[distance(company.info_.slidingWindows_.begin(), find(company.info_.slidingWindows_.begin(), company.info_.slidingWindows_.end(), windowName_))]), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval(company);
-        for (auto &i : interval_) {
-            i -= tableStartRow_;
-        }
     }
+    else {
+        interval_.push_back(company.testStartRow_);
+        interval_.push_back(company.testEndRow_);
+    }
+    for (auto &i : interval_) {
+        i -= tableStartRow_;
+    }
+    intervalSize_ = (int)interval_.size();
 }
 
 void TestWindow::find_test_interval(CompanyInfo &company) {
@@ -555,11 +561,10 @@ TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(compa
         find_train_interval(company);
     }
     else {
-        interval_.push_back(company.testStartRow_);
-        interval_.push_back(company.testEndRow_);
+        interval_ = TestWindow::interval_;
     }
     for (auto &i : interval_) {
-        i -= TestWindow::tableStartRow_;
+        i -= tableStartRow_;
     }
 }
 
