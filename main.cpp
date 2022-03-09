@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -11,10 +12,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <exception>
 
-    //#include "CompanyInfo.h"
-    //#include "TechTable.h"
+//#include "CompanyInfo.h"
+//#include "TechTable.h"
 #include "functions.h"
 
 using namespace std;
@@ -22,47 +22,47 @@ using namespace chrono;
 using namespace filesystem;
 
 class Info {
-public:
+   public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
-    
+
     double delta_ = 0.003;
     int expNum_ = 50;
     int genNum_ = 1000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
-    
+
     int testDeltaLoop_ = 1;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
-    
+
     int techIndex_ = 3;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
-    
+
     string techType_ = allTech_[techIndex_];
     string algoType_ = allAlgo_[algoIndex_];
-    
+
     path pricePath_ = "price";
     string testStartYear_ = "2012-01";
     string testEndYear_ = "2021-01";
     double testLength_ = stod(testEndYear_) - stod(testStartYear_);
-    
+
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
-    
+
     vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
-    
+
     int windowNumber_ = int(slidingWindows_.size());
 } const _info;
 
 class CompanyInfo {
-public:
+   public:
     const Info &info_;
     string companyName_;
-    
+
     map<string, string> allResultOutputPath_;
     map<string, string> allTechOuputPath_;
     map<string, string> allTrainFilePath_;
@@ -70,7 +70,7 @@ public:
     map<string, string> allTrainTraditionFilePath_;
     map<string, string> allTestTraditionFilePath_;
     map<string, string> allTestHoldFilePath_;
-    
+
     int totalDays_;
     vector<string> date_;
     vector<double> price_;
@@ -78,7 +78,7 @@ public:
     int testEndRow_ = -1;
     vector<vector<double>> techTable_;
     int tableStartRow_ = -1;
-    
+
     void set_paths();
     void store_date_price(path priceFilePath);
     void create_folder();
@@ -86,7 +86,7 @@ public:
     void store_tech_to_vector();
     void output_Tech();
     void set_techFile_title(ofstream &out, int techPerid);
-    
+
     CompanyInfo(const Info &info, path pricePath);
 };
 
@@ -314,20 +314,20 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 }
 
 class TechTable {
-private:
+   private:
     CompanyInfo *company_;
-    
-public:
+
+   public:
     int techIndex_;
     string techType_;
     int days_;
     vector<string> date_;
     vector<double> price_;
     vector<vector<double>> techTable_;
-    
+
     void create_techTable(CompanyInfo *company);
     void output_techTable();
-    
+
     TechTable(CompanyInfo *company, int techIndex);
 };
 
@@ -394,10 +394,10 @@ void TechTable::output_techTable() {
 }
 
 class TestWindow {
-protected:
+   protected:
     CompanyInfo &company_;
-    
-public:
+
+   public:
     string windowName_;
     string windowNameEx_;
     int tableStartRow_ = -1;
@@ -406,13 +406,13 @@ public:
     char windowType_;
     vector<int> interval_;
     int intervalSize_;
-    
+
     void find_test_interval();
     void find_M_test();
     void find_W_test();
     void find_D_test();
     void print_test();
-    
+
     TestWindow(CompanyInfo &company, string window);
 };
 
@@ -547,9 +547,9 @@ void TestWindow::print_test() {
 }
 
 class TrainWindow : public TestWindow {
-public:
+   public:
     vector<int> interval_;
-    
+
     void find_train_interval();
     void find_M_train();
     void find_regular_M_train(vector<int> &endRow, vector<int> &startRow);
@@ -557,7 +557,7 @@ public:
     void find_W_train();
     void find_D_train();
     void print_train();
-    
+
     TrainWindow(CompanyInfo &company, string window);
 };
 
@@ -684,10 +684,10 @@ void TrainWindow::print_train() {
 }
 
 class MA {
-public:
+   public:
     const vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
     const vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
-    
+
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int buy1, int buy2) {
         double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][buy1];
         double MAbuy2PreDay = (*tables)[0].techTable_[i - 1][buy2];
@@ -695,7 +695,7 @@ public:
         double MAbuy2Today = (*tables)[0].techTable_[i][buy2];
         return stockHold == 0 && MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today && i != endRow;
     }
-    
+
     static bool sell_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int sell1, int sell2) {
         double MAsell1PreDay = (*tables)[0].techTable_[i - 1][sell1];
         double MAsell2PreDay = (*tables)[0].techTable_[i - 1][sell2];
@@ -706,14 +706,14 @@ public:
 };
 
 class RSI {
-public:
+   public:
     const vector<int> eachVariableBitsNum_ = {8, 7, 7};
     const vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int RSIPeriod, int overSold) {
         double RSI = (*tables)[0].techTable_[i][RSIPeriod];
         return stockHold == 0 && RSI <= overSold && i != endRow;
     }
-    
+
     static bool sell_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, int RSIPeriod, int overBought) {
         double RSI = (*tables)[0].techTable_[i][RSIPeriod];
         return stockHold != 0 && ((RSI >= overBought) || i == endRow);
@@ -721,18 +721,18 @@ public:
 };
 
 class Particle {
-private:
+   private:
     CompanyInfo *company_;
-    
-public:
+
+   public:
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<int> binary_;
     int variableNum_ = 0;
     vector<int> decimal_;
-    
+
     vector<TechTable> *tables_ = nullptr;
-    
+
     double remain_ = 0;
     double RoR_ = 0;
     int buyNum_ = 0;
@@ -742,9 +742,9 @@ public:
     int exp_ = 0;
     int bestCnt_ = 0;
     bool isRecordOn_ = false;
-    
+
     double actualDelta_ = -1;
-    
+
     void instant_trade(string startDate, string endDate, bool hold = false);
     void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
     void push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr);
@@ -771,7 +771,7 @@ public:
     void print(ostream &out);
     void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
-    
+
     Particle(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
 };
 
@@ -956,7 +956,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
         case 3: {
             buyCondition = RSI::buy_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= (*tables_)[0].price_[i];
             sellCondition = RSI::sell_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[2]);
-                // buyCondition = buyCondition && !((*tables_)[1].techTable_[i][5] <= (*tables_)[1].techTable_[i][10]);
+            // buyCondition = buyCondition && !((*tables_)[1].techTable_[i][5] <= (*tables_)[1].techTable_[i][10]);
             break;
         }
         default: {
@@ -1253,12 +1253,12 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
 }
 
 class BetaMatrix {
-public:
+   public:
     int variableNum_ = 0;
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<double> matrix_;
-    
+
     void reset();
     void print(ostream &out);
 };
@@ -1279,21 +1279,21 @@ void BetaMatrix::print(ostream &out = cout) {
 }
 
 class Train {
-private:
+   private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
-    
+
     vector<Particle> particles_;
     vector<Particle> globalP_;  //0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
     BetaMatrix betaMatrix_;
-    
+
     int actualStartRow_ = -1;
     int actualEndRow_ = -1;
-    
+
     double actualDelta_ = -1;
     int compareNew_ = -1;
     int compareOld_ = -1;
-    
+
     void start_train(string targetWindow, string startDate, string endDate, bool debug);
     void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
     void find_new_row(string &startDate, string &endDate);
@@ -1317,8 +1317,8 @@ private:
     void print_debug_beta(ofstream &out, bool debug);
     void update_best(int renewBest);
     void clear_STL();
-    
-public:
+
+   public:
     Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
 };
 
@@ -1554,9 +1554,9 @@ void Train::run_algo() {
         }
         case 3: {
             if (globalP_[1].RoR_ > 0) {
-                    //GNQTS();
+                //GNQTS();
             }
-                //compare_and_multiply();
+            //compare_and_multiply();
             break;
         }
         default: {
@@ -1664,7 +1664,7 @@ void Train::clear_STL() {
 }
 
 class Test {
-private:
+   private:
     CompanyInfo &company_;
     Particle p_;
     vector<TechTable> tables_;
@@ -1672,7 +1672,7 @@ private:
     bool hold_ = false;
     vector<string> holdInfo_;
     vector<string> *holdInfoPtr_ = nullptr;
-    
+
     void add_tables(vector<int> addtionTable);
     void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
     void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
@@ -1680,8 +1680,8 @@ private:
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     void print_test_holdInfo(TestWindow &window);
-    
-public:
+
+   public:
     Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> addtionTable = {});
 };
 
@@ -1755,7 +1755,7 @@ void Test::print_test_holdInfo(TestWindow &window) {
             holdFile.open(company_.allTestHoldFilePath_.at(company_.info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         else if (tradition_) {
-                //set tradition hold file path
+            //set tradition hold file path
         }
         for (auto info : holdInfo_) {
             holdFile << info;
@@ -1784,7 +1784,7 @@ void Test::set_variables(vector<vector<string>> &thisTrainFile) {
 }
 
 class BH {
-public:
+   public:
     double BHRoR;
     BH(string startDate, string endDate, CompanyInfo &company, double totalCPLv) {
         int startRow = -1;
@@ -1813,20 +1813,20 @@ public:
 };
 
 class Tradition {
-private:
+   private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
-    
+
     void train_Tradition(string &targetWindow);
     void create_particles();
     void set_strategy();
     TrainWindow set_window(string &targetWindow, int &windowIndex);
     void set_variables(int index);
-    
-public:
+
+   public:
     Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
@@ -1936,18 +1936,17 @@ int main(int argc, const char *argv[]) {
                     break;
                 }
                 case 10: {
-                        //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                        //                Tradition tradition(company);
-                        //                Train train(company, "2011-12-01", "2011-12-30", "debug");
-                        //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                        //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                        //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                Tradition tradition(company);
+                    //                Train train(company, "2011-12-01", "2011-12-30", "debug");
+                    //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                     break;
                 }
             }
         }
-    }
-    catch (exception &e) {
+    } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
     }
     time_point end = steady_clock::now();
