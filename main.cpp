@@ -804,7 +804,7 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
     vector<TechTable> tmp = {TechTable(company_, company_->info_.techIndex_)};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
-    find_instant_trade_startRow_endRow(startDate, startDate, startRow, endRow);
+    find_instant_trade_startRow_endRow(startDate, endDate, startRow, endRow);
     vector<string> holdInfo;
     vector<string> *holdInfoPtr = nullptr;
     push_holdInfo_column_Name(hold, holdInfo, holdInfoPtr);
@@ -817,23 +817,13 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
 }
 
 void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
-    for (int dateRow = 0; dateRow < (*tables_)[0].days_; dateRow++) {
-        if (startDate == (*tables_)[0].date_[dateRow]) {
-            startRow = dateRow;
-            break;
-        }
-    }
-    if (startRow == -1) {
+    startRow = (int)distance((*tables_)[0].date_.begin(), find((*tables_)[0].date_.begin(), (*tables_)[0].date_.end(), startDate));
+    if (startRow == (*tables_)[0].date_.size()) {
         cout << "instant trade startDate is not found" << endl;
         exit(1);
     }
-    for (int dateRow = startRow; dateRow < (*tables_)[0].days_; dateRow++) {
-        if (endDate == (*tables_)[0].date_[dateRow]) {
-            endRow = dateRow;
-            break;
-        }
-    }
-    if (endRow == -1) {
+    endRow = (int)distance((*tables_)[0].date_.begin(), find((*tables_)[0].date_.begin(), (*tables_)[0].date_.end(), endDate));
+    if (endRow == (*tables_)[0].date_.size()) {
         cout << "instant trade endDate is not found" << endl;
         exit(1);
     }
@@ -1973,7 +1963,7 @@ int main(int argc, const char *argv[]) {
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 break;
             }
         }
