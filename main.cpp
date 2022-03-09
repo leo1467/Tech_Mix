@@ -391,6 +391,9 @@ void TechTable::output_techTable() {
 }
 
 class TestWindow {
+protected:
+    CompanyInfo &company_;
+    
 public:
     string windowName_;
     string windowNameEx_;
@@ -401,22 +404,22 @@ public:
     vector<int> interval_;
     int intervalSize_;
     
-    void find_test_interval(CompanyInfo &company);
-    void find_M_test(CompanyInfo &company);
-    void find_W_test(CompanyInfo &company);
-    void find_D_test(CompanyInfo &company);
-    void print_test(CompanyInfo &company);
+    void find_test_interval();
+    void find_M_test();
+    void find_W_test();
+    void find_D_test();
+    void print_test();
     
     TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo &company, string window) : windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[distance(company.info_.slidingWindows_.begin(), find(company.info_.slidingWindows_.begin(), company.info_.slidingWindows_.end(), windowName_))]), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[distance(company.info_.slidingWindows_.begin(), find(company.info_.slidingWindows_.begin(), company.info_.slidingWindows_.end(), windowName_))]), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
-        find_test_interval(company);
+        find_test_interval();
     }
     else {
-        interval_.push_back(company.testStartRow_);
-        interval_.push_back(company.testEndRow_);
+        interval_.push_back(company_.testStartRow_);
+        interval_.push_back(company_.testEndRow_);
     }
     for (auto &i : interval_) {
         i -= tableStartRow_;
@@ -424,7 +427,7 @@ TestWindow::TestWindow(CompanyInfo &company, string window) : windowName_(window
     intervalSize_ = (int)interval_.size();
 }
 
-void TestWindow::find_test_interval(CompanyInfo &company) {
+void TestWindow::find_test_interval() {
     vector<string> trainTestType = find_train_and_test_len(windowNameEx_, windowType_);
     if (trainTestType.size() == 0) {
         cout << "testType.size() cant be 0" << endl;
@@ -446,15 +449,15 @@ void TestWindow::find_test_interval(CompanyInfo &company) {
     switch (windowType_) {
         case 'M':
         case 'S': {
-            find_M_test(company);
+            find_M_test();
             break;
         }
         case 'W': {
-            find_W_test(company);
+            find_W_test();
             break;
         }
         case 'D': {
-            find_D_test(company);
+            find_D_test();
             break;
         }
         default: {
@@ -464,10 +467,10 @@ void TestWindow::find_test_interval(CompanyInfo &company) {
     }
 }
 
-void TestWindow::find_M_test(CompanyInfo &company) {
+void TestWindow::find_M_test() {
     vector<int> startRow, endRow;
-    for (int dateRow = company.testStartRow_, monthCnt = testLength_ - 1; dateRow <= company.testEndRow_; dateRow++) {
-        if (company.date_[dateRow - 1].substr(5, 2) != company.date_[dateRow].substr(5, 2)) {
+    for (int dateRow = company_.testStartRow_, monthCnt = testLength_ - 1; dateRow <= company_.testEndRow_; dateRow++) {
+        if (company_.date_[dateRow - 1].substr(5, 2) != company_.date_[dateRow].substr(5, 2)) {
             monthCnt++;
             if (monthCnt == testLength_) {
                 startRow.push_back(dateRow);
@@ -475,10 +478,10 @@ void TestWindow::find_M_test(CompanyInfo &company) {
             }
         }
     }
-    for (int dateRow = company.testStartRow_, monthCnt = 0; dateRow <= company.testEndRow_; dateRow++) {
-        if (company.date_[dateRow].substr(5, 2) != company.date_[dateRow + 1].substr(5, 2)) {
+    for (int dateRow = company_.testStartRow_, monthCnt = 0; dateRow <= company_.testEndRow_; dateRow++) {
+        if (company_.date_[dateRow].substr(5, 2) != company_.date_[dateRow + 1].substr(5, 2)) {
             monthCnt++;
-            if (monthCnt == testLength_ || dateRow == company.testEndRow_) {
+            if (monthCnt == testLength_ || dateRow == company_.testEndRow_) {
                 endRow.push_back(dateRow);
                 monthCnt = 0;
             }
@@ -488,14 +491,13 @@ void TestWindow::find_M_test(CompanyInfo &company) {
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TestWindow::find_W_test(CompanyInfo &company) {
+void TestWindow::find_W_test() {
     vector<int> startRow, endRow;
-    int smallWeekDay = -1;
-    int bigWeekDay = -1;
-    for (int dateRow = company.testStartRow_, monthCnt = testLength_ - 1; dateRow < company.testEndRow_; dateRow++) {
-        smallWeekDay = cal_weekday(company.date_[dateRow - 1]);
-        bigWeekDay = cal_weekday(company.date_[dateRow]);
-        if (is_week_changed(company.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
+    int smallWeekDay = -1, bigWeekDay = -1;
+    for (int dateRow = company_.testStartRow_, monthCnt = testLength_ - 1; dateRow < company_.testEndRow_; dateRow++) {
+        smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
+        bigWeekDay = cal_weekday(company_.date_[dateRow]);
+        if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
             monthCnt++;
             if (monthCnt == testLength_) {
                 startRow.push_back(dateRow);
@@ -503,12 +505,12 @@ void TestWindow::find_W_test(CompanyInfo &company) {
             }
         }
     }
-    for (int dateRow = company.testStartRow_, monthCnt = 0; dateRow <= company.testEndRow_; dateRow++) {
-        smallWeekDay = cal_weekday(company.date_[dateRow]);
-        bigWeekDay = cal_weekday(company.date_[dateRow + 1]);
-        if (is_week_changed(company.date_, bigWeekDay, smallWeekDay, dateRow + 1, dateRow)) {
+    for (int dateRow = company_.testStartRow_, monthCnt = 0; dateRow <= company_.testEndRow_; dateRow++) {
+        smallWeekDay = cal_weekday(company_.date_[dateRow]);
+        bigWeekDay = cal_weekday(company_.date_[dateRow + 1]);
+        if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow + 1, dateRow)) {
             monthCnt++;
-            if (monthCnt == testLength_ || dateRow == company.testEndRow_) {
+            if (monthCnt == testLength_ || dateRow == company_.testEndRow_) {
                 endRow.push_back(dateRow);
                 monthCnt = 0;
             }
@@ -518,25 +520,25 @@ void TestWindow::find_W_test(CompanyInfo &company) {
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TestWindow::find_D_test(CompanyInfo &company) {
+void TestWindow::find_D_test() {
     vector<int> startRow, endRow;
-    for (int dateRow = company.testStartRow_; dateRow <= company.testEndRow_; dateRow += testLength_) {
+    for (int dateRow = company_.testStartRow_; dateRow <= company_.testEndRow_; dateRow += testLength_) {
         startRow.push_back(dateRow);
     }
-    for (int dateRow = company.testStartRow_ + testLength_ - 1; dateRow <= company.testEndRow_; dateRow += testLength_) {
+    for (int dateRow = company_.testStartRow_ + testLength_ - 1; dateRow <= company_.testEndRow_; dateRow += testLength_) {
         endRow.push_back(dateRow);
     }
     if (startRow.size() > endRow.size()) {
-        endRow.push_back(company.testEndRow_);
+        endRow.push_back(company_.testEndRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TestWindow::print_test(CompanyInfo &company) {
+void TestWindow::print_test() {
     cout << "test window: " << windowName_ << "=" << windowNameEx_ << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
-        cout << company.date_[*it + tableStartRow_] << "~" << company.date_[*(++it) + tableStartRow_] << endl;
+        cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
     }
     cout << "==========" << endl;
 }
@@ -545,20 +547,20 @@ class TrainWindow : public TestWindow {
 public:
     vector<int> interval_;
     
-    void find_train_interval(CompanyInfo &company);
-    void find_M_train(CompanyInfo &company);
-    void find_regular_M_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow);
-    void find_star_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow);
-    void find_W_train(CompanyInfo &company);
-    void find_D_train(CompanyInfo &company);
-    void print_train(CompanyInfo &company);
+    void find_train_interval();
+    void find_M_train();
+    void find_regular_M_train(vector<int> &endRow, vector<int> &startRow);
+    void find_star_train(vector<int> &endRow, vector<int> &startRow);
+    void find_W_train();
+    void find_D_train();
+    void print_train();
     
     TrainWindow(CompanyInfo &company, string window);
 };
 
 TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(company, window) {
     if (TestWindow::windowName_ != "A2A") {
-        find_train_interval(company);
+        find_train_interval();
     }
     else {
         interval_ = TestWindow::interval_;
@@ -568,19 +570,19 @@ TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(compa
     }
 }
 
-void TrainWindow::find_train_interval(CompanyInfo &company) {
+void TrainWindow::find_train_interval() {
     switch (TestWindow::windowType_) {
         case 'M':
         case 'S': {
-            find_M_train(company);
+            find_M_train();
             break;
         }
         case 'W': {
-            find_W_train(company);
+            find_W_train();
             break;
         }
         case 'D': {
-            find_D_train(company);
+            find_D_train();
             break;
         }
         default: {
@@ -590,15 +592,15 @@ void TrainWindow::find_train_interval(CompanyInfo &company) {
     }
 }
 
-void TrainWindow::find_M_train(CompanyInfo &company) {
+void TrainWindow::find_M_train() {
     vector<int> startRow, endRow;
-    switch (TestWindow::windowType_) {
+    switch (windowType_) {
         case 'M': {
-            find_regular_M_train(company, endRow, startRow);
+            find_regular_M_train(endRow, startRow);
             break;
         }
         case 'S': {
-            find_star_train(company, endRow, startRow);
+            find_star_train(endRow, startRow);
             break;
         }
     }
@@ -606,26 +608,25 @@ void TrainWindow::find_M_train(CompanyInfo &company) {
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TrainWindow::find_regular_M_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow) {
+void TrainWindow::find_regular_M_train(vector<int> &endRow, vector<int> &startRow) {
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
-        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
-            if (company.date_[dateRow].substr(5, 2) != company.date_[dateRow - 1].substr(5, 2)) {
+        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
+            if (company_.date_[dateRow].substr(5, 2) != company_.date_[dateRow - 1].substr(5, 2)) {
                 monthCnt++;
-                if (monthCnt == TestWindow::trainLength_) {
+                if (monthCnt == trainLength_) {
                     startRow.push_back(dateRow);
                     break;
                 }
             }
         }
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_);
+        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
     }
 }
 
-void TrainWindow::find_star_train(CompanyInfo &company, vector<int> &endRow, vector<int> &startRow) {
-//    int intervalSize = (int)TestWindow::interval_.size();
+void TrainWindow::find_star_train(vector<int> &endRow, vector<int> &startRow) {
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex++) {
-        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
-            if (company.date_[dateRow].substr(5, 2) != company.date_[dateRow - 1].substr(5, 2)) {
+        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + tableStartRow_, monthCnt = 0; dateRow > 0; dateRow--) {
+            if (company_.date_[dateRow].substr(5, 2) != company_.date_[dateRow - 1].substr(5, 2)) {
                 monthCnt++;
                 if (monthCnt == 12 && intervalIndex % 2 == 0) {
                     startRow.push_back(dateRow);
@@ -640,42 +641,41 @@ void TrainWindow::find_star_train(CompanyInfo &company, vector<int> &endRow, vec
     }
 }
 
-void TrainWindow::find_W_train(CompanyInfo &company) {
+void TrainWindow::find_W_train() {
     vector<int> startRow, endRow;
-    int smallWeekDay = -1;
-    int bigWeekDay = -1;
+    int smallWeekDay = -1, bigWeekDay = -1;
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
-        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + company.tableStartRow_, weekCnt = 0; dateRow > 0; dateRow--) {
-            smallWeekDay = cal_weekday(company.date_[dateRow - 1]);
-            bigWeekDay = cal_weekday(company.date_[dateRow]);
-            if (is_week_changed(company.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
+        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + tableStartRow_, weekCnt = 0; dateRow > 0; dateRow--) {
+            smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
+            bigWeekDay = cal_weekday(company_.date_[dateRow]);
+            if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
                 weekCnt++;
-                if (weekCnt == TestWindow::trainLength_) {
+                if (weekCnt == trainLength_) {
                     startRow.push_back(dateRow);
                     break;
                 }
             }
         }
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_);
+        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TrainWindow::find_D_train(CompanyInfo &company) {
+void TrainWindow::find_D_train() {
     vector<int> startRow, endRow;
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
-        startRow.push_back(TestWindow::interval_[intervalIndex] - TestWindow::trainLength_ + TestWindow::tableStartRow_);
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + TestWindow::tableStartRow_);
+        startRow.push_back(TestWindow::interval_[intervalIndex] - trainLength_ + tableStartRow_);
+        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TrainWindow::print_train(CompanyInfo &company) {
-    cout << "train window: " << TestWindow::windowName_ << "=" << TestWindow::windowNameEx_ << endl;
+void TrainWindow::print_train() {
+    cout << "train window: " << windowName_ << "=" << windowNameEx_ << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
-        cout << company.date_[*it + TestWindow::tableStartRow_] << "~" << company.date_[*(++it) + TestWindow::tableStartRow_] << endl;
+        cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
     }
     cout << "==========" << endl;
 }
@@ -741,7 +741,6 @@ public:
     bool isRecordOn_ = false;
     
     double actualDelta_ = -1;
-    
     
     void instant_trade(string startDate, string endDate, bool hold = false);
     void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
@@ -964,7 +963,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
         case 3: {
             buyCondition = RSI::buy_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[1]) && remain_ >= (*tables_)[0].price_[i];
             sellCondition = RSI::sell_condition0(tables_, stockHold, i, endRow, decimal_[0], decimal_[2]);
-            // buyCondition = buyCondition && !((*tables_)[1].techTable_[i][5] <= (*tables_)[1].techTable_[i][10]);
+                // buyCondition = buyCondition && !((*tables_)[1].techTable_[i][5] <= (*tables_)[1].techTable_[i][10]);
             break;
         }
         default: {
@@ -1462,7 +1461,7 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
     }
     TrainWindow window(company_, accuallWindow);
     if (startDate == "") {
-        window.print_train(company_);
+        window.print_train();
     }
     if (company_.allTrainFilePath_.at(company_.info_.techType_) == "") {
         window.windowName_ = "";
@@ -1969,7 +1968,7 @@ int main(int argc, const char *argv[]) {
                     //                Train train(company "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 break;
             }
         }
