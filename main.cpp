@@ -27,9 +27,9 @@ class Info {
     string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
 
-    double delta_ = 0.003;
+    double delta_ = 0.0002;
     int expNum_ = 50;
-    int genNum_ = 1000;
+    int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
@@ -38,7 +38,7 @@ class Info {
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
 
-    int techIndex_ = 3;
+    int techIndex_ = 0;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -325,29 +325,28 @@ class TechTable {
     vector<double> price_;
     vector<vector<double>> techTable_;
 
-    void create_techTable(CompanyInfo *company);
+    void create_techTable();
     void output_techTable();
 
     TechTable(CompanyInfo *company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.allTech_[techIndex]) {
-    create_techTable(company_);
+TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.techType_), days_(company->totalDays_ - company->tableStartRow_) {
+    create_techTable();
 }
 
-void TechTable::create_techTable(CompanyInfo *company) {
-    days_ = company->totalDays_ - company->tableStartRow_;
+void TechTable::create_techTable() {
     date_.resize(days_);
     price_.resize(days_);
-    for (int i = company->tableStartRow_, j = 0; i < company->totalDays_; i++, j++) {
-        date_[j] = company->date_[i];
-        price_[j] = company->price_[i];
+    for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
+        date_[j] = company_->date_[i];
+        price_[j] = company_->price_[i];
     }
     techTable_.resize(days_);
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
-    vector<path> techFilePath = get_path(company->allTechOuputPath_.at(techType_));
+    vector<path> techFilePath = get_path(company_->allTechOuputPath_.at(techType_));
     int techFilePathSize = (int)techFilePath.size();
     if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
@@ -366,7 +365,7 @@ void TechTable::create_techTable(CompanyInfo *company) {
         }
         if (techFileSize - days_ < 0) {
             cout << endl;
-            cout << company->companyName_ << " tech file not old enougth" << endl;
+            cout << company_->companyName_ << " tech file not old enougth" << endl;
             exit(1);
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
@@ -720,6 +719,32 @@ class RSI {
     }
 };
 
+class BetaMatrix {
+   public:
+    int variableNum_ = 0;
+    vector<int> eachVariableBitsNum_;
+    int bitsNum_ = 0;
+    vector<double> matrix_;
+
+    void reset();
+    void print(ostream &out);
+};
+
+void BetaMatrix::reset() {
+    fill(matrix_.begin(), matrix_.end(), 0.5);
+}
+
+void BetaMatrix::print(ostream &out = cout) {
+    out << "beta matrix" << endl;
+    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
+        for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
+            out << matrix_[bitIndex] << ",";
+        }
+        out << " ,";
+    }
+    out << endl;
+}
+
 class Particle {
    private:
     CompanyInfo *company_;
@@ -762,11 +787,11 @@ class Particle {
     void push_tradeInfo_sell(int stockHold, int i);
     void push_holdInfo_sell(int endRow, vector<string> *holdInfoPtr, int i);
     void push_holdInfo_holding(vector<string> *holdInfoPtr, int i);
-    void push_hodInfo_not_holding(vector<string> *holdInfoPtr, int i);
+    void push_holdInfo_not_holding(vector<string> *holdInfoPtr, int i);
     void push_tradeInfo_last(bool lastRecord);
     void check_buyNum_sellNum();
     void reset(double RoR = 0);
-    void measure(vector<double> &betaMatrix);
+    void measure(BetaMatrix &betaMatrix);
     void convert_bi_dec();
     void print(ostream &out);
     void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
@@ -936,7 +961,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
             push_holdInfo_holding(holdInfoPtr, i);
         }
         else if (holdInfoPtr != nullptr && stockHold == 0) {
-            push_hodInfo_not_holding(holdInfoPtr, i);
+            push_holdInfo_not_holding(holdInfoPtr, i);
         }
     }
     check_buyNum_sellNum();
@@ -1100,7 +1125,7 @@ void Particle::push_holdInfo_holding(vector<string> *holdInfoPtr, int i) {
     (*holdInfoPtr).push_back(push);
 }
 
-void Particle::push_hodInfo_not_holding(vector<string> *holdInfoPtr, int i) {
+void Particle::push_holdInfo_not_holding(vector<string> *holdInfoPtr, int i) {
     string push;
     push += ",,,,";
     for (auto variable : decimal_) {
@@ -1138,12 +1163,11 @@ void Particle::reset(double RoR) {
     bestCnt_ = 0;
 }
 
-void Particle::measure(vector<double> &betaMatrix) {
+void Particle::measure(BetaMatrix &betaMatrix) {
     double r;
-    int bitSize = (int)betaMatrix.size();
-    for (int i = 0; i < bitSize; i++) {
+    for (int i = 0; i < betaMatrix.bitsNum_; i++) {
         r = (double)rand() / (double)RAND_MAX;
-        if (r < betaMatrix[i]) {
+        if (r < betaMatrix.matrix_[i]) {
             binary_[i] = 1;
         }
         else {
@@ -1252,32 +1276,6 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     return outputPath;
 }
 
-class BetaMatrix {
-   public:
-    int variableNum_ = 0;
-    vector<int> eachVariableBitsNum_;
-    int bitsNum_ = 0;
-    vector<double> matrix_;
-
-    void reset();
-    void print(ostream &out);
-};
-
-void BetaMatrix::reset() {
-    fill(matrix_.begin(), matrix_.end(), 0.5);
-}
-
-void BetaMatrix::print(ostream &out = cout) {
-    out << "beta matrix" << endl;
-    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
-            out << matrix_[bitIndex] << ",";
-        }
-        out << " ,";
-    }
-    out << endl;
-}
-
 class Train {
    private:
     CompanyInfo &company_;
@@ -1377,23 +1375,13 @@ void Train::set_variables_and_condition(string &targetWindow, string &startDate,
 
 void Train::find_new_row(string &startDate, string &endDate) {
     if (startDate != "") {
-        for (int i = 0; i < tables_[0].days_; i++) {
-            if (startDate == tables_[0].date_[i]) {
-                actualStartRow_ = i;
-                break;
-            }
-        }
-        for (int i = actualStartRow_; i < tables_[0].days_; i++) {
-            if (endDate == tables_[0].date_[i]) {
-                actualEndRow_ = i;
-                break;
-            }
-        }
-        if (actualStartRow_ == -1) {
+        actualStartRow_ = (int)distance(tables_[0].date_.begin(), find(tables_[0].date_.begin(), tables_[0].date_.end(), startDate));
+        actualEndRow_ = (int)distance(tables_[0].date_.begin(), find(tables_[0].date_.begin(), tables_[0].date_.end(), endDate));
+        if (actualStartRow_ == tables_[0].days_) {
             cout << "input trainStartDate is not found" << endl;
             exit(1);
         }
-        if (actualEndRow_ == -1) {
+        if (actualEndRow_ == tables_[0].days_) {
             cout << "input trainEndDate is not found" << endl;
             exit(1);
         }
@@ -1486,7 +1474,7 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     globalP_[4].reset(company_.info_.totalCapitalLV_);
     for (int i = 0; i < company_.info_.particleNum_; i++) {
         particles_[i].reset();
-        particles_[i].measure(betaMatrix_.matrix_);
+        particles_[i].measure(betaMatrix_);
         particles_[i].convert_bi_dec();
         particles_[i].trade(actualStartRow_, actualEndRow_);
         print_debug_particle(out, i, debug);
@@ -1516,7 +1504,7 @@ void Train::store_exp_gen(int expCnt, int genCnt) {
 }
 
 void Train::update_local() {
-    for (auto p : particles_) {
+    for (auto &p : particles_) {
         if (p.RoR_ > globalP_[3].RoR_) {
             globalP_[3] = p;
         }
