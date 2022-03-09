@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <exception>
 
     //#include "CompanyInfo.h"
     //#include "TechTable.h"
@@ -1898,47 +1899,52 @@ void Tradition::set_variables(int index) {
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePath = get_path(_info.pricePath_);
-    for (int companyIndex = 0; companyIndex < companyPricePath.size(); companyIndex++) {
-        path targetCompanyPricePath = companyPricePath[companyIndex];
-        if (_info.setCompany_ != "all") {
-            for (auto i : companyPricePath) {
-                if (i.stem() == _info.setCompany_) {
-                    targetCompanyPricePath = i;
+    try {
+        for (int companyIndex = 0; companyIndex < companyPricePath.size(); companyIndex++) {
+            path targetCompanyPricePath = companyPricePath[companyIndex];
+            if (_info.setCompany_ != "all") {
+                for (auto i : companyPricePath) {
+                    if (i.stem() == _info.setCompany_) {
+                        targetCompanyPricePath = i;
+                        break;
+                    }
+                }
+                companyPricePath.clear();
+                companyPricePath.push_back(targetCompanyPricePath);
+            }
+            CompanyInfo company(_info, targetCompanyPricePath);
+            cout << company.companyName_ << endl;
+            switch (company.info_.mode_) {
+                case 0: {
+                    Train train(company, company.info_.setWindow_);
+                    break;
+                }
+                case 1: {
+                    Test test(company, company.info_.setWindow_, false, true);
+                    break;
+                }
+                case 2: {
+                    Tradition trainTradition(company, company.info_.setWindow_);
+                    break;
+                }
+                case 3: {
+                    Test testTradition(company, company.info_.setWindow_, true, false);
+                    break;
+                }
+                case 10: {
+                        //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                        //                Tradition tradition(company);
+                        //                Train train(company, "2011-12-01", "2011-12-30", "debug");
+                        //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                        //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                        //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                     break;
                 }
             }
-            companyPricePath.clear();
-            companyPricePath.push_back(targetCompanyPricePath);
         }
-        CompanyInfo company(_info, targetCompanyPricePath);
-        cout << company.companyName_ << endl;
-        switch (company.info_.mode_) {
-            case 0: {
-                Train train(company, company.info_.setWindow_);
-                break;
-            }
-            case 1: {
-                Test test(company, company.info_.setWindow_, false, true);
-                break;
-            }
-            case 2: {
-                Tradition trainTradition(company, company.info_.setWindow_);
-                break;
-            }
-            case 3: {
-                Test testTradition(company, company.info_.setWindow_, true, false);
-                break;
-            }
-            case 10: {
-                    //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                Tradition tradition(company);
-                    //                Train train(company, "2011-12-01", "2011-12-30", "debug");
-                    //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                break;
-            }
-        }
+    }
+    catch (exception &e) {
+        cout << "exception: " << e.what() << endl;
     }
     time_point end = steady_clock::now();
     cout << "time: " << duration_cast<milliseconds>(end - begin).count() / 1000.0 << " s" << endl;
