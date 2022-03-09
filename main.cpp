@@ -313,8 +313,10 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 }
 
 class TechTable {
-public:
+private:
     CompanyInfo *company_;
+    
+public:
     int techIndex_;
     string techType_;
     int days_;
@@ -1314,7 +1316,7 @@ void BetaMatrix::print(ofstream &out, bool debug) {
 }
 
 class Train {
-public:
+private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
     
@@ -1353,6 +1355,7 @@ public:
     void update_best(int renewBest);
     void clear_STL();
     
+public:
     Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
 };
 
@@ -1698,7 +1701,7 @@ void Train::clear_STL() {
 }
 
 class Test {
-public:
+private:
     CompanyInfo &company_;
     Particle p_;
     vector<TechTable> tables_;
@@ -1715,6 +1718,7 @@ public:
     void set_variables(vector<vector<std::string>> &thisTrainFile);
     void print_test_holdInfo(TestWindow &window);
     
+public:
     Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> addtionTable = {});
 };
 
@@ -1846,7 +1850,7 @@ public:
 };
 
 class Tradition {
-public:
+private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
     vector<Particle> particles_;
@@ -1859,6 +1863,7 @@ public:
     TrainWindow set_window(string &targetWindow, int &windowIndex);
     void set_variables(int index);
     
+public:
     Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
