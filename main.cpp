@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <thread>
 
 //#include "CompanyInfo.h"
 //#include "TechTable.h"
@@ -27,7 +28,7 @@ class Info {
     string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
 
-    double delta_ = 0.0002;
+    double delta_ = 0.00016;
     int expNum_ = 50;
     int genNum_ = 10000;
     int particleNum_ = 10;
@@ -1291,6 +1292,8 @@ class Train {
     double actualDelta_ = -1;
     int compareNew_ = -1;
     int compareOld_ = -1;
+    
+    vector<thread> t_;
 
     void start_train(string targetWindow, string startDate, string endDate, bool debug);
     void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
@@ -1302,6 +1305,8 @@ class Train {
     ofstream set_debug_file(bool debug);
     void start_exp(ofstream &out, int expCnt, bool debug);
     void print_debug_exp(ofstream &out, int expCnt, bool debug);
+    void p(bool debug, int i, std::ofstream &out);
+    
     void start_gen(ofstream &out, int expCnt, int genCnt, bool debug);
     void print_debug_gen(ofstream &out, int genCnt, bool debug);
     void print_debug_particle(ofstream &out, int i, bool debug);
@@ -1338,6 +1343,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
     find_new_row(startDate, endDate);
     create_particles(debug);
     create_betaMatrix();
+    t_.resize(company_.info_.particleNum_);
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, startDate, windowIndex);
         srand(343);
@@ -1473,11 +1479,11 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
     for (int i = 0; i < company_.info_.particleNum_; i++) {
-        particles_[i].reset();
-        particles_[i].measure(betaMatrix_);
-        particles_[i].convert_bi_dec();
-        particles_[i].trade(actualStartRow_, actualEndRow_);
-        print_debug_particle(out, i, debug);
+        t_[i] = thread(&Train::p, this, debug, i, ref(out));
+//        p(debug, i, out);
+    }
+    for (auto & i : t_) {
+        i.join();
     }
     store_exp_gen(expCnt, genCnt);
     update_local();
@@ -1489,6 +1495,14 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
 void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
     if (debug)
         out << "gen:" << genCnt << ",=====" << endl;
+}
+
+void Train::p(bool debug, int i, std::ofstream &out) {
+    particles_[i].reset();
+    particles_[i].measure(betaMatrix_);
+    particles_[i].convert_bi_dec();
+    particles_[i].trade(actualStartRow_, actualEndRow_);
+    print_debug_particle(out, i, debug);
 }
 
 void Train::print_debug_particle(ofstream &out, int i, bool debug) {
@@ -1914,7 +1928,7 @@ int main(int argc, const char *argv[]) {
                 case 10: {
                     //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                Tradition tradition(company);
-                    //                Train train(company, "2011-12-01", "2011-12-30", "debug");
+                    Train train(company, "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
