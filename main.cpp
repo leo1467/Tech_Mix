@@ -801,7 +801,7 @@ class Particle {
     void convert_bi_dec();
     void print(ostream &out);
     void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
-    string set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow);
+    string set_output_filePath(string windowName, string &outputPath, int actualStartRow, int actualEndRow);
 
     Particle(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
 };
@@ -1194,7 +1194,7 @@ void Particle::print(ostream &out = cout) {
 }
 
 void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr) {
-    string filePath = set_output_filePath(windowName, outputPath, actualEndRow, actualStartRow);
+    string filePath = set_output_filePath(windowName, outputPath, actualStartRow, actualEndRow);
     isRecordOn_ = true;
     remain_ = company_->info_.totalCapitalLV_;
     trade(actualStartRow, actualEndRow, false, holdInfoPtr);
@@ -1244,7 +1244,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
     }
 }
 
-string Particle::set_output_filePath(string windowName, string &outputPath, int actualEndRow, int actualStartRow) {
+string Particle::set_output_filePath(string windowName, string &outputPath, int actualStartRow, int actualEndRow) {
     if (outputPath != "") {
         if (company_->info_.testDeltaLoop_ > 0) {
             string folderName = windowName + "_" + to_string(actualDelta_);
