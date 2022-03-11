@@ -1283,7 +1283,7 @@ class Train {
     vector<TechTable> tables_;
 
     vector<Particle> particles_;
-    vector<Particle> globalP_;  //0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
+    vector<Particle> globalP_;  // 0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
     BetaMatrix betaMatrix_;
 
     int actualStartRow_ = -1;
@@ -1293,7 +1293,7 @@ class Train {
     int compareNew_ = -1;
     int compareOld_ = -1;
     
-    vector<thread> t_;
+    //    vector<thread> t_;
 
     void start_train(string targetWindow, string startDate, string endDate, bool debug);
     void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
@@ -1305,8 +1305,7 @@ class Train {
     ofstream set_debug_file(bool debug);
     void start_exp(ofstream &out, int expCnt, bool debug);
     void print_debug_exp(ofstream &out, int expCnt, bool debug);
-    void p(bool debug, int i, std::ofstream &out);
-    
+    void evolve_particles(ofstream &out, int i, bool debug);
     void start_gen(ofstream &out, int expCnt, int genCnt, bool debug);
     void print_debug_gen(ofstream &out, int genCnt, bool debug);
     void print_debug_particle(ofstream &out, int i, bool debug);
@@ -1343,7 +1342,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
     find_new_row(startDate, endDate);
     create_particles(debug);
     create_betaMatrix();
-    t_.resize(company_.info_.particleNum_);
+    //    t_.resize(company_.info_.particleNum_);
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, startDate, windowIndex);
         srand(343);
@@ -1479,12 +1478,12 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
     for (int i = 0; i < company_.info_.particleNum_; i++) {
-        t_[i] = thread(&Train::p, this, debug, i, ref(out));
-//        p(debug, i, out);
+        //        t_[i] =thread(&Train::p, this, debug, i, ref(out));
+        evolve_particles(out, i, debug);
     }
-    for (auto & i : t_) {
-        i.join();
-    }
+    //    for (auto& i : t_) {
+    //        i.join();
+    //    }
     store_exp_gen(expCnt, genCnt);
     update_local();
     update_global();
@@ -1497,7 +1496,7 @@ void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
         out << "gen:" << genCnt << ",=====" << endl;
 }
 
-void Train::p(bool debug, int i, std::ofstream &out) {
+void Train::evolve_particles(ofstream &out, int i, bool debug) {
     particles_[i].reset();
     particles_[i].measure(betaMatrix_);
     particles_[i].convert_bi_dec();
