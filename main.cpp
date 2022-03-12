@@ -27,7 +27,7 @@ class Info {
     string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
 
-    double delta_ = 0.00016;
+    double delta_ = 0.00128;
     int expNum_ = 50;
     int genNum_ = 10000;
     int particleNum_ = 10;
@@ -41,7 +41,7 @@ class Info {
 
     int techIndex_ = 0;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
-    int algoIndex_ = 2;
+    int algoIndex_ = 3;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
 
     string techType_ = allTech_[techIndex_];
@@ -1564,12 +1564,12 @@ void Train::KNQTScompare() {
     switch(company_.info_.compareMode_) {
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
-            for (; localBestBinaryIter != globalP_[3].binary_.end() && localWorstBinaryIter != globalP_[4].binary_.end();) {
+            for (; localBestBinaryIter != globalP_[3].binary_.end();) {
                 if (*localBestBinaryIter != *localWorstBinaryIter) {
                     compareNew_++;
-                    localBestBinaryIter++;
-                    localWorstBinaryIter++;
                 }
+                localBestBinaryIter++;
+                localWorstBinaryIter++;
             }
             break;
         }
@@ -1900,7 +1900,7 @@ int main(int argc, const char *argv[]) {
                 case 10: {
                     //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                    Tradition tradition(company);
-                    //                    Train train(company, "2011-12-01", "2011-12-30");
+                    Train train(company, "2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
