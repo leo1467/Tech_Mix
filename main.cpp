@@ -546,7 +546,7 @@ TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(compa
 }
 
 void TrainWindow::find_train_interval() {
-    switch (TestWindow::windowType_) {
+    switch (windowType_) {
         case 'M':
         case 'S': {
             find_M_train();
@@ -747,6 +747,8 @@ class Particle {
     typedef vector<bool (*)(vector<TechTable> *, int, int, int, vector<int> &)> buy_sell;
     buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
     buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
+    
+    vector<vector<int>> allTechEachVariableBitsNum_{MA().eachVariableBitsNum_, MA().eachVariableBitsNum_, MA().eachVariableBitsNum_, RSI().eachVariableBitsNum_};
 
     void instant_trade(string startDate, string endDate, bool hold = false);
     void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
@@ -779,22 +781,7 @@ class Particle {
 };
 
 Particle::Particle(CompanyInfo *company, bool isRecordOn, vector<int> variables) : company_(company), remain_(company->info_.totalCapitalLV_), isRecordOn_(isRecordOn) {
-    switch (company_->info_.techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            eachVariableBitsNum_ = MA().eachVariableBitsNum_;
-            break;
-        }
-        case 3: {
-            eachVariableBitsNum_ = RSI().eachVariableBitsNum_;
-            break;
-        }
-        default: {
-            cout << "no techIndex_ " << company_->info_.techIndex_ << ", choose a techIndex_" << endl;
-            exit(1);
-        }
-    }
+    eachVariableBitsNum_ = allTechEachVariableBitsNum_[company_->info_.techIndex_];
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
     variableNum_ = (int)eachVariableBitsNum_.size();
@@ -1756,6 +1743,8 @@ class Tradition {
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
+    
+    vector<vector<vector<int>>> allTraditionStrategy_{MA().traditionStrategy_, MA().traditionStrategy_, MA().traditionStrategy_, RSI().traditionStrategy_};
 
     void train_Tradition(string &targetWindow);
     void create_particles();
@@ -1793,18 +1782,7 @@ void Tradition::train_Tradition(string &targetWindow) {
 }
 
 void Tradition::set_strategy() {
-    switch (company_.info_.techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            traditionStrategy_ = MA().traditionStrategy_;
-            break;
-        }
-        case 3: {
-            traditionStrategy_ = RSI().traditionStrategy_;
-            break;
-        }
-    }
+    traditionStrategy_ = allTraditionStrategy_[company_.info_.techIndex_];
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
 
@@ -1873,12 +1851,12 @@ int main(int argc, const char *argv[]) {
                     break;
                 }
                 case 10: {
-                    //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                Tradition tradition(company);
-//                    Train train(company, "2011-12-01", "2011-12-30");
-                    //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    Tradition tradition(company);
+                    //                    Train train(company, "2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                     break;
                 }
             }
