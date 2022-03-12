@@ -79,12 +79,18 @@ class CompanyInfo {
     int testEndRow_ = -1;
     vector<vector<double>> techTable_;
     int tableStartRow_ = -1;
+    
+    vector<void (CompanyInfo::*)(vector<double> &)> cal_tech_{&CompanyInfo::cal_SMA, &CompanyInfo::cal_WMA, &CompanyInfo::cal_EMA, &CompanyInfo::cal_RSI};  // outside the class (company.*(company.cal_tech_[company.info_.techIndex_]))(tmp);
 
     void set_paths();
     void store_date_price(path priceFilePath);
     void create_folder();
     void find_table_start_row();
     void store_tech_to_vector();
+    void cal_SMA(vector<double> &tmp);
+    void cal_WMA(vector<double> &tmp);
+    void cal_EMA(vector<double> &tmp);
+    void cal_RSI(vector<double> &tmp);
     void output_Tech();
     void set_techFile_title(ofstream &out, int techPerid);
 
@@ -183,74 +189,71 @@ void CompanyInfo::store_tech_to_vector() {
     cout << "calculating " << companyName_ << " " << info_.techType_ << endl;
     vector<double> tmp;
     techTable_.push_back(tmp);
-    switch (info_.techIndex_) {
-        case 0: {
-            for (int MA = 1; MA < 257; MA++) {
-                for (int dateRow = MA - 1; dateRow < totalDays_; dateRow++) {
-                    double MARangePriceSum = 0;
-                    for (int i = dateRow, j = MA; j > 0; i--, j--) {
-                        MARangePriceSum += price_[i];
-                    }
-                    tmp.push_back(MARangePriceSum / MA);
-                }
-                techTable_.push_back(tmp);
-                tmp.clear();
-            }
-            break;
-        }
-        case 1: {
-            break;
-        }
-        case 2: {
-            break;
-        }
-        case 3: {
-            vector<double> priceGainLoss(totalDays_ - 1);
-            for (int priceDateRow = 1; priceDateRow < totalDays_; priceDateRow++) {
-                priceGainLoss[priceDateRow - 1] = price_[priceDateRow] - price_[priceDateRow - 1];
-            }
-            for (int RSIPeriod = 1; RSIPeriod < 257; RSIPeriod++) {
-                double RSI, gain = 0, loss = 0, avgGain = 0, avgLoss = 0;
-                for (int row = 0; row < RSIPeriod; row++) {
-                    if (priceGainLoss[row] >= 0) {
-                        gain += priceGainLoss[row];
-                    }
-                    else {
-                        loss += -priceGainLoss[row];
-                    }
-                }
-                avgGain = gain / RSIPeriod;
-                avgLoss = loss / RSIPeriod;
-                RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
-                tmp.push_back(RSI);
-                double preAvgGain = avgGain, preAvgLoss = avgLoss;
-                for (int i = RSIPeriod; i < totalDays_ - 1; i++) {
-                    if (priceGainLoss[i] >= 0) {
-                        RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
-                        preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
-                        preAvgLoss = (preAvgLoss * (RSIPeriod - 1)) / RSIPeriod;
-                    }
-                    else {
-                        RSI = 100.0 - (100.0 / (1 + ((preAvgGain * (RSIPeriod - 1)) / (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]))));
-                        preAvgGain = (preAvgGain * (RSIPeriod - 1)) / RSIPeriod;
-                        preAvgLoss = (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]) / RSIPeriod;
-                    }
-                    if (isnan(RSI)) {
-                        RSI = 100;
-                    }
-                    tmp.push_back(RSI);
-                }
-                techTable_.push_back(tmp);
-                tmp.clear();
-            }
-            break;
-        }
-        default: {
-            cout << "store_tech_to_vector exception" << endl;
-            exit(1);
-        }
-    }
+    (this->*cal_tech_[info_.techIndex_])(tmp); // or (*this.*cal_tech_[info_.techIndex_])(tmp);
     cout << "done calculating" << endl;
+}
+
+void CompanyInfo::cal_SMA(vector<double> &tmp) {
+    for (int MA = 1; MA < 257; MA++) {
+        for (int dateRow = MA - 1; dateRow < totalDays_; dateRow++) {
+            double MARangePriceSum = 0;
+            for (int i = dateRow, j = MA; j > 0; i--, j--) {
+                MARangePriceSum += price_[i];
+            }
+            tmp.push_back(MARangePriceSum / MA);
+        }
+        techTable_.push_back(tmp);
+        tmp.clear();
+    }
+}
+
+void CompanyInfo::cal_WMA(vector<double> &tmp) {
+    
+}
+
+void CompanyInfo::cal_EMA(vector<double> &tmp) {
+    
+}
+
+void CompanyInfo::cal_RSI(vector<double> &tmp) {
+    vector<double> priceGainLoss(totalDays_ - 1);
+    for (int priceDateRow = 1; priceDateRow < totalDays_; priceDateRow++) {
+        priceGainLoss[priceDateRow - 1] = price_[priceDateRow] - price_[priceDateRow - 1];
+    }
+    for (int RSIPeriod = 1; RSIPeriod < 257; RSIPeriod++) {
+        double RSI, gain = 0, loss = 0, avgGain = 0, avgLoss = 0;
+        for (int row = 0; row < RSIPeriod; row++) {
+            if (priceGainLoss[row] >= 0) {
+                gain += priceGainLoss[row];
+            }
+            else {
+                loss += -priceGainLoss[row];
+            }
+        }
+        avgGain = gain / RSIPeriod;
+        avgLoss = loss / RSIPeriod;
+        RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
+        tmp.push_back(RSI);
+        double preAvgGain = avgGain, preAvgLoss = avgLoss;
+        for (int i = RSIPeriod; i < totalDays_ - 1; i++) {
+            if (priceGainLoss[i] >= 0) {
+                RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
+                preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
+                preAvgLoss = (preAvgLoss * (RSIPeriod - 1)) / RSIPeriod;
+            }
+            else {
+                RSI = 100.0 - (100.0 / (1 + ((preAvgGain * (RSIPeriod - 1)) / (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]))));
+                preAvgGain = (preAvgGain * (RSIPeriod - 1)) / RSIPeriod;
+                preAvgLoss = (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]) / RSIPeriod;
+            }
+            if (isnan(RSI)) {
+                RSI = 100;
+            }
+            tmp.push_back(RSI);
+        }
+        techTable_.push_back(tmp);
+        tmp.clear();
+    }
 }
 
 void CompanyInfo::output_Tech() {
@@ -1903,7 +1906,7 @@ int main(int argc, const char *argv[]) {
                 case 10: {
                     //                Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                Tradition tradition(company);
-                    Train train(company, "2011-12-01", "2011-12-30");
+//                    Train train(company, "2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
