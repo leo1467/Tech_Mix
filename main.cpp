@@ -37,6 +37,7 @@ class Info {
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = -1;
     double multiplyDown_ = -1;
+    int compareMode_ = 0;
 
     int techIndex_ = 0;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -1251,6 +1252,7 @@ class Train {
     void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex);
     ofstream set_debug_file(bool debug);
     void start_exp(ofstream &out, int expCnt, bool debug);
+    void initialize_KNQTS();
     void print_debug_exp(ofstream &out, int expCnt, bool debug);
     void evolve_particles(ofstream &out, int i, bool debug);
     void start_gen(ofstream &out, int expCnt, int genCnt, bool debug);
@@ -1263,6 +1265,8 @@ class Train {
     void QTS();
     void GQTS();
     void GNQTS();
+    void KNQTScompare();
+    void KNQTSmultiply();
     void print_debug_beta(ofstream &out, bool debug);
     void update_best(int renewBest);
     void clear_STL();
@@ -1409,10 +1413,17 @@ void Train::start_exp(ofstream &out, int expCnt, bool debug) {
     print_debug_exp(out, expCnt, debug);
     globalP_[1].reset();
     betaMatrix_.reset();
+    initialize_KNQTS();
     for (int genCnt = 0; genCnt < company_.info_.genNum_; genCnt++) {
         start_gen(out, expCnt, genCnt, debug);
     }
     update_best(0);
+}
+
+void Train::initialize_KNQTS() {
+    actualDelta_ = company_.info_.delta_;
+    compareNew_ = 0;
+    compareOld_ = 0;
 }
 
 void Train::print_debug_exp(ofstream &out, int expCnt, bool debug) {
@@ -1502,9 +1513,10 @@ void Train::run_algo() {
         }
         case 3: {
             if (globalP_[1].RoR_ > 0) {
-                //GNQTS();
+                GNQTS();
             }
-            //compare_and_multiply();
+            KNQTScompare();
+            KNQTSmultiply();
             break;
         }
         default: {
@@ -1546,6 +1558,42 @@ void Train::GNQTS() {
         }
     }
     GQTS();
+}
+
+void Train::KNQTScompare() {
+    switch(company_.info_.compareMode_) {
+        case 0: {
+            auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
+            for (; localBestBinaryIter != globalP_[3].binary_.end() && localWorstBinaryIter != globalP_[4].binary_.end();) {
+                if (*localBestBinaryIter != *localWorstBinaryIter) {
+                    compareNew_++;
+                    localBestBinaryIter++;
+                    localWorstBinaryIter++;
+                }
+            }
+            break;
+        }
+        case 1: {
+            auto localBestDecimalIter = globalP_[3].decimal_.begin(), localWorstDecimalIter = globalP_[4].decimal_.begin();
+            for (; localBestDecimalIter != globalP_[3].decimal_.end() && localWorstDecimalIter != globalP_[4].decimal_.end();) {
+                compareNew_ += abs(*localBestDecimalIter - *localWorstDecimalIter);
+                localBestDecimalIter++;
+                localWorstDecimalIter++;
+            }
+            break;
+        }
+    }
+}
+
+void Train::KNQTSmultiply() {
+    if (compareNew_ > compareOld_) {
+        actualDelta_ *= company_.info_.multiplyUp_;
+    }
+    else {
+        actualDelta_ *= company_.info_.multiplyDown_;
+    }
+    compareOld_ = compareNew_;
+    compareNew_ = 0;
 }
 
 void Train::print_debug_beta(ofstream &out, bool debug) {
