@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -64,13 +63,13 @@ class CompanyInfo {
     const Info &info_;
     string companyName_;
 
-    map<string, string> allResultOutputPath_;
-    map<string, string> allTechOuputPath_;
-    map<string, string> allTrainFilePath_;
-    map<string, string> allTestFilePath_;
-    map<string, string> allTrainTraditionFilePath_;
-    map<string, string> allTestTraditionFilePath_;
-    map<string, string> allTestHoldFilePath_;
+    vector<string> allResultOutputPath_;
+    vector<string> allTechOuputPath_;
+    vector<string> allTrainFilePath_;
+    vector<string> allTestFilePath_;
+    vector<string> allTrainTraditionFilePath_;
+    vector<string> allTestTraditionFilePath_;
+    vector<string> allTestHoldFilePath_;
 
     int totalDays_;
     vector<string> date_;
@@ -106,13 +105,13 @@ CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), compan
 
 void CompanyInfo::set_paths() {
     for (auto tech : info_.allTech_) {
-        allResultOutputPath_.insert({tech, tech + "_result"});
-        allTechOuputPath_.insert({tech, tech + "/" + companyName_});
-        allTrainFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/train/"});
-        allTestFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/test/"});
-        allTrainTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/trainTradition/"});
-        allTestTraditionFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testTradition/"});
-        allTestHoldFilePath_.insert({tech, tech + "_result" + "/" + companyName_ + "/testHoldPerid/"});
+        allResultOutputPath_.push_back(tech + "_result");
+        allTechOuputPath_.push_back(tech + "/" + companyName_);
+        allTrainFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/train/");
+        allTestFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/test/");
+        allTrainTraditionFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/trainTradition/");
+        allTestTraditionFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/testTradition/");
+        allTestHoldFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/testHoldPerid/");
     }
 }
 
@@ -142,12 +141,12 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 
 void CompanyInfo::create_folder() {
     create_directories(info_.techType_ + "/" + companyName_);
-    create_directories(allTestHoldFilePath_.at(info_.techType_));
+    create_directories(allTestHoldFilePath_[info_.techIndex_]);
     for (auto i : info_.slidingWindows_) {
-        create_directories(allTrainFilePath_.at(info_.techType_) + i);
-        create_directories(allTestFilePath_.at(info_.techType_) + i);
-        create_directories(allTrainTraditionFilePath_.at(info_.techType_) + i);
-        create_directories(allTestTraditionFilePath_.at(info_.techType_) + i);
+        create_directories(allTrainFilePath_[info_.techIndex_] + i);
+        create_directories(allTestFilePath_[info_.techIndex_] + i);
+        create_directories(allTrainTraditionFilePath_[info_.techIndex_] + i);
+        create_directories(allTestTraditionFilePath_[info_.techIndex_] + i);
     }
 }
 
@@ -276,13 +275,13 @@ void CompanyInfo::output_Tech() {
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
     if (techPerid < 10) {
-        out.open(allTechOuputPath_.at(info_.techType_) + "/" + companyName_ + "_" + info_.techType_ + "_00" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_00" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 10 && techPerid < 100) {
-        out.open(allTechOuputPath_.at(info_.techType_) + "/" + companyName_ + "_" + info_.techType_ + "_0" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_0" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 100) {
-        out.open(allTechOuputPath_.at(info_.techType_) + "/" + companyName_ + "_" + info_.techType_ + "_" + to_string(techPerid) + ".csv");
+        out.open(allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
 
@@ -319,7 +318,7 @@ void TechTable::create_techTable() {
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
-    vector<path> techFilePath = get_path(company_->allTechOuputPath_.at(techType_));
+    vector<path> techFilePath = get_path(company_->allTechOuputPath_[techIndex_]);
     int techFilePathSize = (int)techFilePath.size();
     if (techFilePathSize == 0) {
         cout << "no MA file" << endl;
@@ -1302,7 +1301,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
                 start_exp(out, expCnt, debug);
             }
             out.close();
-            globalP_[0].print_train_test_data(window.windowName_, company_.allTrainFilePath_.at(company_.info_.techType_) + window.windowName_, actualStartRow_, actualEndRow_);
+            globalP_[0].print_train_test_data(window.windowName_, company_.allTrainFilePath_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
             cout << globalP_[0].RoR_ << "%" << endl;
         }
         cout << "==========" << endl;
@@ -1313,13 +1312,13 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
 void Train::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
     if (startDate == "debug" || endDate == "debug") {
         debug = true;
-        company_.allTrainFilePath_.at(company_.info_.techType_) = "";
+        company_.allTrainFilePath_[company_.info_.techIndex_] = "";
     }
     if (targetWindow.length() == startDate.length()) {
         endDate = startDate;
         startDate = targetWindow;
         targetWindow = "A2A";
-        company_.allTrainFilePath_.at(company_.info_.techType_) = "";
+        company_.allTrainFilePath_[company_.info_.techIndex_] = "";
     }
     else {
         startDate = "";
@@ -1370,7 +1369,7 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
     if (startDate == "") {
         window.print_train();
     }
-    if (company_.allTrainFilePath_.at(company_.info_.techType_) == "") {
+    if (company_.allTrainFilePath_[company_.info_.techIndex_] == "") {
         window.windowName_ = "";
     }
     return window;
@@ -1656,12 +1655,12 @@ void Test::add_tables(vector<int> addtionTable) {
 
 void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath) {
     if (tradition_) {
-        trainFilePath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_);
-        testFileOutputPath = company_.allTestTraditionFilePath_.at(company_.info_.techType_);
+        trainFilePath = company_.allTrainTraditionFilePath_[company_.info_.techIndex_];
+        testFileOutputPath = company_.allTestTraditionFilePath_[company_.info_.techIndex_];
     }
     else {
-        trainFilePath = company_.allTrainFilePath_.at(company_.info_.techType_);
-        testFileOutputPath = company_.allTestFilePath_.at(company_.info_.techType_);
+        trainFilePath = company_.allTrainFilePath_[company_.info_.techIndex_];
+        testFileOutputPath = company_.allTestFilePath_[company_.info_.techIndex_];
     }
     cout << "test " << company_.companyName_ << endl;
 }
@@ -1701,7 +1700,7 @@ void Test::print_test_holdInfo(TestWindow &window) {
     if (hold_) {
         ofstream holdFile;
         if (!tradition_) {
-            holdFile.open(company_.allTestHoldFilePath_.at(company_.info_.techType_) + company_.companyName_ + "_" + window.windowName_ + ".csv");
+            holdFile.open(company_.allTestHoldFilePath_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         else if (tradition_) {
             //set tradition hold file path
@@ -1766,7 +1765,7 @@ void Tradition::train_Tradition(string &targetWindow) {
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        string outputPath = company_.allTrainTraditionFilePath_.at(company_.info_.techType_) + window.windowName_;
+        string outputPath = company_.allTrainTraditionFilePath_[company_.info_.techIndex_] + window.windowName_;
         for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
             int startRow = window.interval_[intervalIndex];
             int endRow = window.interval_[intervalIndex + 1];
