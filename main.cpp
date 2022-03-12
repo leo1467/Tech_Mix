@@ -259,50 +259,19 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
 void CompanyInfo::output_Tech() {
     store_tech_to_vector();
     cout << "saving " << info_.techType_ << " file" << endl;
-    switch (info_.techIndex_) {
-        case 0: {
-            for (int SMAPeriod = 1; SMAPeriod < 257; SMAPeriod++) {
-                if (SMAPeriod % 10 == 0) {
-                    cout << ".";
-                }
-                ofstream out;
-                set_techFile_title(out, SMAPeriod);
-                int techSize = (int)techTable_[SMAPeriod].size();
-                for (int i = 0, dateRow = SMAPeriod - 1; i < techSize; i++, dateRow++) {
-                    out << date_[dateRow] << "," << set_precision(techTable_[SMAPeriod][i]) << endl;
-                }
-                out.close();
-            }
-            cout << endl;
-            break;
+    for (int techPeriod = 1; techPeriod < 257; techPeriod++) {
+        if (techPeriod % 10 == 0) {
+            cout << ".";
         }
-        case 1: {
-            break;
+        ofstream out;
+        set_techFile_title(out, techPeriod);
+        int techSize = (int)techTable_[techPeriod].size();
+        for (int i = 0, dateRow = techPeriod - 1; i < techSize; i++, dateRow++) {
+            out << date_[dateRow] << "," << set_precision(techTable_[techPeriod][i]) << endl;
         }
-        case 2: {
-            break;
-        }
-        case 3: {
-            for (int RSIPerid = 1; RSIPerid < 257; RSIPerid++) {
-                if (RSIPerid % 10 == 0) {
-                    cout << ".";
-                }
-                ofstream out;
-                set_techFile_title(out, RSIPerid);
-                int techSize = (int)techTable_[RSIPerid].size();
-                for (int i = 0, dateRow = RSIPerid; i < techSize; i++, dateRow++) {
-                    out << date_[dateRow] << "," << set_precision(techTable_[RSIPerid][i]) << endl;
-                }
-                out.close();
-            }
-            cout << endl;
-            break;
-        }
-        default: {
-            cout << "store_tech_to_vector exception" << endl;
-            exit(1);
-        }
+        out.close();
     }
+    cout << endl;
 }
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
