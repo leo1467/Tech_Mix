@@ -23,7 +23,7 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 10;
+    int mode_ = 0;
     string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
 
@@ -33,7 +33,7 @@ class Info {
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
-    int testDeltaLoop_ = 1;
+    int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
     double multiplyDown_ = 0.99;
@@ -57,11 +57,11 @@ class Info {
     vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     int windowNumber_ = int(slidingWindows_.size());
-} const _info;
+} _info;
 
 class CompanyInfo {
    public:
-    const Info &info_;
+    Info &info_;
     string companyName_;
 
     vector<string> allResultOutputPath_;
@@ -94,10 +94,10 @@ class CompanyInfo {
     void output_Tech();
     void set_techFile_title(ofstream &out, int techPerid);
 
-    CompanyInfo(const Info &info, path pricePath);
+    CompanyInfo(Info &info, path pricePath);
 };
 
-CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), companyName_(pricePath.stem().string()) {
+CompanyInfo::CompanyInfo(Info &info, path pricePath) : info_(info), companyName_(pricePath.stem().string()) {
     set_paths();
     store_date_price(pricePath);
     create_folder();
@@ -1242,10 +1242,10 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     return outputPath;
 }
 
-class Train {
+class TrainOneWindow {
    private:
     CompanyInfo &company_;
-    vector<TechTable> tables_;
+    vector<TechTable> &tables_;
 
     vector<Particle> particles_;
     vector<Particle> globalP_;  // 0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
@@ -1263,8 +1263,8 @@ class Train {
     void find_new_row(string &startDate, string &endDate);
     void create_particles(bool debug);
     void create_betaMatrix();
-    TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex);
-    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex);
+    TrainWindow set_window(string &targetWindow, string &startDate);
+    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &intervalIndex);
     ofstream set_debug_file(bool debug);
     void start_exp(ofstream &out, int expCnt, bool debug);
     void initialize_KNQTS();
@@ -1287,51 +1287,31 @@ class Train {
     void clear_STL();
 
    public:
-    Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
+    TrainOneWindow(CompanyInfo &company, vector<TechTable> &table, string targetWindow, string startDate = "", string endDate = "", bool debug = false, bool record = false);
 };
 
-Train::Train(CompanyInfo &company, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)}, actualDelta_(company.info_.delta_) {
-    if (company.info_.testDeltaLoop_ == 0) {
-        start_train(targetWindow, startDate, endDate, debug);
-    }
-    else {
-        for (int loop = 0; loop < company.info_.testDeltaLoop_; loop++) {
-            start_train(targetWindow, startDate, endDate, debug);
-            actualDelta_ = company_.info_.delta_;
-            actualDelta_ -= company.info_.testDeltaGap_ * (loop + 1);
-        }
-    }
-}
-
-void Train::start_train(string targetWindow, string startDate, string endDate, bool debug) {
+TrainOneWindow::TrainOneWindow(CompanyInfo &company, vector<TechTable> &table, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), tables_(table), actualDelta_(company.info_.delta_) {
     set_variables_and_condition(targetWindow, startDate, endDate, debug);
     find_new_row(startDate, endDate);
     create_particles(debug);
     create_betaMatrix();
-    for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-        TrainWindow window = set_window(targetWindow, startDate, windowIndex);
-        if (window.interval_[0] < 0) {
-            cout << "train window is too old, skip this window" << endl;
-            continue;
+    TrainWindow window = set_window(targetWindow, startDate);
+    srand(343);
+    for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
+        set_row_and_break_condition(window, startDate, intervalIndex);
+        globalP_[0].reset();
+        ofstream out = set_debug_file(debug);
+        for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
+            start_exp(out, expCnt, debug);
         }
-        srand(343);
-        for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
-            set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
-            globalP_[0].reset();
-            ofstream out = set_debug_file(debug);
-            for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
-                start_exp(out, expCnt, debug);
-            }
-            out.close();
-            globalP_[0].print_train_test_data(window.windowName_, company_.allTrainFilePath_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
-            cout << globalP_[0].RoR_ << "%" << endl;
-        }
-        cout << "==========" << endl;
+        out.close();
+        globalP_[0].print_train_test_data(window.windowName_, company_.allTrainFilePath_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
+        cout << globalP_[0].RoR_ << "%" << endl;
     }
-    clear_STL();
+    cout << "==========" << endl;
 }
 
-void Train::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
+void TrainOneWindow::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
     if (startDate == "debug" || endDate == "debug") {
         debug = true;
         company_.allTrainFilePath_[company_.info_.techIndex_] = "";
@@ -1347,7 +1327,7 @@ void Train::set_variables_and_condition(string &targetWindow, string &startDate,
     }
 }
 
-void Train::find_new_row(string &startDate, string &endDate) {
+void TrainOneWindow::find_new_row(string &startDate, string &endDate) {
     if (startDate != "") {
         actualStartRow_ = find_date_row(tables_[0].date_, startDate);
         actualEndRow_ = find_date_row(tables_[0].date_, endDate);
@@ -1362,7 +1342,7 @@ void Train::find_new_row(string &startDate, string &endDate) {
     }
 }
 
-void Train::create_particles(bool debug) {
+void TrainOneWindow::create_particles(bool debug) {
     Particle p(&company_, debug);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
@@ -1374,18 +1354,17 @@ void Train::create_particles(bool debug) {
     }
 }
 
-void Train::create_betaMatrix() {
+void TrainOneWindow::create_betaMatrix() {
     betaMatrix_.variableNum_ = particles_[0].variableNum_;
     betaMatrix_.eachVariableBitsNum_ = particles_[0].eachVariableBitsNum_;
     betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
 
-TrainWindow Train::set_window(string &targetWindow, string &startDate, int &windowIndex) {
-    string accuallWindow = company_.info_.slidingWindows_[windowIndex];
+TrainWindow TrainOneWindow::set_window(string &targetWindow, string &startDate) {
+    string accuallWindow = targetWindow;
     if (targetWindow != "all") {
         accuallWindow = targetWindow;
-        windowIndex = company_.info_.windowNumber_;
     }
     TrainWindow window(company_, accuallWindow);
     if (startDate == "") {
@@ -1397,9 +1376,8 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
     return window;
 }
 
-void Train::set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
+void TrainOneWindow::set_row_and_break_condition(TrainWindow &window, string &startDate, int &intervalIndex) {
     if (startDate != "") {
-        windowIndex = company_.info_.windowNumber_;
         intervalIndex = window.intervalSize_;
     }
     else {
@@ -1409,7 +1387,7 @@ void Train::set_row_and_break_condition(TrainWindow &window, string &startDate, 
     cout << tables_[0].date_[actualStartRow_] << "~" << tables_[0].date_[actualEndRow_] << endl;
 }
 
-ofstream Train::set_debug_file(bool debug) {
+ofstream TrainOneWindow::set_debug_file(bool debug) {
     ofstream out;
     if (debug) {
         string delta = set_precision(actualDelta_);
@@ -1427,7 +1405,7 @@ ofstream Train::set_debug_file(bool debug) {
     return out;
 }
 
-void Train::start_exp(ofstream &out, int expCnt, bool debug) {
+void TrainOneWindow::start_exp(ofstream &out, int expCnt, bool debug) {
     print_debug_exp(out, expCnt, debug);
     globalP_[1].reset();
     betaMatrix_.reset();
@@ -1438,18 +1416,18 @@ void Train::start_exp(ofstream &out, int expCnt, bool debug) {
     update_best(0);
 }
 
-void Train::initialize_KNQTS() {
+void TrainOneWindow::initialize_KNQTS() {
     actualDelta_ = company_.info_.delta_;
     compareNew_ = 0;
     compareOld_ = 0;
 }
 
-void Train::print_debug_exp(ofstream &out, int expCnt, bool debug) {
+void TrainOneWindow::print_debug_exp(ofstream &out, int expCnt, bool debug) {
     if (debug)
         out << "exp:" << expCnt << ",==========,==========" << endl;
 }
 
-void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
+void TrainOneWindow::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     print_debug_gen(out, genCnt, debug);
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
@@ -1463,12 +1441,12 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     print_debug_beta(out, debug);
 }
 
-void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
+void TrainOneWindow::print_debug_gen(ofstream &out, int genCnt, bool debug) {
     if (debug)
         out << "gen:" << genCnt << ",=====" << endl;
 }
 
-void Train::evolve_particles(ofstream &out, int i, bool debug) {
+void TrainOneWindow::evolve_particles(ofstream &out, int i, bool debug) {
     particles_[i].reset();
     particles_[i].measure(betaMatrix_);
     particles_[i].convert_bi_dec();
@@ -1476,19 +1454,19 @@ void Train::evolve_particles(ofstream &out, int i, bool debug) {
     print_debug_particle(out, i, debug);
 }
 
-void Train::print_debug_particle(ofstream &out, int i, bool debug) {
+void TrainOneWindow::print_debug_particle(ofstream &out, int i, bool debug) {
     if (debug)
         particles_[i].print(out);
 }
 
-void Train::store_exp_gen(int expCnt, int genCnt) {
+void TrainOneWindow::store_exp_gen(int expCnt, int genCnt) {
     for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &p) {
         p.exp_ = expCnt;
         p.gen_ = genCnt;
     });
 }
 
-void Train::update_local() {
+void TrainOneWindow::update_local() {
     for (auto &p : particles_) {
         if (p.RoR_ > globalP_[3].RoR_) {
             globalP_[3] = p;
@@ -1499,13 +1477,13 @@ void Train::update_local() {
     }
 }
 
-void Train::update_global() {
+void TrainOneWindow::update_global() {
     if (globalP_[3].RoR_ > globalP_[1].RoR_) {
         globalP_[1] = globalP_[3];
     }
 }
 
-void Train::run_algo() {
+void TrainOneWindow::run_algo() {
     switch (company_.info_.algoIndex_) {
         case 0: {
             if (globalP_[3].RoR_ > 0) {
@@ -1540,7 +1518,7 @@ void Train::run_algo() {
     }
 }
 
-void Train::QTS() {
+void TrainOneWindow::QTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[3].binary_[i] == 1) {
             betaMatrix_.matrix_[i] += actualDelta_;
@@ -1551,7 +1529,7 @@ void Train::QTS() {
     }
 }
 
-void Train::GQTS() {
+void TrainOneWindow::GQTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[1].binary_[i] == 1) {
             betaMatrix_.matrix_[i] += actualDelta_;
@@ -1562,7 +1540,7 @@ void Train::GQTS() {
     }
 }
 
-void Train::GNQTS() {
+void TrainOneWindow::GNQTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[1].binary_[i] == 1 && globalP_[4].binary_[i] == 0 && betaMatrix_.matrix_[i] < 0.5) {
             betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
@@ -1574,7 +1552,7 @@ void Train::GNQTS() {
     GQTS();
 }
 
-void Train::KNQTScompare() {
+void TrainOneWindow::KNQTScompare() {
     switch (company_.info_.compareMode_) {
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
@@ -1599,7 +1577,7 @@ void Train::KNQTScompare() {
     }
 }
 
-void Train::KNQTSmultiply() {
+void TrainOneWindow::KNQTSmultiply() {
     if (compareNew_ > compareOld_) {
         actualDelta_ *= company_.info_.multiplyUp_;
     }
@@ -1610,7 +1588,7 @@ void Train::KNQTSmultiply() {
     compareNew_ = 0;
 }
 
-void Train::print_debug_beta(ofstream &out, bool debug) {
+void TrainOneWindow::print_debug_beta(ofstream &out, bool debug) {
     if (debug) {
         switch (company_.info_.algoIndex_) {
             case 0: {
@@ -1643,7 +1621,7 @@ void Train::print_debug_beta(ofstream &out, bool debug) {
     }
 }
 
-void Train::update_best(int renewBest) {
+void TrainOneWindow::update_best(int renewBest) {
     if (globalP_[0].RoR_ < globalP_[1].RoR_) {
         globalP_[0] = globalP_[1];
     }
@@ -1667,10 +1645,47 @@ void Train::update_best(int renewBest) {
     }
 }
 
-void Train::clear_STL() {
+void TrainOneWindow::clear_STL() {
     particles_.clear();
     globalP_.clear();
     betaMatrix_.matrix_.clear();
+}
+
+class Train {
+   private:
+    CompanyInfo &company_;
+    vector<TechTable> tables_;
+    
+public:
+    void start_train(const string &window);
+    
+    Train(CompanyInfo &company, bool debug = false, bool record = false);
+};
+
+Train::Train(CompanyInfo &company, bool debug, bool record) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)} {
+    if (company.info_.testDeltaLoop_ == 0) {
+        for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
+            vector<thread> threads(3);
+            for (auto &t : threads) {
+                t = thread(&Train::start_train, this, ref(company_.info_.slidingWindows_[windowIndex++]));
+            }
+            for (auto &t : threads) {
+                t.join();
+            }
+        }
+    }
+    else {
+        for (int loop = 0; loop < company.info_.testDeltaLoop_; loop++) {
+            for (const auto &window : company_.info_.slidingWindows_) {
+                TrainOneWindow window1(company_, tables_, window);
+            }
+            company_.info_.delta_ -= company_.info_.testDeltaGap_;
+        }
+    }
+}
+
+void Train::start_train(const string &window) {
+    TrainOneWindow window1(company_, tables_, window);
 }
 
 class Test {
@@ -1896,7 +1911,7 @@ int main(int argc, const char *argv[]) {
             CompanyInfo company = set_company(companyPricePath, companyPricePathIter);
             switch (company.info_.mode_) {
                 case 0: {
-                    Train train(company, company.info_.setWindow_);
+                    Train train(company);
                     break;
                 }
                 case 1: {
