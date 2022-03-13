@@ -24,7 +24,7 @@ using namespace filesystem;
 class Info {
    public:
     int mode_ = 10;
-    string setCompany_ = "AAPL";
+    string setCompany_ = "V";
     string setWindow_ = "M2M";
 
     double delta_ = 0.00128;
@@ -299,6 +299,7 @@ class TechTable {
     vector<vector<double>> techTable_;
 
     void create_techTable();
+    void read_techFile(vector<path> &techFilePath, int techFilePathSize);
     void output_techTable();
 
     TechTable(CompanyInfo *company, int techIndex);
@@ -309,6 +310,16 @@ TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), t
 }
 
 void TechTable::create_techTable() {
+    vector<path> techFilePath = get_path(company_->allTechOuputPath_[techIndex_]);
+    int techFilePathSize = (int)techFilePath.size();
+    if (techFilePathSize == 0) {
+        cout << "no MA file" << endl;
+        exit(1);
+    }
+    if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
+        company_->tableStartRow_ = (int)distance(company_->date_.begin(), find(company_->date_.begin(), company_->date_.end(), read_data(techFilePath.back())[0][0]));
+        days_ = company_->totalDays_ - company_->tableStartRow_;
+    }
     date_.resize(days_);
     price_.resize(days_);
     for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
@@ -319,12 +330,11 @@ void TechTable::create_techTable() {
     for (int i = 0; i < days_; i++) {
         techTable_[i].resize(257);
     }
-    vector<path> techFilePath = get_path(company_->allTechOuputPath_[techIndex_]);
-    int techFilePathSize = (int)techFilePath.size();
-    if (techFilePathSize == 0) {
-        cout << "no MA file" << endl;
-        exit(1);
-    }
+    read_techFile(techFilePath, techFilePathSize);
+    cout << endl;
+}
+
+void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) {
     cout << "reading " << techType_ << " files";
     for (int i = 0; i < techFilePathSize; i++) {
         if (i % 16 == 0) {
@@ -332,20 +342,29 @@ void TechTable::create_techTable() {
         }
         vector<vector<string>> techFile = read_data(techFilePath[i]);
         int techFileSize = (int)techFile.size();
-        if (i == 0 && techFile[techFileSize - 1][0] != date_[days_ - 1]) {
+        if (i == 0 && techFile.back()[0] != date_.back()) {
             cout << "last date of price file and techFile are different, need to generate new techFile" << endl;
-            exit(1);
-        }
-        if (techFileSize - days_ < 0) {
-            cout << endl;
-            cout << company_->companyName_ << " tech file not old enougth" << endl;
-            exit(1);
+            cout << "generate new tech file now?\n1.y\n2.n" << endl;
+            int choose;
+            cin >> choose;
+            switch (choose) {
+                case 1: {
+                    company_->output_Tech();
+                    break;
+                }
+                case 2: {
+                    cout << "exit program" << endl;
+                    exit(1);
+                    break;
+                }
+            }
+            i--;
+            break;
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
             techTable_[j][i + 1] = stod(techFile[k][1]);
         }
     }
-    cout << endl;
 }
 
 void TechTable::output_techTable() {
@@ -1900,10 +1919,11 @@ int main(int argc, const char *argv[]) {
                 case 10: {
                     //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                    Tradition tradition(company);
-                    Train train(company, "2011-12-01", "2011-12-30");
+                    //                    Train train(company, "2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    TechTable t(&company, 0);
                     break;
                 }
             }
