@@ -24,7 +24,7 @@ using namespace filesystem;
 class Info {
    public:
     int mode_ = 10;
-    string setCompany_ = "V";
+    string setCompany_ = "AAPL";
     string setWindow_ = "M2M";
 
     double delta_ = 0.00128;
@@ -35,8 +35,8 @@ class Info {
 
     int testDeltaLoop_ = 1;
     double testDeltaGap_ = 0.00001;
-    double multiplyUp_ = -1;
-    double multiplyDown_ = -1;
+    double multiplyUp_ = 1.01;
+    double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
     int techIndex_ = 0;
@@ -359,7 +359,7 @@ void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) 
                 }
             }
             i--;
-            break;
+            continue;
         }
         for (int j = 0, k = techFileSize - days_; k < techFileSize; j++, k++) {
             techTable_[j][i + 1] = stod(techFile[k][1]);
@@ -1315,6 +1315,10 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
     //    t_.resize(company_.info_.particleNum_);
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, startDate, windowIndex);
+        if (window.interval_[0] < 0) {
+            cout << "train window is too old, skip this window" << endl;
+            continue;
+        }
         srand(343);
         for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
             set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
@@ -1923,7 +1927,6 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    TechTable t(&company, 0);
                     break;
                 }
             }
