@@ -676,8 +676,8 @@ void TrainWindow::print_train() {
 
 class MA {
    public:
-    const vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
-    const vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
+    static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
+    static const inline vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
 
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
         double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][decimal[0]];
@@ -698,8 +698,8 @@ class MA {
 
 class RSI {
    public:
-    const vector<int> eachVariableBitsNum_ = {8, 7, 7};
-    const vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
+    static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};
+    static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
 
     static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
         double RSI = (*tables)[0].techTable_[i][decimal[0]];
@@ -767,7 +767,7 @@ class Particle {
     buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
     buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
     
-    vector<vector<int>> allTechEachVariableBitsNum_{MA().eachVariableBitsNum_, MA().eachVariableBitsNum_, MA().eachVariableBitsNum_, RSI().eachVariableBitsNum_};
+    vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
     void instant_trade(string startDate, string endDate, bool hold = false);
     void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
@@ -1814,7 +1814,7 @@ class Tradition {
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
     
-    vector<vector<vector<int>>> allTraditionStrategy_{MA().traditionStrategy_, MA().traditionStrategy_, MA().traditionStrategy_, RSI().traditionStrategy_};
+    vector<vector<vector<int>>> allTraditionStrategy_{MA::traditionStrategy_, MA::traditionStrategy_, MA::traditionStrategy_, RSI::traditionStrategy_};
 
     void train_Tradition(string &targetWindow);
     void create_particles();
