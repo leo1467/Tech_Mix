@@ -73,7 +73,7 @@ static string set_precision(const double inputDouble, const int n = 10) {
     return ss.str();
 }
 
-static vector<string> find_train_and_test_len(string window, char &delimiter) {
+static vector<int> find_train_and_test_len(string window, char &delimiter) {
     for (int i = 0; i < window.length(); i++) {
         if (isalpha(window[i])) {
             delimiter = window[i];
@@ -86,7 +86,11 @@ static vector<string> find_train_and_test_len(string window, char &delimiter) {
     while (getline(toCut, segment, delimiter)) {
         segmentList.push_back(segment);
     }
-    return segmentList;
+    vector<int> TrainTest;
+    for (auto i : segmentList) {
+        TrainTest.push_back(stoi(i));
+    }
+    return TrainTest;
 }
 
 static void check_startRowSize_endRowSize(int startRowSize, int endRowSize) {

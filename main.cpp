@@ -155,16 +155,16 @@ void CompanyInfo::find_table_start_row() {
     char delimiter;
     int longestTrainMonth = -1;
     for (int i = 0; i < info_.windowNumber_; i++) {
-        vector<string> trainTest = find_train_and_test_len(info_.slidingWindowsEx_[i], delimiter);
-        string trainMonth;
+        vector<int> trainTest = find_train_and_test_len(info_.slidingWindowsEx_[i], delimiter);
+        int trainMonth;
         if (trainTest.size() == 1) {
-            trainMonth = "12";
+            trainMonth = 12;
         }
         else {
             trainMonth = trainTest[0];
         }
-        if (delimiter == 'M' && stoi(trainMonth) > longestTrainMonth) {
-            longestTrainMonth = stoi(trainMonth);
+        if (delimiter == 'M' && trainMonth > longestTrainMonth) {
+            longestTrainMonth = trainMonth;
         }
     }
     if (longestTrainMonth == -1) {
@@ -422,19 +422,19 @@ TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company),
 }
 
 void TestWindow::find_test_interval() {
-    vector<string> trainTestType = find_train_and_test_len(windowNameEx_, windowType_);
+    vector<int> trainTestType = find_train_and_test_len(windowNameEx_, windowType_);
     if (trainTestType.size() == 0) {
         cout << "testType.size() cant be 0" << endl;
         exit(1);
     }
     if (trainTestType.size() == 1) {
-        trainLength_ = stoi(trainTestType[0]);
+        trainLength_ = trainTestType[0];
         testLength_ = trainLength_;
         windowType_ = 'S';
     }
     else {
-        trainLength_ = stoi(trainTestType[0]);
-        testLength_ = stoi(trainTestType[1]);
+        trainLength_ = trainTestType[0];
+        testLength_ = trainTestType[1];
     }
     if (testLength_ == -1) {
         cout << "cant find testLength" << endl;
