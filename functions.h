@@ -88,7 +88,12 @@ static vector<int> find_train_and_test_len(string window, char &delimiter) {
     }
     vector<int> TrainTest;
     for (auto i : segmentList) {
-        TrainTest.push_back(stoi(i));
+        if (i.length() == 0) {
+            TrainTest.push_back(0);
+        }
+        else {
+            TrainTest.push_back(stoi(i));
+        }
     }
     return TrainTest;
 }
