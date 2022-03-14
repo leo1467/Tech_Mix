@@ -1,6 +1,7 @@
 #ifndef functions_h
 #define functions_h
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -121,6 +122,10 @@ static bool is_week_changed(vector<string> date, int bigWeekDay, int smallWeekDa
     return (bigWeekDay < smallWeekDay ||
             stoi(date[big_i].substr(8, 2)) - stoi(date[small_i].substr(8, 2)) >= 7 ||
             (stoi(date[big_i].substr(8, 2)) < stoi(date[small_i].substr(8, 2)) && stoi(date[big_i].substr(8, 2)) + 30 - stoi(date[small_i].substr(8, 2)) >= 7));
+}
+
+static int find_date_row(const vector<string> &dateVec, const string &targetDate) {
+    return (int)distance(dateVec.begin(), find(dateVec.begin(), dateVec.end(), targetDate));
 }
 
 #endif /* functions_h */

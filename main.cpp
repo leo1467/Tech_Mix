@@ -317,7 +317,7 @@ void TechTable::create_techTable() {
         exit(1);
     }
     if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
-        company_->tableStartRow_ = (int)distance(company_->date_.begin(), find(company_->date_.begin(), company_->date_.end(), read_data(techFilePath.back())[0][0]));
+        company_->tableStartRow_ =  find_date_row(company_->date_, read_data(techFilePath.back())[0][0]);
         days_ = company_->totalDays_ - company_->tableStartRow_;
     }
     date_.resize(days_);
@@ -407,7 +407,7 @@ class TestWindow {
     TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[distance(company.info_.slidingWindows_.begin(), find(company.info_.slidingWindows_.begin(), company.info_.slidingWindows_.end(), windowName_))]), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[find_date_row(company.info_.slidingWindows_, windowName_)]), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval();
     }
@@ -827,12 +827,12 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
 }
 
 void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
-    startRow = (int)distance((*tables_)[0].date_.begin(), find((*tables_)[0].date_.begin(), (*tables_)[0].date_.end(), startDate));
+    startRow = find_date_row((*tables_)[0].date_, startDate);
     if (startRow == (*tables_)[0].date_.size()) {
         cout << "instant trade startDate is not found" << endl;
         exit(1);
     }
-    endRow = (int)distance((*tables_)[0].date_.begin(), find((*tables_)[0].date_.begin(), (*tables_)[0].date_.end(), endDate));
+    endRow = find_date_row((*tables_)[0].date_, endDate);
     if (endRow == (*tables_)[0].date_.size()) {
         cout << "instant trade endDate is not found" << endl;
         exit(1);
@@ -1354,8 +1354,8 @@ void Train::set_variables_and_condition(string &targetWindow, string &startDate,
 
 void Train::find_new_row(string &startDate, string &endDate) {
     if (startDate != "") {
-        actualStartRow_ = (int)distance(tables_[0].date_.begin(), find(tables_[0].date_.begin(), tables_[0].date_.end(), startDate));
-        actualEndRow_ = (int)distance(tables_[0].date_.begin(), find(tables_[0].date_.begin(), tables_[0].date_.end(), endDate));
+        actualStartRow_ = find_date_row(tables_[0].date_, startDate);
+        actualEndRow_ = find_date_row(tables_[0].date_, endDate);
         if (actualStartRow_ == tables_[0].days_) {
             cout << "input trainStartDate is not found" << endl;
             exit(1);
@@ -1793,8 +1793,8 @@ class BH {
    public:
     double BHRoR;
     BH(CompanyInfo &company, string startDate, string endDate) {
-        int startRow = (int)distance(company.date_.begin(), find(company.date_.begin(), company.date_.end(), startDate));
-        int endRow = (int)distance(company.date_.begin(), find(company.date_.begin(), company.date_.end(), endDate));
+        int startRow = find_date_row(company.date_, startDate);
+        int endRow = find_date_row(company.date_, endDate);
         if (startRow == company.totalDays_ || endRow == company.totalDays_) {
             cout << "cant find B&H startRow or endRow" << endl;
             exit(1);
