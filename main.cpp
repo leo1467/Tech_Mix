@@ -25,23 +25,23 @@ class Info {
    public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "M2M";
+    string setWindow_ = "YYY2Y";
 
-    double delta_ = 0.00128;
+    double delta_ = 0.003;
     int expNum_ = 50;
-    int genNum_ = 10000;
+    int genNum_ = 1000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
-    int testDeltaLoop_ = 1;
+    int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
-    int techIndex_ = 0;
+    int techIndex_ = 3;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
-    int algoIndex_ = 3;
+    int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
 
     string techType_ = allTech_[techIndex_];
@@ -303,7 +303,7 @@ class TechTable {
     TechTable(CompanyInfo *company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.techType_), days_(company->totalDays_ - company->tableStartRow_) {
+TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_) {
     create_techTable();
 }
 
@@ -781,6 +781,7 @@ class Particle {
     void push_tradeInfo_column_name();
     void push_tradeInfo_buy(int stockHold, int i);
     void push_holdInfo_buy(vector<string> *holdInfoPtr, int i);
+    void push_extra_techInfo(int i, string &push);
     void push_tradeInfo_sell(int stockHold, int i);
     void push_holdInfo_sell(int endRow, vector<string> *holdInfoPtr, int i);
     void push_holdInfo_holding(vector<string> *holdInfoPtr, int i);
@@ -849,7 +850,7 @@ void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, ve
                 break;
             }
             case 3: {
-                holdInfo.push_back("overSold,overbought\n");
+                holdInfo.push_back("period,overSold,overbought\n");
             }
         }
         holdInfoPtr = &holdInfo;
@@ -954,6 +955,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
     buyCondition = (*buy[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_) && remain_ >= (*tables_)[0].price_[i];
     sellCondition = (*sell[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_);
+    buyCondition = buyCondition && ((*tables_)[1].techTable_[i][3] > (*tables_)[1].techTable_[i][5]);
 }
 
 void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
@@ -1012,6 +1014,29 @@ void Particle::push_tradeInfo_buy(int stockHold, int i) {
     }
 }
 
+void Particle::push_extra_techInfo(int i, string &push) {
+    switch (company_->info_.techIndex_) {
+        case 0:
+        case 1:
+        case 2: {
+            for (auto variable : decimal_) {
+                push += set_precision((*tables_)[0].techTable_[i][variable]);
+                push += ",";
+            }
+            break;
+        }
+        case 3: {
+            push += set_precision((*tables_)[0].techTable_[i][decimal_[0]]);
+            push += ",";
+            push += to_string(decimal_[1]);
+            push += ",";
+            push += to_string(decimal_[2]);
+            push += ",";
+            break;
+        }
+    }
+}
+
 void Particle::push_holdInfo_buy(vector<string> *holdInfoPtr, int i) {
     if (holdInfoPtr != nullptr) {
         string push;
@@ -1019,10 +1044,7 @@ void Particle::push_holdInfo_buy(vector<string> *holdInfoPtr, int i) {
         push += ",";
         push += set_precision((*tables_)[0].price_[i]);
         push += ",,,";
-        for (auto variable : decimal_) {
-            push += set_precision((*tables_)[0].techTable_[i][variable]);
-            push += ",";
-        }
+        push_extra_techInfo(i, push);
         push += "\n";
         (*holdInfoPtr).push_back(push);
     }
@@ -1070,10 +1092,7 @@ void Particle::push_holdInfo_sell(int endRow, vector<string> *holdInfoPtr, int i
             push += set_precision((*tables_)[0].price_[i]);
             push += ",";
         }
-        for (auto variable : decimal_) {
-            push += set_precision((*tables_)[0].techTable_[i][variable]);
-            push += ",";
-        }
+        push_extra_techInfo(i, push);
         push += "\n";
         (*holdInfoPtr).push_back(push);
     }
@@ -1083,10 +1102,7 @@ void Particle::push_holdInfo_holding(vector<string> *holdInfoPtr, int i) {
     string push;
     push += set_precision((*tables_)[0].price_[i]);
     push += ",,,,";
-    for (auto variable : decimal_) {
-        push += set_precision((*tables_)[0].techTable_[i][variable]);
-        push += ",";
-    }
+    push_extra_techInfo(i, push);
     push += "\n";
     (*holdInfoPtr).push_back(push);
 }
@@ -1094,10 +1110,7 @@ void Particle::push_holdInfo_holding(vector<string> *holdInfoPtr, int i) {
 void Particle::push_holdInfo_not_holding(vector<string> *holdInfoPtr, int i) {
     string push;
     push += ",,,,";
-    for (auto variable : decimal_) {
-        push += set_precision((*tables_)[0].techTable_[i][variable]);
-        push += ",";
-    }
+    push_extra_techInfo(i, push);
     push += "\n";
     (*holdInfoPtr).push_back(push);
 }
@@ -1731,11 +1744,11 @@ void Test::start_test(string &actualWindow, string &targetWindow, const string &
     TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
     check_exception(eachTrainFilePath, window);
+    p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
     for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
         vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
         p_.reset();
         set_variables(thisTrainFile);
-        p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
         p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdInfoPtr_);
         print_test_holdInfo(window);
     }
@@ -1918,6 +1931,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     break;
                 }
             }
