@@ -5,6 +5,8 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <future>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -57,6 +59,7 @@ class Info {
     vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     int windowNumber_ = int(slidingWindows_.size());
+    int threadNumber = 2;
 } _info;
 
 class CompanyInfo {
@@ -1653,24 +1656,68 @@ void TrainOneWindow::clear_STL() {
 
 class Train {
    private:
+    class ThreadObj {
+       public:
+        bool finished_ = false;
+        thread t_;
+        packaged_task<void(string &)> task_;
+        future<void> future_;
+
+        ThreadObj(Train &train) {
+            packaged_task<void(string &)> task(bind(&Train::start_train, train, placeholders::_1));
+            task_ = move(task);
+            future_ = task_.get_future();
+        }
+    };
     CompanyInfo &company_;
     vector<TechTable> tables_;
-    
-public:
+
     void start_train(const string &window);
-    
+
+   public:
     Train(CompanyInfo &company, bool debug = false, bool record = false);
 };
 
 Train::Train(CompanyInfo &company, bool debug, bool record) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)} {
     if (company.info_.testDeltaLoop_ == 0) {
-        for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-            vector<thread> threads(3);
-            for (auto &t : threads) {
-                t = thread(&Train::start_train, this, ref(company_.info_.slidingWindows_[windowIndex++]));
+        vector<ThreadObj> objs;
+        int windowIndex = 0;
+        for (int threadIndex = 0; threadIndex < company_.info_.threadNumber; threadIndex++) {
+            objs.push_back(ThreadObj(*this));
+            objs.back().t_ = thread(move(objs.back().task_), ref(company_.info_.slidingWindows_[windowIndex++]));
+        }
+        while (objs.size() < company_.info_.windowNumber_) {
+            this_thread::sleep_for(5min);
+            cout << "==========" << endl;
+            size_t objsSize = objs.size();
+            for (size_t objIndex = 0; objIndex < objsSize; objIndex++) {
+                cout << "checking window " << company_.info_.slidingWindows_[objIndex] << " status: ";
+                if (objs[objIndex].finished_ == false) {
+                    auto status = objs[objIndex].future_.wait_for(0s);
+                    if (status == future_status::ready) {
+                        cout << "finished" << endl;
+                        objs[objIndex].finished_ = true;
+                        if (objs.size() < company_.info_.windowNumber_) {
+                            objs.push_back(ThreadObj(*this));
+                            objs.back().t_ = thread(move(objs.back().task_), ref(company_.info_.slidingWindows_[windowIndex++]));
+                            cout << "window " << company_.info_.slidingWindows_[windowIndex - 1] << " created" << endl;
+                        }
+                    }
+                    else {
+                        cout << "running" << endl;
+                    }
+                }
+                else {
+                    cout << "finished" << endl;
+                }
+                if (objs.size() == company_.info_.windowNumber_) {
+                    break;
+                }
             }
-            for (auto &t : threads) {
-                t.join();
+        }
+        for (auto &obj : objs) {
+            if (obj.t_.joinable()) {
+                obj.t_.join();
             }
         }
     }
