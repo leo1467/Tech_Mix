@@ -79,7 +79,7 @@ class CompanyInfo {
     int testEndRow_ = -1;
     vector<vector<double>> techTable_;
     int tableStartRow_ = -1;
-    
+
     vector<void (CompanyInfo::*)(vector<double> &)> cal_tech_{&CompanyInfo::cal_SMA, &CompanyInfo::cal_WMA, &CompanyInfo::cal_EMA, &CompanyInfo::cal_RSI};  // outside the class (company.*(company.cal_tech_[company.info_.techIndex_]))(tmp);
 
     void set_paths();
@@ -189,7 +189,7 @@ void CompanyInfo::store_tech_to_vector() {
     cout << "calculating " << companyName_ << " " << info_.techType_ << endl;
     vector<double> tmp;
     techTable_.push_back(tmp);
-    (this->*cal_tech_[info_.techIndex_])(tmp); // or (*this.*cal_tech_[info_.techIndex_])(tmp);
+    (this->*cal_tech_[info_.techIndex_])(tmp);  // or (*this.*cal_tech_[info_.techIndex_])(tmp);
     cout << "done calculating" << endl;
 }
 
@@ -208,11 +208,9 @@ void CompanyInfo::cal_SMA(vector<double> &tmp) {
 }
 
 void CompanyInfo::cal_WMA(vector<double> &tmp) {
-    
 }
 
 void CompanyInfo::cal_EMA(vector<double> &tmp) {
-    
 }
 
 void CompanyInfo::cal_RSI(vector<double> &tmp) {
@@ -317,7 +315,7 @@ void TechTable::create_techTable() {
         exit(1);
     }
     if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
-        company_->tableStartRow_ =  find_date_row(company_->date_, read_data(techFilePath.back())[0][0]);
+        company_->tableStartRow_ = find_date_row(company_->date_, read_data(techFilePath.back())[0][0]);
         days_ = company_->totalDays_ - company_->tableStartRow_;
     }
     date_.resize(days_);
@@ -766,7 +764,7 @@ class Particle {
     typedef vector<bool (*)(vector<TechTable> *, int, int, int, vector<int> &)> buy_sell;
     buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
     buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
-    
+
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
     void instant_trade(string startDate, string endDate, bool hold = false);
@@ -1260,8 +1258,6 @@ class Train {
     int compareNew_ = -1;
     int compareOld_ = -1;
 
-    //    vector<thread> t_;
-
     void start_train(string targetWindow, string startDate, string endDate, bool debug);
     void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
     void find_new_row(string &startDate, string &endDate);
@@ -1312,7 +1308,6 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
     find_new_row(startDate, endDate);
     create_particles(debug);
     create_betaMatrix();
-    //    t_.resize(company_.info_.particleNum_);
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, startDate, windowIndex);
         if (window.interval_[0] < 0) {
@@ -1459,12 +1454,8 @@ void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
     for (int i = 0; i < company_.info_.particleNum_; i++) {
-        //        t_[i] =thread(&Train::p, this, debug, i, ref(out));
         evolve_particles(out, i, debug);
     }
-    //    for (auto& i : t_) {
-    //        i.join();
-    //    }
     store_exp_gen(expCnt, genCnt);
     update_local();
     update_global();
@@ -1584,7 +1575,7 @@ void Train::GNQTS() {
 }
 
 void Train::KNQTScompare() {
-    switch(company_.info_.compareMode_) {
+    switch (company_.info_.compareMode_) {
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
             for (; localBestBinaryIter != globalP_[3].binary_.end();) {
@@ -1813,7 +1804,7 @@ class Tradition {
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
-    
+
     vector<vector<vector<int>>> allTraditionStrategy_{MA::traditionStrategy_, MA::traditionStrategy_, MA::traditionStrategy_, RSI::traditionStrategy_};
 
     void train_Tradition(string &targetWindow);
