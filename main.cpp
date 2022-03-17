@@ -246,7 +246,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
         RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
         tmp.push_back(RSI);
         double preAvgGain = avgGain, preAvgLoss = avgLoss;
-        for (int i = RSIPeriod; i < totalDays_; i++) {
+        for (int i = RSIPeriod; i < totalDays_ - 1; i++) {
             if (priceGainLoss[i] >= 0) {
                 RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
                 preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
@@ -277,7 +277,20 @@ void CompanyInfo::output_Tech() {
         ofstream out;
         set_techFile_title(out, techPeriod);
         int techSize = (int)techTable_[techPeriod].size();
-        for (int i = 0, dateRow = techPeriod - 1; i < techSize; i++, dateRow++) {
+        int dateRow;
+        switch (info_.techIndex_) {
+            case 0:
+            case 1:
+            case 2: {
+                dateRow = techPeriod - 1;
+                break;
+            }
+            case 3: {
+                dateRow = techPeriod;
+                break;
+            }
+        }
+        for (int i = 0; i < techSize; i++, dateRow++) {
             out << date_[dateRow] << "," << set_precision(techTable_[techPeriod][i]) << endl;
         }
         out.close();
@@ -690,20 +703,20 @@ class MA {
     static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
 
-    static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
+    static bool buy_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
         double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][decimal[0]];
         double MAbuy2PreDay = (*tables)[0].techTable_[i - 1][decimal[1]];
         double MAbuy1Today = (*tables)[0].techTable_[i][decimal[0]];
         double MAbuy2Today = (*tables)[0].techTable_[i][decimal[1]];
-        return stockHold == 0 && MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today && i != endRow;
+        return MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today;
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
+    static bool sell_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
         double MAsell1PreDay = (*tables)[0].techTable_[i - 1][decimal[2]];
         double MAsell2PreDay = (*tables)[0].techTable_[i - 1][decimal[3]];
         double MAsell1Today = (*tables)[0].techTable_[i][decimal[2]];
         double MAsell2Today = (*tables)[0].techTable_[i][decimal[3]];
-        return stockHold != 0 && ((MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today) || i == endRow);
+        return MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today;
     }
 };
 
@@ -712,14 +725,14 @@ class RSI {
     static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
 
-    static bool buy_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
+    static bool buy_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
         double RSI = (*tables)[0].techTable_[i][decimal[0]];
-        return stockHold == 0 && RSI <= decimal[1] && i != endRow;
+        return RSI <= decimal[1];
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, int stockHold, int i, int endRow, vector<int> &decimal) {
+    static bool sell_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
         double RSI = (*tables)[0].techTable_[i][decimal[0]];
-        return stockHold != 0 && ((RSI >= decimal[2]) || i == endRow);
+        return RSI >= decimal[2];
     }
 };
 
@@ -774,7 +787,7 @@ class Particle {
 
     double actualDelta_ = -1;
 
-    typedef vector<bool (*)(vector<TechTable> *, int, int, int, vector<int> &)> buy_sell;
+    typedef vector<bool (*)(vector<TechTable> *, vector<int> &, int)> buy_sell;
     buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
     buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
 
@@ -863,7 +876,7 @@ void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, ve
                 break;
             }
             case 3: {
-                holdInfo.push_back("period,overSold,overbought\n");
+                holdInfo.push_back("RSI,overSold,overbought\n");
             }
         }
         holdInfoPtr = &holdInfo;
@@ -966,8 +979,8 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
 }
 
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    buyCondition = (*buy[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_) && remain_ >= (*tables_)[0].price_[i];
-    sellCondition = (*sell[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_);
+    buyCondition = !stockHold && remain_ >= (*tables_)[0].price_[i] && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
     // buyCondition = buyCondition && ((*tables_)[1].techTable_[i][3] > (*tables_)[1].techTable_[i][5]);
 }
 
