@@ -208,6 +208,19 @@ void CompanyInfo::cal_SMA(vector<double> &tmp) {
 }
 
 void CompanyInfo::cal_WMA(vector<double> &tmp) {
+    for (int WMA = 1; WMA < 257; WMA++) {
+        for (int dateRow = WMA - 1; dateRow < totalDays_; dateRow++) {
+            double weightedPriceSum = 0;
+            int totalWeight = 0;
+            for (int weight = WMA, tmpDateRow = dateRow; weight > 0; weight--, tmpDateRow--) {
+                weightedPriceSum += price_[tmpDateRow] * weight;
+                totalWeight += weight;
+            }
+            tmp.push_back(weightedPriceSum / totalWeight);
+        }
+        techTable_.push_back(tmp);
+        tmp.clear();
+    }
 }
 
 void CompanyInfo::cal_EMA(vector<double> &tmp) {
@@ -233,7 +246,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
         RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
         tmp.push_back(RSI);
         double preAvgGain = avgGain, preAvgLoss = avgLoss;
-        for (int i = RSIPeriod; i < totalDays_ - 1; i++) {
+        for (int i = RSIPeriod; i < totalDays_; i++) {
             if (priceGainLoss[i] >= 0) {
                 RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
                 preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
@@ -955,7 +968,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
     buyCondition = (*buy[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_) && remain_ >= (*tables_)[0].price_[i];
     sellCondition = (*sell[company_->info_.techIndex_])(tables_, stockHold, i, endRow, decimal_);
-    buyCondition = buyCondition && ((*tables_)[1].techTable_[i][3] > (*tables_)[1].techTable_[i][5]);
+    // buyCondition = buyCondition && ((*tables_)[1].techTable_[i][3] > (*tables_)[1].techTable_[i][5]);
 }
 
 void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
@@ -1032,6 +1045,9 @@ void Particle::push_extra_techInfo(int i, string &push) {
             push += ",";
             push += to_string(decimal_[2]);
             push += ",";
+            // push += set_precision((*tables_)[1].techTable_[i][10]);
+            // push += ",";
+            // push += set_precision((*tables_)[1].techTable_[i][20]);
             break;
         }
     }
@@ -1931,7 +1947,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    Test test(company, company.info_.setWindow_, false, true, vector<int>{1});
                     break;
                 }
             }
