@@ -25,7 +25,7 @@ class Info {
    public:
     int mode_ = 10;
     string setCompany_ = "AAPL";
-    string setWindow_ = "YYY2Y";
+    string setWindow_ = "all";
 
     double delta_ = 0.003;
     int expNum_ = 50;
@@ -408,6 +408,11 @@ void TechTable::output_techTable() {
     out.close();
 }
 
+class TechTables {
+    vector<TechTable> tables_;
+    int tableSize_;
+};
+
 class TestWindow {
    protected:
     CompanyInfo &company_;
@@ -774,6 +779,7 @@ class Particle {
     vector<int> decimal_;
 
     vector<TechTable> *tables_ = nullptr;
+    TechTables *tables__ = nullptr;
 
     double remain_ = 0;
     double RoR_ = 0;
@@ -977,11 +983,46 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
     RoR_ = (remain_ - company_->info_.totalCapitalLV_) / company_->info_.totalCapitalLV_ * 100.0;
     push_tradeInfo_last(lastRecord);
 }
-
+bool RSIhold = false;
+bool MAhold = false;
+int buy1 = 10;
+int buy2 = 20;
+int sell1 = 5;
+int sell2 = 10;
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    buyCondition = !stockHold && remain_ >= (*tables_)[0].price_[i] && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
-    sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
-    // buyCondition = buyCondition && ((*tables_)[1].techTable_[i][3] > (*tables_)[1].techTable_[i][5]);
+    if ((*tables_).size() == 1) {
+        buyCondition = !stockHold /*  && remain_ >= (*tables_)[0].price_[i] */ && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+        sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    }
+    else {
+        bool RSIbuy = false;
+        bool RSIsell = false;
+        bool MAbuy = false;
+        bool MAsell = false;
+        if (!RSIhold) {
+            RSIbuy = !RSIhold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+            if (RSIbuy)
+                RSIhold = true;
+        }
+        if (!MAhold) {
+            MAbuy = !MAhold && ((*tables_)[1].techTable_[i][buy1] >= (*tables_)[1].techTable_[i][buy2]) && i != endRow;
+            if (MAbuy)
+                MAhold = true;
+        }
+
+        RSIsell = RSIhold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+        MAsell = MAhold && ((*tables_)[1].techTable_[i][sell1] <= (*tables_)[1].techTable_[i][sell2] || i == endRow);
+
+        buyCondition = !stockHold && RSIhold && MAhold && i != endRow;
+        sellCondition = stockHold && (RSIsell || MAsell || i == endRow);
+
+        if (RSIsell) {
+            RSIhold == false;
+        }
+        if (MAsell) {
+            MAhold = false;
+        }
+    }
 }
 
 void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
@@ -1058,9 +1099,13 @@ void Particle::push_extra_techInfo(int i, string &push) {
             push += ",";
             push += to_string(decimal_[2]);
             push += ",";
-            // push += set_precision((*tables_)[1].techTable_[i][10]);
+            // push += set_precision((*tables_)[1].techTable_[i][buy1]);
             // push += ",";
-            // push += set_precision((*tables_)[1].techTable_[i][20]);
+            // push += set_precision((*tables_)[1].techTable_[i][buy2]);
+            // push += ",";
+            // push += set_precision((*tables_)[1].techTable_[i][sell1]);
+            // push += ",";
+            // push += set_precision((*tables_)[1].techTable_[i][sell2]);
             break;
         }
     }
@@ -1147,6 +1192,9 @@ void Particle::push_holdInfo_not_holding(vector<string> *holdInfoPtr, int i) {
 void Particle::check_buyNum_sellNum() {
     if (buyNum_ != sellNum_) {
         cout << "particle.buyNum_ = " << buyNum_ << ", particle.sellNum_ = " << sellNum_ << endl;
+        for (auto &record : tradeRecord_) {
+            cout << record << endl;
+        }
         exit(1);
     }
 }
