@@ -20,7 +20,7 @@ static vector<vector<string>> read_data(path filePath) {
         cout << filePath << " not found" << endl;
         exit(1);
     }
-        //    cout << "reading " << filePath.filename() << endl;
+    //    cout << "reading " << filePath.filename() << endl;
     string row;
     string cell;
     vector<string> oneRow;
@@ -98,12 +98,22 @@ static vector<int> find_train_and_test_len(string window, char &delimiter) {
     return TrainTest;
 }
 
+static vector<string> find_first_and_last_company(string companyRange, char delimiter = ' ') {
+    string segment;
+    vector<string> segmentList;
+    stringstream toCut(companyRange);
+    while (getline(toCut, segment, delimiter)) {
+        segmentList.push_back(segment);
+    }
+    return segmentList;
+}
+
 static void check_startRowSize_endRowSize(int startRowSize, int endRowSize) {
     if (startRowSize > endRowSize) {
         cout << "startRowSize > endRowSize" << endl;
         exit(1);
     }
-    else if(startRowSize < endRowSize){
+    else if (startRowSize < endRowSize) {
         cout << "startRowSize < endRowSize" << endl;
     }
 }

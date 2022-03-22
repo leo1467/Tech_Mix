@@ -102,6 +102,7 @@ CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), compan
     store_date_price(pricePath);
     create_folder();
     find_table_start_row();
+    cout << companyName_ << endl;
 }
 
 void CompanyInfo::set_paths() {
@@ -779,7 +780,6 @@ class Particle {
     vector<int> decimal_;
 
     vector<TechTable> *tables_ = nullptr;
-    TechTables *tables__ = nullptr;
 
     double remain_ = 0;
     double RoR_ = 0;
@@ -993,7 +993,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
     buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
     sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
-    
+
     // 以RSI訓練期的資料為底，測試期的時候再加上MA的條件
     // if ((*tables_).size() == 1) {
     //     buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
@@ -1967,28 +1967,34 @@ void Tradition::set_variables(int index) {
     }
 }
 
-static CompanyInfo set_company(vector<path> &companyPricePath, vector<path>::iterator &companyPricePathIter) {
-    path targetCompanyPricePath = *companyPricePathIter;
-    if (_info.setCompany_ != "all") {
-        for (auto i : companyPricePath) {
-            if (i.stem() == _info.setCompany_) {
-                targetCompanyPricePath = i;
-                break;
-            }
+static vector<path> set_company_price_paths(const Info &info) {
+    vector<path> allCompanyPricePaths = get_path(info.pricePath_);
+    string inputForSetCompany = [&]() {
+        if (_info.setCompany_ == "all") {
+            return allCompanyPricePaths.front().stem().string() + " to " + allCompanyPricePaths.back().stem().string();
         }
-        companyPricePathIter = companyPricePath.end() - 1;
+        return _info.setCompany_;
+    }();
+    vector<string> setCompany = find_first_and_last_company(inputForSetCompany);
+    if (auto iter = find_if(setCompany.begin(), setCompany.end(), [](string i) { return i == "to"; }); iter != setCompany.end()) {
+        setCompany.erase(iter);
     }
-    CompanyInfo company(_info, targetCompanyPricePath);
-    cout << company.companyName_ << endl;
-    return company;
+    auto find_company = [&](string &targetCompany) { return find_if(allCompanyPricePaths.begin(), allCompanyPricePaths.end(), [&](path pricePath) { return pricePath.stem() == targetCompany; }); };
+    auto firstCompanyIter = find_company(setCompany.front());
+    auto lastCompanyIter = find_company(setCompany.back()) + 1;
+    if (firstCompanyIter == allCompanyPricePaths.end() || lastCompanyIter - 1 == allCompanyPricePaths.end()) {
+        cout << "cant find company in _info.setcompany_" << endl;
+        exit(1);
+    }
+    return vector<path>(firstCompanyIter, lastCompanyIter);
 }
 
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
-    vector<path> companyPricePath = get_path(_info.pricePath_);
+    vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
-        for (auto companyPricePathIter = companyPricePath.begin(); companyPricePathIter != companyPricePath.end(); companyPricePathIter++) {
-            CompanyInfo company = set_company(companyPricePath, companyPricePathIter);
+        for (auto companyPricePath : companyPricePaths) {
+            CompanyInfo company(_info, companyPricePath);
             switch (company.info_.mode_) {
                 case 0: {
                     Train train(company, company.info_.setWindow_);
