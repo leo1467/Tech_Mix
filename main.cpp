@@ -983,46 +983,51 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
     RoR_ = (remain_ - company_->info_.totalCapitalLV_) / company_->info_.totalCapitalLV_ * 100.0;
     push_tradeInfo_last(lastRecord);
 }
-bool RSIhold = false;
-bool MAhold = false;
-int buy1 = 10;
-int buy2 = 20;
-int sell1 = 5;
-int sell2 = 10;
+
+// bool RSIhold = true;
+// bool MAhold = false;
+// int buy1 = 10;
+// int buy2 = 20;
+// int sell1 = 10;
+// int sell2 = 20;
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    if ((*tables_).size() == 1) {
-        buyCondition = !stockHold /*  && remain_ >= (*tables_)[0].price_[i] */ && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
-        sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
-    }
-    else {
-        bool RSIbuy = false;
-        bool RSIsell = false;
-        bool MAbuy = false;
-        bool MAsell = false;
-        if (!RSIhold) {
-            RSIbuy = !RSIhold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
-            if (RSIbuy)
-                RSIhold = true;
-        }
-        if (!MAhold) {
-            MAbuy = !MAhold && ((*tables_)[1].techTable_[i][buy1] >= (*tables_)[1].techTable_[i][buy2]) && i != endRow;
-            if (MAbuy)
-                MAhold = true;
-        }
+    buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    
+    // 以RSI訓練期的資料為底，測試期的時候再加上MA的條件
+    // if ((*tables_).size() == 1) {
+    //     buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    //     sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    // }
+    // else {
+    //     bool RSIbuy = false;
+    //     bool RSIsell = false;
+    //     bool MAbuy = false;
+    //     bool MAsell = false;
+    //     if (!RSIhold) {
+    //         RSIbuy = !RSIhold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    //         if (RSIbuy)
+    //             RSIhold = true;
+    //     }
+    //     if (!MAhold) {
+    //         MAbuy = !MAhold && ((*tables_)[1].techTable_[i][buy1] >= (*tables_)[1].techTable_[i][buy2]) && i != endRow;
+    //         if (MAbuy)
+    //             MAhold = true;
+    //     }
 
-        RSIsell = RSIhold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
-        MAsell = MAhold && ((*tables_)[1].techTable_[i][sell1] <= (*tables_)[1].techTable_[i][sell2] || i == endRow);
+    //     RSIsell = RSIhold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    //     MAsell = MAhold && ((*tables_)[1].techTable_[i][sell1] <= (*tables_)[1].techTable_[i][sell2] || i == endRow);
 
-        buyCondition = !stockHold && RSIhold && MAhold && i != endRow;
-        sellCondition = stockHold && (RSIsell || MAsell || i == endRow);
+    //     buyCondition = !stockHold && RSIhold && MAhold && i != endRow;
+    //     sellCondition = stockHold && (RSIsell || MAsell || i == endRow);
 
-        if (RSIsell) {
-            RSIhold == false;
-        }
-        if (MAsell) {
-            MAhold = false;
-        }
-    }
+    //     if (RSIsell) {
+    //         RSIhold = false;
+    //     }
+    //     if (MAsell) {
+    //         MAhold = false;
+    //     }
+    // }
 }
 
 void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
@@ -2008,7 +2013,8 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    Test test(company, company.info_.setWindow_, false, true, vector<int>{1});
+                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     break;
                 }
             }
