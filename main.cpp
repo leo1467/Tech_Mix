@@ -39,7 +39,7 @@ class Info {
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
-    int techIndex_ = 3;
+    int techIndex_ = 0;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -331,6 +331,7 @@ class TechTable {
     vector<vector<double>> techTable_;
 
     void create_techTable();
+    void ask_generate_tech_file();
     void read_techFile(vector<path> &techFilePath, int techFilePathSize);
     void output_techTable();
 
@@ -344,9 +345,11 @@ TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), t
 void TechTable::create_techTable() {
     vector<path> techFilePath = get_path(company_->allTechOuputPath_[techIndex_]);
     int techFilePathSize = (int)techFilePath.size();
-    if (techFilePathSize == 0) {
-        cout << "no MA file" << endl;
-        exit(1);
+    while (techFilePathSize == 0) {
+        cout << "no " << techType_ << " tech file" << endl;
+        ask_generate_tech_file();
+        techFilePath = get_path(company_->allTechOuputPath_[techIndex_]);
+        techFilePathSize = (int)techFilePath.size();
     }
     if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
         company_->tableStartRow_ = find_date_row(company_->date_, read_data(techFilePath.back())[0][0]);
@@ -366,6 +369,26 @@ void TechTable::create_techTable() {
     cout << endl;
 }
 
+void TechTable::ask_generate_tech_file() {
+    cout << "generate new tech file now?\n1.y\n2.n" << endl;
+    char choose;
+    cin >> choose;
+    switch (choose) {
+        case 'y': {
+            company_->output_Tech();
+            break;
+        }
+        case 'n': {
+            cout << "exit program" << endl;
+            exit(1);
+            break;
+        }
+        default: {
+            cout << "wrong choise" << endl;
+        }
+    }
+}
+
 void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) {
     cout << "reading " << techType_ << " files";
     for (int i = 0; i < techFilePathSize; i++) {
@@ -376,20 +399,7 @@ void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) 
         int techFileSize = (int)techFile.size();
         if (i == 0 && techFile.back()[0] != date_.back()) {
             cout << "last date of price file and techFile are different, need to generate new techFile" << endl;
-            cout << "generate new tech file now?\n1.y\n2.n" << endl;
-            int choose;
-            cin >> choose;
-            switch (choose) {
-                case 1: {
-                    company_->output_Tech();
-                    break;
-                }
-                case 2: {
-                    cout << "exit program" << endl;
-                    exit(1);
-                    break;
-                }
-            }
+            ask_generate_tech_file();
             i--;
             continue;
         }
@@ -1787,7 +1797,7 @@ class Test {
 
     void add_tables(vector<int> addtionTable);
     void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
-    void start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
+    void test_a_window(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
     void set_variables(vector<vector<std::string>> &thisTrainFile);
@@ -1806,7 +1816,7 @@ Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold,
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         string actualWindow = company_.info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
-            start_test(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
+            test_a_window(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
         }
     }
 }
@@ -1829,7 +1839,7 @@ void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath)
     cout << "test " << company_.companyName_ << endl;
 }
 
-void Test::start_test(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex) {
+void Test::test_a_window(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex) {
     TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
     vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
     check_exception(eachTrainFilePath, window);
@@ -2027,7 +2037,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                     //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     break;
                 }
             }
