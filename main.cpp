@@ -64,6 +64,7 @@ class CompanyInfo {
     const Info &info_;
     string companyName_;
 
+    string rootFolder_;
     vector<string> allResultOutputPath_;
     vector<string> allTechOuputPath_;
     vector<string> allTrainFilePath_;
@@ -106,14 +107,15 @@ CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), compan
 }
 
 void CompanyInfo::set_paths() {
+    rootFolder_ = "result";
     for (auto tech : info_.allTech_) {
-        allResultOutputPath_.push_back(tech + "_result");
-        allTechOuputPath_.push_back(tech + "/" + companyName_);
-        allTrainFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/train/");
-        allTestFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/test/");
-        allTrainTraditionFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/trainTradition/");
-        allTestTraditionFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/testTradition/");
-        allTestHoldFilePath_.push_back(tech + "_result" + "/" + companyName_ + "/testHoldPerid/");
+        allResultOutputPath_.push_back(rootFolder_ + "/" + tech + "_result");
+        allTechOuputPath_.push_back("tech/" + tech + "/" + companyName_);
+        allTrainFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/train/");
+        allTestFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/test/");
+        allTrainTraditionFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/trainTradition/");
+        allTestTraditionFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testTradition/");
+        allTestHoldFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testHoldPeriod/");
     }
 }
 
@@ -142,7 +144,7 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 }
 
 void CompanyInfo::create_folder() {
-    create_directories(info_.techType_ + "/" + companyName_);
+    create_directories(allTechOuputPath_[info_.techIndex_]);
     create_directories(allTestHoldFilePath_[info_.techIndex_]);
     for (auto i : info_.slidingWindows_) {
         create_directories(allTrainFilePath_[info_.techIndex_] + i);
@@ -278,7 +280,7 @@ void CompanyInfo::output_Tech() {
         ofstream out;
         set_techFile_title(out, techPeriod);
         int techSize = (int)techTable_[techPeriod].size();
-        int dateRow;
+        int dateRow = 0;
         switch (info_.techIndex_) {
             case 0:
             case 1:
@@ -288,6 +290,11 @@ void CompanyInfo::output_Tech() {
             }
             case 3: {
                 dateRow = techPeriod;
+                break;
+            }
+            default: {
+                cout << "output_tech exception" << endl;
+                exit(1);
                 break;
             }
         }
@@ -1787,11 +1794,11 @@ class Test {
     void print_test_holdInfo(TestWindow &window);
 
    public:
-    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> addtionTable = {});
+    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> additionTable = {});
 };
 
-Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> addtionTable) : company_(company), p_(&company), tables_{TechTable(&company, company.info_.techIndex_)}, tradition_(tradition), hold_(hold) {
-    add_tables(addtionTable);
+Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company), tables_{TechTable(&company, company.info_.techIndex_)}, tradition_(tradition), hold_(hold) {
+    add_tables(additionTable);
     p_.tables_ = &tables_;
     string trainFilePath;
     string testFileOutputPath;
