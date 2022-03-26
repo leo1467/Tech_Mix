@@ -98,10 +98,10 @@ static vector<int> find_train_and_test_len(string window, char &delimiter) {
     return TrainTest;
 }
 
-static vector<string> find_first_and_last_company(string companyRange, char delimiter = ' ') {
+static vector<string> cut_string(string input, char delimiter = ' ') {
     string segment;
     vector<string> segmentList;
-    stringstream toCut(companyRange);
+    stringstream toCut(input);
     while (getline(toCut, segment, delimiter)) {
         segmentList.push_back(segment);
     }

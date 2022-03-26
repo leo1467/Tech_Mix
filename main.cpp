@@ -39,24 +39,48 @@ class Info {
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
-    int techIndex_ = 0;
-    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
+    int techIndex_ = 4;
+    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI", "SMA_RSI",};
+    vector<int> mixedTechIndex_;
+    
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
 
-    string techType_ = allTech_[techIndex_];
-    string algoType_ = allAlgo_[algoIndex_];
-
-    path pricePath_ = "price";
+    string techType_;
+    string algoType_;
+    
     string testStartYear_ = "2012-01";
     string testEndYear_ = "2021-01";
-    double testLength_ = stod(testEndYear_) - stod(testStartYear_);
+    double testLength_;
+    
+    path pricePath_ = "price";
+    string rootFolder_ = "result";
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
-    int windowNumber_ = int(slidingWindows_.size());
+    int windowNumber_;
+    
+    Info() {
+        techType_ = allTech_[techIndex_];
+        algoType_ = allAlgo_[algoIndex_];
+        testLength_ = stod(testEndYear_) - stod(testStartYear_);
+        windowNumber_ = (int)slidingWindows_.size();
+        if (techIndex_ > 3) {
+            vector<string> mixTech = cut_string(techType_, '_');
+            for (auto &tech : mixTech) {
+                mixedTechIndex_.push_back(find_date_row(allTech_, tech));
+            }
+            sort(mixedTechIndex_.begin(), mixedTechIndex_.end());
+            techType_.clear();
+            for (auto &techIndex : mixedTechIndex_) {
+                techType_ += allTech_[techIndex] + "_";
+            }
+            techType_.pop_back();
+            allTech_[techIndex_] = techType_;
+        }
+    }
 } const _info;
 
 class CompanyInfo {
@@ -64,7 +88,6 @@ class CompanyInfo {
     const Info &info_;
     string companyName_;
 
-    string rootFolder_;
     vector<string> allResultOutputPath_;
     vector<string> allTechOuputPath_;
     vector<string> allTrainFilePath_;
@@ -107,15 +130,14 @@ CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), compan
 }
 
 void CompanyInfo::set_paths() {
-    rootFolder_ = "result";
     for (auto tech : info_.allTech_) {
-        allResultOutputPath_.push_back(rootFolder_ + "/" + tech + "_result");
+        allResultOutputPath_.push_back(info_.rootFolder_ + "/" + tech + "_result");
         allTechOuputPath_.push_back("tech/" + tech + "/" + companyName_);
-        allTrainFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/train/");
-        allTestFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/test/");
-        allTrainTraditionFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/trainTradition/");
-        allTestTraditionFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testTradition/");
-        allTestHoldFilePath_.push_back(rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testHoldPeriod/");
+        allTrainFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/train/");
+        allTestFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/test/");
+        allTrainTraditionFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/trainTradition/");
+        allTestTraditionFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testTradition/");
+        allTestHoldFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testHoldPeriod/");
     }
 }
 
@@ -1992,7 +2014,7 @@ static vector<path> set_company_price_paths(const Info &info) {
         }
         return _info.setCompany_;
     }();
-    vector<string> setCompany = find_first_and_last_company(inputForSetCompany);
+    vector<string> setCompany = cut_string(inputForSetCompany);
     if (auto iter = find_if(setCompany.begin(), setCompany.end(), [](string i) { return i == "to"; }); iter != setCompany.end()) {
         setCompany.erase(iter);
     }
@@ -2037,7 +2059,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                     //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                     //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     break;
                 }
             }
