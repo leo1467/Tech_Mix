@@ -39,9 +39,9 @@ class Info {
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
-    int techIndex_ = 4;
-    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI", "SMA_RSI"};
-    vector<int> mixedTechIndex_;
+    vector<int> techIndexs_ = {0, 3};
+    int techIndex_;
+    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
 
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -63,22 +63,21 @@ class Info {
     int windowNumber_;
 
     Info() {
-        techType_ = allTech_[techIndex_];
+        sort(techIndexs_.begin(), techIndexs_.end());
+        vector<string> mixTech = cut_string(techType_, '_');
+        for (auto &techIndex : techIndexs_) {
+            techType_ += allTech_[techIndex] + "_";
+        }
+        techType_.pop_back();
         algoType_ = allAlgo_[algoIndex_];
         testLength_ = stod(testEndYear_) - stod(testStartYear_);
         windowNumber_ = (int)slidingWindows_.size();
-        if (techIndex_ > 3) {
-            vector<string> mixTech = cut_string(techType_, '_');
-            for (auto &tech : mixTech) {
-                mixedTechIndex_.push_back(find_date_row(allTech_, tech));
-            }
-            sort(mixedTechIndex_.begin(), mixedTechIndex_.end());
-            techType_.clear();
-            for (auto &techIndex : mixedTechIndex_) {
-                techType_ += allTech_[techIndex] + "_";
-            }
-            techType_.pop_back();
-            allTech_[techIndex_] = techType_;
+        if (techIndexs_.size() == 1) {
+            techIndex_ = techIndexs_[0];
+        }
+        else {
+            techIndex_ = (int)allTech_.size();
+            allTech_.push_back(techType_);
         }
     }
 } const _info;
@@ -171,7 +170,7 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 }
 
 void CompanyInfo::create_folder(Path &paths) {
-    if (info_.mixedTechIndex_.size() == 0) {
+    if (info_.techIndexs_.size() > 1) {
         create_directories(paths.allTechOuputPath_[info_.techIndex_]);
     }
     create_directories(paths.allTestHoldFilePath_[info_.techIndex_]);
