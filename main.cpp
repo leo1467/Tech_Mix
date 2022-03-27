@@ -96,7 +96,7 @@ class CompanyInfo {
         vector<string> allTestTraditionFilePath_;
         vector<string> allTestHoldFilePath_;
     };
-    const Info &info_;
+    Info info_;
     string companyName_;
     Path paths_;
 
