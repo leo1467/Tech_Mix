@@ -2055,7 +2055,7 @@ void Test::print_test_holdInfo(TestWindow &window) {
             holdFile.open(company_.paths_.testHoldFilePaths_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         else if (tradition_) {
-            //set tradition hold file path
+            holdFile.open(company_.paths_.testTraditionHoldFilePaths_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         for (auto info : holdInfo_) {
             holdFile << info;
