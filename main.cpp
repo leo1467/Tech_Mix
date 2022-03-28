@@ -153,7 +153,7 @@ void CompanyInfo::set_paths(Path &paths) {
         paths.techOuputPaths_.push_back("tech/" + tech + "/" + companyName_ + "/");
 
         paths.resultOutputPaths_.push_back(info_.rootFolder_ + "/" + tech + "_result/");
-        
+
         string companyRootFolder = info_.rootFolder_ + "/" + tech + "_result/" + companyName_ + "/";
         paths.companyRootPaths_.push_back(companyRootFolder);
 
@@ -168,10 +168,10 @@ void CompanyInfo::set_paths(Path &paths) {
 
         paths.trainTraditionHoldFilePaths_.push_back(companyRootFolder + "trainTraditionHold/");
         paths.testTraditionHoldFilePaths_.push_back(companyRootFolder + "testTraditionHold/");
-        
+
         paths.trainBestHold_.push_back(companyRootFolder + "trainBestHold/");
         paths.testBestHold_.push_back(companyRootFolder + "testBestHold/");
-        
+
         paths.trainTraditionBestHold_.push_back(companyRootFolder + "trainTraditionBestHold/");
         paths.testTraditionBestHold_.push_back(companyRootFolder + "testTraditionBestHold/");
     }
@@ -2091,10 +2091,10 @@ class Tradition {
 
     vector<vector<vector<int>>> allTraditionStrategy_{MA::traditionStrategy_, MA::traditionStrategy_, MA::traditionStrategy_, RSI::traditionStrategy_};
 
-    void train_Tradition(string &targetWindow);
     void create_particles();
     void set_strategy();
     TrainWindow set_window(string &targetWindow, int &windowIndex);
+    void train_a_tradition_window(TrainWindow &window);
     void set_variables(int index);
 
    public:
@@ -2102,27 +2102,16 @@ class Tradition {
 };
 
 Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)} {
-    train_Tradition(targetWindow);
-}
-
-void Tradition::train_Tradition(string &targetWindow) {
     set_strategy();
     create_particles();
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_;
-        for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
-            int startRow = window.interval_[intervalIndex];
-            int endRow = window.interval_[intervalIndex + 1];
-            for (int i = 0; i < traditionStrategyNum_; i++) {
-                particles_[i].reset();
-                set_variables(i);
-                particles_[i].trade(startRow, endRow);
-            }
-            stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
-            particles_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
+        if (window.interval_[0] < 0) {
+            cout << "train window is too old, skip this window" << endl;
+            continue;
         }
+        train_a_tradition_window(window);
     }
 }
 
@@ -2148,6 +2137,21 @@ TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
     TrainWindow window(company_, actualWindow);
     cout << actualWindow << endl;
     return window;
+}
+
+void Tradition::train_a_tradition_window(TrainWindow &window) {
+    string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_;
+    for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
+        int startRow = window.interval_[intervalIndex];
+        int endRow = window.interval_[intervalIndex + 1];
+        for (int i = 0; i < traditionStrategyNum_; i++) {
+            particles_[i].reset();
+            set_variables(i);
+            particles_[i].trade(startRow, endRow);
+        }
+        stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
+        particles_[0].print_train_test_data(window.windowName_, outputPath, startRow, endRow);
+    }
 }
 
 void Tradition::set_variables(int index) {
