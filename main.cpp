@@ -137,10 +137,10 @@ class CompanyInfo {
     void output_Tech();
     void set_techFile_title(ofstream &out, int techPerid);
 
-    CompanyInfo(const Info &info, path pricePath);
+    CompanyInfo(path pricePath);
 };
 
-CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), companyName_(pricePath.stem().string()) {
+CompanyInfo::CompanyInfo(path pricePath) : companyName_(pricePath.stem().string()) {
     set_paths(paths_);
     store_date_price(pricePath);
     create_folder(paths_);
@@ -2183,7 +2183,7 @@ int main(int argc, const char *argv[]) {
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
         for (auto companyPricePath : companyPricePaths) {
-            CompanyInfo company(_info, companyPricePath);
+            CompanyInfo company(companyPricePath);
             switch (company.info_.mode_) {
                 case 0: {
                     Train train(company, company.info_.setWindow_);
