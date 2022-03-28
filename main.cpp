@@ -23,13 +23,13 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 10;
+    int mode_ = 1;
     string setCompany_ = "AAPL";
-    string setWindow_ = "all";
+    string setWindow_ = "YYY2Y";
 
     double delta_ = 0.003;
-    int expNum_ = 50;
-    int genNum_ = 1000;
+    int expNum_ = 1;
+    int genNum_ = 1;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
@@ -40,6 +40,7 @@ class Info {
     int compareMode_ = 0;
 
     vector<int> techIndexs_ = {0, 3};
+    bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
 
@@ -74,10 +75,12 @@ class Info {
         windowNumber_ = (int)slidingWindows_.size();
         if (techIndexs_.size() == 1) {
             techIndex_ = techIndexs_[0];
+            mixedTech_ = false;
         }
         else {
             techIndex_ = (int)allTech_.size();
             allTech_.push_back(techType_);
+            mixedTech_ = true;
         }
     }
 } const _info;
@@ -818,6 +821,9 @@ class Particle {
     CompanyInfo *company_;
 
    public:
+    int techIndex_;
+    string techType_;
+
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<int> binary_;
@@ -869,14 +875,14 @@ class Particle {
     void measure(BetaMatrix &betaMatrix);
     void convert_bi_dec();
     void print(ostream &out);
-    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr);
+    void print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
     string set_output_filePath(string windowName, string &outputPath, int actualStartRow, int actualEndRow);
 
-    Particle(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
+    Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
 };
 
-Particle::Particle(CompanyInfo *company, bool isRecordOn, vector<int> variables) : company_(company), remain_(company->info_.totalCapitalLV_), isRecordOn_(isRecordOn) {
-    eachVariableBitsNum_ = allTechEachVariableBitsNum_[company_->info_.techIndex_];
+Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) : company_(company), techIndex_(techIndex), techType_(company_->info_.techType_), remain_(company->info_.totalCapitalLV_), isRecordOn_(isRecordOn) {
+    eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
     variableNum_ = (int)eachVariableBitsNum_.size();
@@ -887,7 +893,7 @@ Particle::Particle(CompanyInfo *company, bool isRecordOn, vector<int> variables)
 }
 
 void Particle::instant_trade(string startDate, string endDate, bool hold) {
-    vector<TechTable> tmp = {TechTable(company_, company_->info_.techIndex_)};
+    vector<TechTable> tmp = {TechTable(company_, techIndex_)};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
     find_instant_trade_startRow_endRow(startDate, endDate, startRow, endRow);
@@ -918,17 +924,23 @@ void Particle::find_instant_trade_startRow_endRow(const string &startDate, const
 void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr) {
     if (hold) {
         holdInfo.clear();
-        holdInfo.push_back("Date,Price,Hold,buy,sell date,sell " + company_->info_.techType_ + ",");
-        switch (company_->info_.techIndex_) {
-            case 0:
-            case 1:
-            case 2: {
-                holdInfo.push_back("buy 1,buy 2,sell 1,sell 2\n");
-                break;
+        holdInfo.push_back("Date,Price,Hold,buy,sell date,sell " + techType_ + ",");
+        if (company_->info_.techIndex_ == techIndex_) {
+            switch (techIndex_) {
+                case 0:
+                case 1:
+                case 2: {
+                    holdInfo.push_back("buy 1,buy 2,sell 1,sell 2\n");
+                    break;
+                }
+                case 3: {
+                    holdInfo.push_back("RSI,overSold,overbought\n");
+                    break;
+                }
             }
-            case 3: {
-                holdInfo.push_back("RSI,overSold,overbought\n");
-            }
+        }
+        else {
+            holdInfo.push_back("\n");
         }
         holdInfoPtr = &holdInfo;
     }
@@ -941,8 +953,8 @@ void Particle::set_instant_trade_file(ofstream &out, const string &startDate, co
         showVariablesInFile += ",";
         showVariablesInFile += to_string(i);
     }
-    out.open(company_->companyName_ + "_" + company_->info_.techType_ + titleVariables + "_instantTrade_" + startDate + "_" + endDate + ".csv");
-    switch (company_->info_.techIndex_) {
+    out.open(company_->companyName_ + "_" + techType_ + titleVariables + "_instantTrade_" + startDate + "_" + endDate + ".csv");
+    switch (techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -1036,13 +1048,13 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, vector<string> *
 // int sell1 = 10;
 // int sell2 = 20;
 void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, int stockHold, int i, int endRow) {
-    buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
-    sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    buyCondition = !stockHold && (*buy[techIndex_])(tables_, decimal_, i) && i != endRow;
+    sellCondition = stockHold && ((*sell[techIndex_])(tables_, decimal_, i) || i == endRow);
 
     // 以RSI訓練期的資料為底，測試期的時候再加上MA的條件
     // if ((*tables_).size() == 1) {
-    //     buyCondition = !stockHold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
-    //     sellCondition = stockHold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    //     buyCondition = !stockHold && (*buy[techIndex_])(tables_, decimal_, i) && i != endRow;
+    //     sellCondition = stockHold && ((*sell[techIndex_])(tables_, decimal_, i) || i == endRow);
     // }
     // else {
     //     bool RSIbuy = false;
@@ -1050,7 +1062,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
     //     bool MAbuy = false;
     //     bool MAsell = false;
     //     if (!RSIhold) {
-    //         RSIbuy = !RSIhold && (*buy[company_->info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    //         RSIbuy = !RSIhold && (*buy[info_.techIndex_])(tables_, decimal_, i) && i != endRow;
     //         if (RSIbuy)
     //             RSIhold = true;
     //     }
@@ -1060,7 +1072,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
     //             MAhold = true;
     //     }
 
-    //     RSIsell = RSIhold && ((*sell[company_->info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    //     RSIsell = RSIhold && ((*sell[info_.techIndex_])(tables_, decimal_, i) || i == endRow);
     //     MAsell = MAhold && ((*tables_)[1].techTable_[i][sell1] <= (*tables_)[1].techTable_[i][sell2] || i == endRow);
 
     //     buyCondition = !stockHold && RSIhold && MAhold && i != endRow;
@@ -1088,7 +1100,7 @@ void Particle::push_holdInfo_date_price(vector<string> *holdInfoPtr, int i) {
 
 void Particle::push_tradeInfo_column_name() {
     if (isRecordOn_) {
-        switch (company_->info_.techIndex_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1109,7 +1121,7 @@ void Particle::push_tradeInfo_buy(int stockHold, int i) {
         push += "buy,";
         push += (*tables_)[0].date_[i] + ",";
         push += set_precision((*tables_)[0].price_[i]) + ",";
-        switch (company_->info_.techIndex_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1132,7 +1144,7 @@ void Particle::push_tradeInfo_buy(int stockHold, int i) {
 }
 
 void Particle::push_extra_techInfo(int i, string &push) {
-    switch (company_->info_.techIndex_) {
+    switch (techIndex_) {
         case 0:
         case 1:
         case 2: {
@@ -1180,7 +1192,7 @@ void Particle::push_tradeInfo_sell(int stockHold, int i) {
         push += "sell,";
         push += (*tables_)[0].date_[i] + ",";
         push += set_precision((*tables_)[0].price_[i]) + ",";
-        switch (company_->info_.techIndex_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1290,7 +1302,7 @@ void Particle::convert_bi_dec() {
         decimal_[variableIndex]++;
         bitIndex += eachVariableBitsNum_[variableIndex];
     }
-    if (company_->info_.techIndex_ == 3) {
+    if (techIndex_ == 3) {
         decimal_[1]--;
         decimal_[2]--;
     }
@@ -1309,25 +1321,44 @@ void Particle::print(ostream &out = cout) {
     out << set_precision(RoR_) << "%," << endl;
 }
 
-void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr) {
+void Particle::print_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdInfoPtr, vector<vector<string>> *trainFile) {
     string filePath = set_output_filePath(windowName, outputPath, actualStartRow, actualEndRow);
     isRecordOn_ = true;
     remain_ = company_->info_.totalCapitalLV_;
-    trade(actualStartRow, actualEndRow, false, holdInfoPtr);
+    if (decimal_[0]) {
+        trade(actualStartRow, actualEndRow, false, holdInfoPtr);
+    }
+    else {
+        reset();
+    }
     if (holdInfoPtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 10) {
         ofstream out;
         out.open(filePath);
-        out << "algo," << company_->info_.algoType_ << endl;
-        out << "delta," << set_precision(company_->info_.delta_) << endl;
-        out << "exp," << company_->info_.expNum_ << endl;
-        out << "gen," << company_->info_.genNum_ << endl;
-        out << "p number," << company_->info_.particleNum_ << endl;
-        out << endl;
+        if (trainFile != nullptr) {
+            for (size_t row = 0; row < 6; row++) {
+                for (size_t col = 0; col < (*trainFile)[row].size(); col++) {
+                    out << (*trainFile)[row][col] << ",";
+                }
+                out << endl;
+            }
+            out << endl;
+        }
+        else {
+            out << "algo," << company_->info_.algoType_ << endl;
+            out << "tech type," << techType_ << endl;
+            out << "delta," << set_precision(company_->info_.delta_) << endl;
+            out << "exp," << company_->info_.expNum_ << endl;
+            out << "gen," << company_->info_.genNum_ << endl;
+            out << "p number," << company_->info_.particleNum_ << endl;
+            out << endl;
+        }
         out << "initial capital," << set_precision(company_->info_.totalCapitalLV_) << endl;
         out << "final capital," << set_precision(remain_) << endl;
         out << "final return," << set_precision(remain_ - company_->info_.totalCapitalLV_) << endl;
+        out << "return rate"
+            << "," << set_precision(RoR_) << "%" << endl;
         out << endl;
-        switch (company_->info_.techIndex_) {
+        switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -1348,13 +1379,12 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
                 exit(1);
             }
         }
-        out << "trade," << sellNum_ << endl;
-        out << "return rate," << set_precision(RoR_) << "%" << endl;
         out << endl;
         out << "best exp," << exp_ << endl;
         out << "best gen," << gen_ << endl;
         out << "best cnt," << bestCnt_ << endl;
         out << endl;
+        out << "trade," << sellNum_ << endl;
         print_trade_record(out);
         out.close();
     }
@@ -1372,7 +1402,7 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     else {
         string delta = set_precision(actualDelta_);
         delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
-        outputPath = company_->info_.techType_ + "_";
+        outputPath = techType_ + "_";
         outputPath += company_->companyName_ + "_";
         outputPath += company_->info_.algoType_ + "_";
         outputPath += delta + "_";
@@ -1503,7 +1533,7 @@ void Train::find_new_row(string &startDate, string &endDate) {
 }
 
 void Train::create_particles(bool debug) {
-    Particle p(&company_, debug);
+    Particle p(&company_, company_.info_.techIndex_, debug);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
     for (int i = 0; i < company_.info_.particleNum_; i++) {
@@ -1815,7 +1845,13 @@ void Train::clear_STL() {
 
 class Test {
    private:
+    class Path {
+       public:
+        vector<string> trainFilePaths_;
+        string testFileOutputPath_;
+    };
     CompanyInfo &company_;
+    Path paths_;
     Particle p_;
     vector<TechTable> tables_;
     bool tradition_ = false;
@@ -1824,60 +1860,98 @@ class Test {
     vector<string> *holdInfoPtr_ = nullptr;
 
     void add_tables(vector<int> addtionTable);
-    void set_test_file_path(string &trainFilePath, string &testFileOutputPath);
-    void test_a_window(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex);
+    void create_particle();
+    void set_train_test_file_path();
+    void set_normal_paths();
+    void set_mixedTech_paths();
+    void test_a_window(TestWindow &window);
     TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
-    void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
-    void set_variables(vector<vector<std::string>> &thisTrainFile);
+    void check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &window);
+    size_t set_variables(vector<vector<vector<string>>> &thisTrainFile);
     void print_test_holdInfo(TestWindow &window);
 
    public:
     Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> additionTable = {});
 };
 
-Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company), tables_{TechTable(&company, company.info_.techIndex_)}, tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company, 0), tradition_(tradition), hold_(hold) {
     add_tables(additionTable);
-    p_.tables_ = &tables_;
-    string trainFilePath;
-    string testFileOutputPath;
-    set_test_file_path(trainFilePath, testFileOutputPath);
+    create_particle();
+    set_train_test_file_path();
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         string actualWindow = company_.info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
-            test_a_window(actualWindow, targetWindow, testFileOutputPath, trainFilePath, windowIndex);
+            TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
+            if (window.interval_[0] < 0) {
+                cout << "train window is too old, skip this window" << endl;
+                continue;
+            }
+            test_a_window(window);
         }
     }
 }
 
 void Test::add_tables(vector<int> addtionTable) {
-    for (int i = 0; i < addtionTable.size(); i++) {
-        tables_.push_back(TechTable(&company_, addtionTable[i]));
+    if (!company_.info_.mixedTech_) {
+        tables_.push_back(TechTable(&company_, company_.info_.techIndex_));
+    }
+    else {
+        for (auto &techIndex : company_.info_.techIndexs_) {
+            tables_.push_back(TechTable(&company_, techIndex));
+        }
+    }
+    if (addtionTable.size() > 0) {
+        for (int i = 0; i < addtionTable.size(); i++) {
+            tables_.push_back(TechTable(&company_, addtionTable[i]));
+        }
     }
 }
 
-void Test::set_test_file_path(string &trainFilePath, string &testFileOutputPath) {
-    if (tradition_) {
-        trainFilePath = company_.paths_.allTrainTraditionFilePath_[company_.info_.techIndex_];
-        testFileOutputPath = company_.paths_.allTestTraditionFilePath_[company_.info_.techIndex_];
+void Test::create_particle() {
+    if (!company_.info_.mixedTech_) {
+        switch (company_.info_.techIndex_) {
+            case 3: {
+                p_ = Particle(&company_, company_.info_.techIndex_);
+                break;
+            }
+        }
     }
-    else {
-        trainFilePath = company_.paths_.allTrainFilePath_[company_.info_.techIndex_];
-        testFileOutputPath = company_.paths_.allTestFilePath_[company_.info_.techIndex_];
+    p_.tables_ = &tables_;
+}
+
+void Test::set_train_test_file_path() {
+    if (!company_.info_.mixedTech_) {
+        set_normal_paths();
+    }
+    else if (company_.info_.mixedTech_) {
+        set_mixedTech_paths();
     }
     cout << "test " << company_.companyName_ << endl;
 }
 
-void Test::test_a_window(string &actualWindow, string &targetWindow, const string &testFileOutputPath, const string &trainFilePath, int &windowIndex) {
-    TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
-    vector<path> eachTrainFilePath = get_path(trainFilePath + window.windowName_);
-    check_exception(eachTrainFilePath, window);
-    p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
-    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
-        vector<vector<string>> thisTrainFile = read_data(eachTrainFilePath[trainFileIndex]);
-        p_.reset();
-        set_variables(thisTrainFile);
-        p_.print_train_test_data(window.windowName_, testFileOutputPath + window.windowName_, window.interval_[intervalIndex], window.interval_[intervalIndex + 1], holdInfoPtr_);
-        print_test_holdInfo(window);
+void Test::set_normal_paths() {
+    if (tradition_) {
+        paths_.trainFilePaths_.push_back(company_.paths_.allTrainTraditionFilePath_[company_.info_.techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.allTestTraditionFilePath_[company_.info_.techIndex_];
+    }
+    else {
+        paths_.trainFilePaths_.push_back(company_.paths_.allTrainFilePath_[company_.info_.techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.allTestFilePath_[company_.info_.techIndex_];
+    }
+}
+
+void Test::set_mixedTech_paths() {
+    if (tradition_) {
+        for (auto &techIndex : company_.info_.techIndexs_) {
+            paths_.trainFilePaths_.push_back(company_.paths_.allTrainTraditionFilePath_[techIndex]);
+        }
+        paths_.testFileOutputPath_ = company_.paths_.allTestTraditionFilePath_[company_.info_.techIndex_];
+    }
+    else {
+        for (auto &techIndex : company_.info_.techIndexs_) {
+            paths_.trainFilePaths_.push_back(company_.paths_.allTrainFilePath_[techIndex]);
+        }
+        paths_.testFileOutputPath_ = company_.paths_.allTestFilePath_[company_.info_.techIndex_];
     }
 }
 
@@ -1891,11 +1965,51 @@ TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &win
     return window;
 }
 
-void Test::check_exception(vector<path> &eachTrainFilePath, TestWindow &window) {
-    if (eachTrainFilePath.size() != window.intervalSize_ / 2) {
-        cout << window.windowName_ << " test interval number is not equal to train fle number" << endl;
-        exit(1);
+void Test::test_a_window(TestWindow &window) {
+    vector<vector<path>> eachTrainFilePath;
+    for (auto &trainPath : paths_.trainFilePaths_) {
+        eachTrainFilePath.push_back(get_path(trainPath + window.windowName_));
     }
+    check_exception(eachTrainFilePath, window);
+    p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
+    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
+        int startRow = window.interval_[intervalIndex];
+        int endRow = window.interval_[intervalIndex + 1];
+        vector<vector<vector<string>>> thisTrainFile;
+        for (auto &diffTrainFilePath : eachTrainFilePath) {
+            thisTrainFile.push_back(read_data(diffTrainFilePath[trainFileIndex]));
+        }
+        p_.reset();
+        size_t bestIndex = set_variables(thisTrainFile);
+        p_.print_train_test_data(window.windowName_, paths_.testFileOutputPath_ + window.windowName_, startRow, endRow, holdInfoPtr_, &thisTrainFile[bestIndex]);
+        print_test_holdInfo(window);
+    }
+}
+
+void Test::check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &window) {
+    for (auto &trainFilePath : eachTrainFilePath) {
+        if (trainFilePath.size() != window.intervalSize_ / 2) {
+            cout << company_.companyName_ << " " << window.windowName_ << " test interval number is not equal to train fle number" << endl;
+            exit(1);
+        }
+    }
+}
+
+size_t Test::set_variables(vector<vector<vector<string>>> &thisTrainFile) {
+    size_t bestRoRIndex = 0;
+    if (company_.info_.mixedTech_) {
+        vector<double> everyRoR;
+        for (auto &trainFile : thisTrainFile) {
+            everyRoR.push_back(stod(trainFile[10][1]));
+        }
+        bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
+        p_ = Particle(&company_, company_.info_.techIndexs_[bestRoRIndex]);
+        p_.tables_ = &tables_;
+    }
+    for (int i = 0; i < p_.variableNum_; i++) {
+        p_.decimal_[i] = stoi(thisTrainFile[bestRoRIndex][i + 12][1]);
+    }
+    return bestRoRIndex;
 }
 
 void Test::print_test_holdInfo(TestWindow &window) {
@@ -1911,12 +2025,6 @@ void Test::print_test_holdInfo(TestWindow &window) {
             holdFile << info;
         }
         holdFile.close();
-    }
-}
-
-void Test::set_variables(vector<vector<string>> &thisTrainFile) {
-    for (int i = 0; i < p_.variableNum_; i++) {
-        p_.decimal_[i] = stoi(thisTrainFile[i + 10][1]);
     }
 }
 
@@ -1988,7 +2096,7 @@ void Tradition::set_strategy() {
 }
 
 void Tradition::create_particles() {
-    Particle p(&company_);
+    Particle p(&company_, company_.info_.techIndex_);
     p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++) {
         particles_.push_back(p);
