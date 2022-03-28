@@ -23,7 +23,7 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 1;
+    int mode_ = 10;
     string setCompany_ = "AAPL";
     string setWindow_ = "YYY2Y";
 
@@ -39,7 +39,7 @@ class Info {
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {0};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -89,14 +89,28 @@ class CompanyInfo {
    public:
     class Path {
        public:
-        vector<string> allResultOutputPath_;
-        vector<string> allCompanyRootPath_;
-        vector<string> allTechOuputPath_;
-        vector<string> allTrainFilePath_;
-        vector<string> allTestFilePath_;
-        vector<string> allTrainTraditionFilePath_;
-        vector<string> allTestTraditionFilePath_;
-        vector<string> allTestHoldFilePath_;
+        vector<string> techOuputPaths_;
+
+        vector<string> resultOutputPaths_;
+        vector<string> companyRootPaths_;
+
+        vector<string> trainFilePaths_;
+        vector<string> testFilePaths_;
+
+        vector<string> trainTraditionFilePaths_;
+        vector<string> testTraditionFilePaths_;
+
+        vector<string> trainHoldFilePaths_;
+        vector<string> testHoldFilePaths_;
+
+        vector<string> trainTraditionHoldFilePaths_;
+        vector<string> testTraditionHoldFilePaths_;
+
+        vector<string> trainBestHold_;
+        vector<string> testBestHold_;
+
+        vector<string> trainTraditionBestHold_;
+        vector<string> testTraditionBestHold_;
     };
     Info info_;
     string companyName_;
@@ -137,14 +151,30 @@ CompanyInfo::CompanyInfo(const Info &info, path pricePath) : info_(info), compan
 
 void CompanyInfo::set_paths(Path &paths) {
     for (auto tech : info_.allTech_) {
-        paths.allResultOutputPath_.push_back(info_.rootFolder_ + "/" + tech + "_result");
-        paths.allCompanyRootPath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/");
-        paths.allTechOuputPath_.push_back("tech/" + tech + "/" + companyName_);
-        paths.allTrainFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/train/");
-        paths.allTestFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/test/");
-        paths.allTrainTraditionFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/trainTradition/");
-        paths.allTestTraditionFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testTradition/");
-        paths.allTestHoldFilePath_.push_back(info_.rootFolder_ + "/" + tech + "_result" + "/" + companyName_ + "/testHoldPeriod/");
+        paths.techOuputPaths_.push_back("tech/" + tech + "/" + companyName_ + "/");
+
+        paths.resultOutputPaths_.push_back(info_.rootFolder_ + "/" + tech + "_result/");
+        
+        string companyRootFolder = info_.rootFolder_ + "/" + tech + "_result/" + companyName_ + "/";
+        paths.companyRootPaths_.push_back(companyRootFolder);
+
+        paths.trainFilePaths_.push_back(companyRootFolder + "train/");
+        paths.testFilePaths_.push_back(companyRootFolder + "test/");
+
+        paths.trainTraditionFilePaths_.push_back(companyRootFolder + "trainTradition/");
+        paths.testTraditionFilePaths_.push_back(companyRootFolder + "testTradition/");
+
+        paths.trainHoldFilePaths_.push_back(companyRootFolder + "trainHold/");
+        paths.testHoldFilePaths_.push_back(companyRootFolder + "testHold/");
+
+        paths.trainTraditionHoldFilePaths_.push_back(companyRootFolder + "trainTraditionHold/");
+        paths.testTraditionHoldFilePaths_.push_back(companyRootFolder + "testTraditionHold/");
+        
+        paths.trainBestHold_.push_back(companyRootFolder + "trainBestHold/");
+        paths.testBestHold_.push_back(companyRootFolder + "testBestHold/");
+        
+        paths.trainTraditionBestHold_.push_back(companyRootFolder + "trainTraditionBestHold/");
+        paths.testTraditionBestHold_.push_back(companyRootFolder + "testTraditionBestHold/");
     }
 }
 
@@ -173,15 +203,22 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 }
 
 void CompanyInfo::create_folder(Path &paths) {
-    if (info_.techIndexs_.size() > 1) {
-        create_directories(paths.allTechOuputPath_[info_.techIndex_]);
+    if (!info_.mixedTech_) {
+        create_directories(paths.techOuputPaths_[info_.techIndex_]);
     }
-    create_directories(paths.allTestHoldFilePath_[info_.techIndex_]);
+    // create_directories(paths.trainHoldFilePaths_[info_.techIndex_]);
+    create_directories(paths.testHoldFilePaths_[info_.techIndex_]);
+    // create_directories(paths.trainTraditionHoldFilePaths_[info_.techIndex_]);
+    // create_directories(paths.testTraditionHoldFilePaths_[info_.techIndex_]);
+    // create_directories(paths.trainBestHold_[info_.techIndex_]);
+    // create_directories(paths.testBestHold_[info_.techIndex_]);
+    // create_directories(paths.trainTraditionBestHold_[info_.techIndex_]);
+    // create_directories(paths.testTraditionBestHold_[info_.techIndex_]);
     for (auto i : info_.slidingWindows_) {
-        create_directories(paths.allTrainFilePath_[info_.techIndex_] + i);
-        create_directories(paths.allTestFilePath_[info_.techIndex_] + i);
-        create_directories(paths.allTrainTraditionFilePath_[info_.techIndex_] + i);
-        create_directories(paths.allTestTraditionFilePath_[info_.techIndex_] + i);
+        create_directories(paths.trainFilePaths_[info_.techIndex_] + i);
+        create_directories(paths.testFilePaths_[info_.techIndex_] + i);
+        create_directories(paths.trainTraditionFilePaths_[info_.techIndex_] + i);
+        create_directories(paths.testTraditionFilePaths_[info_.techIndex_] + i);
     }
 }
 
@@ -339,13 +376,13 @@ void CompanyInfo::output_Tech() {
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
     if (techPerid < 10) {
-        out.open(paths_.allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_00" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_00" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 10 && techPerid < 100) {
-        out.open(paths_.allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_0" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_0" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 100) {
-        out.open(paths_.allTechOuputPath_[info_.techIndex_] + "/" + companyName_ + "_" + info_.techType_ + "_" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
 
@@ -374,12 +411,12 @@ TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), t
 }
 
 void TechTable::create_techTable() {
-    vector<path> techFilePath = get_path(company_->paths_.allTechOuputPath_[techIndex_]);
+    vector<path> techFilePath = get_path(company_->paths_.techOuputPaths_[techIndex_]);
     int techFilePathSize = (int)techFilePath.size();
     while (techFilePathSize == 0) {
         cout << "no " << techType_ << " tech file" << endl;
         ask_generate_tech_file();
-        techFilePath = get_path(company_->paths_.allTechOuputPath_[techIndex_]);
+        techFilePath = get_path(company_->paths_.techOuputPaths_[techIndex_]);
         techFilePathSize = (int)techFilePath.size();
     }
     if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
@@ -1344,8 +1381,8 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
             out << endl;
         }
         else {
-            out << "algo," << company_->info_.algoType_ << endl;
             out << "tech type," << techType_ << endl;
+            out << "algo," << company_->info_.algoType_ << endl;
             out << "delta," << set_precision(company_->info_.delta_) << endl;
             out << "exp," << company_->info_.expNum_ << endl;
             out << "gen," << company_->info_.genNum_ << endl;
@@ -1493,7 +1530,7 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
                 start_exp(out, expCnt, debug);
             }
             out.close();
-            globalP_[0].print_train_test_data(window.windowName_, company_.paths_.allTrainFilePath_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
+            globalP_[0].print_train_test_data(window.windowName_, company_.paths_.trainFilePaths_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
             cout << globalP_[0].RoR_ << "%" << endl;
         }
         cout << "==========" << endl;
@@ -1504,13 +1541,13 @@ void Train::start_train(string targetWindow, string startDate, string endDate, b
 void Train::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
     if (startDate == "debug" || endDate == "debug") {
         debug = true;
-        company_.paths_.allTrainFilePath_[company_.info_.techIndex_] = "";
+        company_.paths_.trainFilePaths_[company_.info_.techIndex_] = "";
     }
     if (targetWindow.length() == startDate.length()) {
         endDate = startDate;
         startDate = targetWindow;
         targetWindow = "A2A";
-        company_.paths_.allTrainFilePath_[company_.info_.techIndex_] = "";
+        company_.paths_.trainFilePaths_[company_.info_.techIndex_] = "";
     }
     else {
         startDate = "";
@@ -1561,7 +1598,7 @@ TrainWindow Train::set_window(string &targetWindow, string &startDate, int &wind
     if (startDate == "") {
         window.print_train();
     }
-    if (company_.paths_.allTrainFilePath_[company_.info_.techIndex_] == "") {
+    if (company_.paths_.trainFilePaths_[company_.info_.techIndex_] == "") {
         window.windowName_ = "";
     }
     return window;
@@ -1931,27 +1968,27 @@ void Test::set_train_test_file_path() {
 
 void Test::set_normal_paths() {
     if (tradition_) {
-        paths_.trainFilePaths_.push_back(company_.paths_.allTrainTraditionFilePath_[company_.info_.techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.allTestTraditionFilePath_[company_.info_.techIndex_];
+        paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_];
     }
     else {
-        paths_.trainFilePaths_.push_back(company_.paths_.allTrainFilePath_[company_.info_.techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.allTestFilePath_[company_.info_.techIndex_];
+        paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[company_.info_.techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_.techIndex_];
     }
 }
 
 void Test::set_mixedTech_paths() {
     if (tradition_) {
         for (auto &techIndex : company_.info_.techIndexs_) {
-            paths_.trainFilePaths_.push_back(company_.paths_.allTrainTraditionFilePath_[techIndex]);
+            paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[techIndex]);
         }
-        paths_.testFileOutputPath_ = company_.paths_.allTestTraditionFilePath_[company_.info_.techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_];
     }
     else {
         for (auto &techIndex : company_.info_.techIndexs_) {
-            paths_.trainFilePaths_.push_back(company_.paths_.allTrainFilePath_[techIndex]);
+            paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[techIndex]);
         }
-        paths_.testFileOutputPath_ = company_.paths_.allTestFilePath_[company_.info_.techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_.techIndex_];
     }
 }
 
@@ -2016,7 +2053,7 @@ void Test::print_test_holdInfo(TestWindow &window) {
     if (hold_) {
         ofstream holdFile;
         if (!tradition_) {
-            holdFile.open(company_.paths_.allTestHoldFilePath_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
+            holdFile.open(company_.paths_.testHoldFilePaths_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         else if (tradition_) {
             //set tradition hold file path
@@ -2075,7 +2112,7 @@ void Tradition::train_Tradition(string &targetWindow) {
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        string outputPath = company_.paths_.allTrainTraditionFilePath_[company_.info_.techIndex_] + window.windowName_;
+        string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_;
         for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
             int startRow = window.interval_[intervalIndex];
             int endRow = window.interval_[intervalIndex + 1];
