@@ -23,9 +23,19 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 10;
+    int mode_ = 3;
     string setCompany_ = "AAPL";
-    string setWindow_ = "YYY2Y";
+    string setWindow_ = "all";
+
+    vector<int> techIndexs_ = {0, 3};
+    bool mixedTech_ = false;
+    int techIndex_;
+    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
+    string techType_;
+
+    int algoIndex_ = 2;
+    vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
+    string algoType_;
 
     double delta_ = 0.003;
     int expNum_ = 1;
@@ -38,17 +48,6 @@ class Info {
     double multiplyUp_ = 1.01;
     double multiplyDown_ = 0.99;
     int compareMode_ = 0;
-
-    vector<int> techIndexs_ = {0};
-    bool mixedTech_ = false;
-    int techIndex_;
-    vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
-
-    int algoIndex_ = 2;
-    vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
-
-    string techType_;
-    string algoType_;
 
     string testStartYear_ = "2012-01";
     string testEndYear_ = "2021-01";
