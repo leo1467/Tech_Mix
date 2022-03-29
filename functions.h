@@ -147,4 +147,25 @@ static int find_index_of_string_in_vec(const vector<string> &dateVec, const stri
     return (int)distance(dateVec.begin(), find(dateVec.begin(), dateVec.end(), targetDate));
 }
 
+static vector<string> set_certain_range_of_vec(const string &inputString, vector<string> &targetVector) {
+    string inputForSetTarget = [&]() {
+        if (inputString == "all") {
+            return targetVector.front() + " to " + targetVector.back();
+        }
+        return inputString;
+    }();
+    vector<string> setTarget = cut_string(inputForSetTarget);
+    if (auto iter = find_if(setTarget.begin(), setTarget.end(), [](string i) { return i == "to"; }); iter != setTarget.end()) {
+        setTarget.erase(iter);
+    }
+    auto find_target = [&](string &targetString) { return find_if(targetVector.begin(), targetVector.end(), [&](string &string) { return string == targetString; }); };
+    auto firstWindowIter = find_target(setTarget.front());
+    auto lastWindowIter = find_target(setTarget.back()) + 1;
+    if (firstWindowIter == targetVector.end() || lastWindowIter - 1 == targetVector.end()) {
+        cout << "cant find inpuString in targetVector" << endl;
+        exit(1);
+    }
+    return vector<string>(firstWindowIter, lastWindowIter);
+}
+
 #endif /* functions_h */
