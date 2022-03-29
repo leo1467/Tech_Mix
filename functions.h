@@ -143,7 +143,7 @@ static bool is_week_changed(vector<string> date, int bigWeekDay, int smallWeekDa
             (stoi(date[big_i].substr(8, 2)) < stoi(date[small_i].substr(8, 2)) && stoi(date[big_i].substr(8, 2)) + 30 - stoi(date[small_i].substr(8, 2)) >= 7));
 }
 
-static int find_date_row(const vector<string> &dateVec, const string &targetDate) {
+static int find_index_of_string_in_vec(const vector<string> &dateVec, const string &targetDate) {
     return (int)distance(dateVec.begin(), find(dateVec.begin(), dateVec.end(), targetDate));
 }
 

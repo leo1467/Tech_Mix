@@ -23,7 +23,7 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 3;
+    int mode_ = 11;
     string setCompany_ = "AAPL";
     string setWindow_ = "all";
 
@@ -419,7 +419,7 @@ void TechTable::create_techTable() {
         techFilePathSize = (int)techFilePath.size();
     }
     if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
-        company_->tableStartRow_ = find_date_row(company_->date_, read_data(techFilePath.back())[0][0]);
+        company_->tableStartRow_ = find_index_of_string_in_vec(company_->date_, read_data(techFilePath.back())[0][0]);
         days_ = company_->totalDays_ - company_->tableStartRow_;
     }
     date_.resize(days_);
@@ -521,7 +521,7 @@ class TestWindow {
     TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[find_date_row(company.info_.slidingWindows_, windowName_)]), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowsEx_[find_index_of_string_in_vec(company.info_.slidingWindows_, windowName_)]), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval();
     }
@@ -945,12 +945,12 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
 }
 
 void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
-    startRow = find_date_row((*tables_)[0].date_, startDate);
+    startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
     if (startRow == (*tables_)[0].date_.size()) {
         cout << "instant trade startDate is not found" << endl;
         exit(1);
     }
-    endRow = find_date_row((*tables_)[0].date_, endDate);
+    endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
     if (endRow == (*tables_)[0].date_.size()) {
         cout << "instant trade endDate is not found" << endl;
         exit(1);
@@ -1555,8 +1555,8 @@ void Train::set_variables_and_condition(string &targetWindow, string &startDate,
 
 void Train::find_new_row(string &startDate, string &endDate) {
     if (startDate != "") {
-        actualStartRow_ = find_date_row(tables_[0].date_, startDate);
-        actualEndRow_ = find_date_row(tables_[0].date_, endDate);
+        actualStartRow_ = find_index_of_string_in_vec(tables_[0].date_, startDate);
+        actualEndRow_ = find_index_of_string_in_vec(tables_[0].date_, endDate);
         if (actualStartRow_ == tables_[0].days_) {
             cout << "input trainStartDate is not found" << endl;
             exit(1);
@@ -2068,8 +2068,8 @@ class BH {
    public:
     double BHRoR;
     BH(CompanyInfo &company, string startDate, string endDate) {
-        int startRow = find_date_row(company.date_, startDate);
-        int endRow = find_date_row(company.date_, endDate);
+        int startRow = find_index_of_string_in_vec(company.date_, startDate);
+        int endRow = find_index_of_string_in_vec(company.date_, endDate);
         if (startRow == company.totalDays_ || endRow == company.totalDays_) {
             cout << "cant find B&H startRow or endRow" << endl;
             exit(1);
@@ -2160,6 +2160,129 @@ void Tradition::set_variables(int index) {
     }
 }
 
+class CalIRR {
+   public:
+    class WindowIRR {
+       public:
+        string windowName_;
+        double algoIRR_;
+        double traditionIRR_;
+    };
+    class Rank {
+       public:
+        string companyName_;
+        vector<int> algoWindowRank_;
+        vector<int> traditionWindowRank_;
+    };
+
+    class CompanyAllRoR {
+       public:
+        vector<string> algoRoRoutInfo_;
+        vector<string> traditionRoRoutInfo_;
+    };
+
+    class CalOneCompanyIRR {
+       public:
+        CompanyInfo &company_;
+        vector<vector<WindowIRR>> &allCompanyWindowRank_;
+        vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
+
+        CalOneCompanyIRR(CompanyInfo &company, vector<vector<WindowIRR>> &allCompanyWindowRank) : company_(company), allCompanyWindowRank_(allCompanyWindowRank) {
+            vector<WindowIRR> windowRankList;
+            CompanyAllRoR allRoR;
+            WindowIRR tmp;
+            for (auto &window : company_.info_.slidingWindows_) {
+                if (window != "A2A") {
+                    cout << window << endl;
+                    tmp.windowName_ = window;
+                    tmp.algoIRR_ = cal_one_window_IRR(allRoR.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
+                    tmp.traditionIRR_ = cal_one_window_IRR(allRoR.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
+                    windowRankList.push_back(tmp);
+                }
+            }
+            windowRankList.push_back(cal_BH_IRR(company_));
+            ofstream out(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_testRoR.csv");
+            for (auto &info : allRoR.algoRoRoutInfo_) {
+                out << info;
+            }
+            out.close();
+            out.open(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_traditionRoR.csv");
+            for (auto &info : allRoR.traditionRoRoutInfo_) {
+                out << info;
+            }
+            out.close();
+            allCompanyWindowRank_.push_back(windowRankList);
+        }
+
+        double cal_one_window_IRR(vector<string> &RoRoutInfo, string &window, string &stratgyFilePath) {
+            RoRoutInfo.push_back("," + window + "\n");
+            double totalRoR = 0;
+            vector<path> strategyPaths = get_path(stratgyFilePath + window);
+            for (auto filePathIter = strategyPaths.begin(); filePathIter != strategyPaths.end(); filePathIter++) {
+                RoRoutInfo.push_back(compute_and_record_window_RoR(strategyPaths, filePathIter, totalRoR));
+            }
+            double windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_.testLength_) - 1.0;
+            RoRoutInfo.push_back(",,,,,," + window + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n");
+            return windowIRR;
+        }
+
+        string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR) {
+            vector<vector<string>> file = read_data(*filePathIter);
+            double RoR = stod(file[10][1]);
+            if (filePathIter == strategyPaths.begin()) {
+                totalRoR = RoR / 100.0 + 1.0;
+            }
+            else {
+                totalRoR = totalRoR * (RoR / 100.0 + 1.0);
+            }
+            string push = filePathIter->stem().string() + ",";
+            int techUse = find_index_of_string_in_vec(company_.info_.allTech_, file[0][1]);
+            for (int i = 0; i < eachVariableNum_[techUse]; i++) {
+                push += file[i + 12][1] + ",";
+            }
+            if (techUse == 3) {
+                push += ",";
+            }
+            push += file[10][1] + "\n";
+            return push;
+        }
+
+        WindowIRR cal_BH_IRR(CompanyInfo &company_) {
+            BH bh(company_, company_.date_[company_.testStartRow_], company_.date_[company_.testEndRow_]);
+            WindowIRR tmp;
+            tmp.windowName_ = "B&H";
+            tmp.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
+            tmp.traditionIRR_ = tmp.algoIRR_;
+            return tmp;
+        }
+    };
+
+    Info info_;
+    vector<path> &companyPricePaths_;
+    vector<Rank> companyWindowRank_;
+    vector<vector<WindowIRR>> allCompanyWindowRank_;
+
+    CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPricePaths) {
+        for (auto &companyPricePath : companyPricePaths_) {
+            CompanyInfo company(companyPricePath);
+            CalOneCompanyIRR calONcompanyIRR(company, allCompanyWindowRank_);
+        }
+        ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR.csv");
+        for (auto &companyPricePath : companyPricePaths_) {
+            IRRout << "=====" << companyPricePath.stem().string() << "=====";
+            IRRout << "," << info_.techType_ << " " << info_.algoType_ << ",";
+            IRRout << info_.techType_ << " Tradition" << endl;
+            for (auto &companyIRR : allCompanyWindowRank_) {
+                for (auto &eachIRR : companyIRR) {
+                    IRRout << eachIRR.windowName_ << ",";
+                    IRRout << set_precision(eachIRR.algoIRR_) << ",";
+                    IRRout << set_precision(eachIRR.traditionIRR_) << "\n";
+                }
+            }
+        }
+    }
+};
+
 static vector<path> set_company_price_paths(const Info &info) {
     vector<path> allCompanyPricePaths = get_path(info.pricePath_);
     string inputForSetCompany = [&]() {
@@ -2186,37 +2309,42 @@ int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
-        for (auto companyPricePath : companyPricePaths) {
-            CompanyInfo company(companyPricePath);
-            switch (company.info_.mode_) {
-                case 0: {
-                    Train train(company, company.info_.setWindow_);
-                    break;
-                }
-                case 1: {
-                    Test test(company, company.info_.setWindow_, false, true);
-                    break;
-                }
-                case 2: {
-                    Tradition trainTradition(company, company.info_.setWindow_);
-                    break;
-                }
-                case 3: {
-                    Test testTradition(company, company.info_.setWindow_, true, false);
-                    break;
-                }
-                case 10: {
-                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                    Tradition tradition(company);
-                    //                    Train train(company, "2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    break;
+        if (_info.mode_ <= 10) {
+            for (auto companyPricePath : companyPricePaths) {
+                CompanyInfo company(companyPricePath);
+                switch (company.info_.mode_) {
+                    case 0: {
+                        Train train(company, company.info_.setWindow_);
+                        break;
+                    }
+                    case 1: {
+                        Test test(company, company.info_.setWindow_, false, true);
+                        break;
+                    }
+                    case 2: {
+                        Tradition trainTradition(company, company.info_.setWindow_);
+                        break;
+                    }
+                    case 3: {
+                        Test testTradition(company, company.info_.setWindow_, true, false);
+                        break;
+                    }
+                    case 10: {
+                        //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                        //                    Tradition tradition(company);
+                        //                    Train train(company, "2011-12-01", "2011-12-30");
+                        //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                        //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                        //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                        //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                        //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                        break;
+                    }
                 }
             }
+        }
+        else if (_info.mode_ == 11) {
+            CalIRR calIRR(companyPricePaths);
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
