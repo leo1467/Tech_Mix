@@ -57,9 +57,9 @@ class Info {
     path pricePath_ = "price";
     string rootFolder_ = "result";
 
-    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
+    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2"/* , "4D4" */, "4D3", "4D2"/* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
-    vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
+    vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2"/* , "4D4" */, "4D3", "4D2"/* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
     
     map<string, string> slidingWindowPairs = {};
 
@@ -229,7 +229,7 @@ void CompanyInfo::create_folder(Path &paths) {
     // create_directories(paths.trainHoldFilePaths_[info_.techIndex_]);
     create_directories(paths.testHoldFilePaths_[info_.techIndex_]);
     // create_directories(paths.trainTraditionHoldFilePaths_[info_.techIndex_]);
-    // create_directories(paths.testTraditionHoldFilePaths_[info_.techIndex_]);
+    create_directories(paths.testTraditionHoldFilePaths_[info_.techIndex_]);
     // create_directories(paths.trainBestHold_[info_.techIndex_]);
     // create_directories(paths.testBestHold_[info_.techIndex_]);
     // create_directories(paths.trainTraditionBestHold_[info_.techIndex_]);
@@ -2197,7 +2197,7 @@ class CalIRR {
         vector<int> traditionWindowRank_;
     };
 
-    class CompanyAllRoR {
+    class CompanyAllRoRInfo {
        public:
         vector<string> algoRoRoutInfo_;
         vector<string> traditionRoRoutInfo_;
@@ -2297,26 +2297,26 @@ vector<string> CalIRR::remove_A2A_and_sort() {
 
 CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<vector<WindowIRR>> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
     vector<WindowIRR> windowsIRR;
-    CompanyAllRoR allRoR;
+    CompanyAllRoRInfo allRoRInfo;
     WindowIRR tmp;
     for (auto &window : company_.info_.slidingWindows_) {
         if (window != "A2A") {
             cout << window << endl;
             tmp.windowName_ = window;
-            tmp.algoIRR_ = cal_one_window_IRR(allRoR.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
-            tmp.traditionIRR_ = cal_one_window_IRR(allRoR.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
+            tmp.algoIRR_ = cal_one_window_IRR(allRoRInfo.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
+            tmp.traditionIRR_ = cal_one_window_IRR(allRoRInfo.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
             windowsIRR.push_back(tmp);
         }
     }
     windowsIRR.push_back(cal_BH_IRR(company_));
     rank_algo_and_tradition_window(windowsIRR);
     ofstream out(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_testRoR.csv");
-    for (auto &info : allRoR.algoRoRoutInfo_) {
+    for (auto &info : allRoRInfo.algoRoRoutInfo_) {
         out << info;
     }
     out.close();
     out.open(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_traditionRoR.csv");
-    for (auto &info : allRoR.traditionRoRoutInfo_) {
+    for (auto &info : allRoRInfo.traditionRoRoutInfo_) {
         out << info;
     }
     out.close();
@@ -2345,11 +2345,17 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         totalRoR = totalRoR * (RoR / 100.0 + 1.0);
     }
     string push = filePathIter->stem().string() + ",";
-    int techUse = find_index_of_string_in_vec(company_.info_.allTech_, file[0][1]);
-    for (int i = 0; i < eachVariableNum_[techUse]; i++) {
+    int techIndex = -1;
+    if (!company_.info_.mixedTech_) {
+        techIndex = company_.info_.techIndex_;
+    }
+    else {
+        techIndex = find_index_of_string_in_vec(company_.info_.allTech_, file[0][1]);
+    }
+    for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
         push += file[i + 12][1] + ",";
     }
-    if (techUse == 3) {
+    if (techIndex == 3) {
         push += ",";
     }
     push += file[10][1] + "\n";
@@ -2438,7 +2444,7 @@ int main(int argc, const char *argv[]) {
                         break;
                     }
                     case 3: {
-                        Test testTradition(company, company.info_.setWindow_, true, false);
+                        Test testTradition(company, company.info_.setWindow_, true, true);
                         break;
                     }
                     case 10: {
