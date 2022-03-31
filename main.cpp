@@ -24,8 +24,8 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 11;
-    string setCompany_ = "AAPL";
+    int mode_ = 12;
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0, 3};
@@ -1388,7 +1388,7 @@ void Particle::print_train_test_data(string windowName, string outputPath, int a
     else {
         reset();
     }
-    if (holdInfoPtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 10) {
+    if (holdInfoPtr == nullptr || company_->info_.mode_ == 1 || company_->info_.mode_ == 3 || company_->info_.mode_ == 10) {
         ofstream out;
         out.open(filePath);
         if (trainFile != nullptr) {
@@ -1939,10 +1939,6 @@ Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold,
         string actualWindow = company_.info_.slidingWindows_[windowIndex];
         if (actualWindow != "A2A") {
             TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
-            if (window.interval_[0] < 0) {
-                cout << "train window is too old, skip this window" << endl;
-                continue;
-            }
             test_a_window(window);
         }
     }
@@ -2027,19 +2023,23 @@ void Test::test_a_window(TestWindow &window) {
     for (auto &trainPath : paths_.trainFilePaths_) {
         eachTrainFilePath.push_back(get_path(trainPath + window.windowName_));
     }
-    check_exception(eachTrainFilePath, window);
-    p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
-    for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
-        int startRow = window.interval_[intervalIndex];
-        int endRow = window.interval_[intervalIndex + 1];
-        vector<vector<vector<string>>> thisTrainFile;
-        for (auto &diffTrainFilePath : eachTrainFilePath) {
-            thisTrainFile.push_back(read_data(diffTrainFilePath[trainFileIndex]));
+    for (auto &eachPath : eachTrainFilePath) {
+        if (eachPath.size() == 0)
+            break;
+        check_exception(eachTrainFilePath, window);
+        p_.push_holdInfo_column_Name(hold_, holdInfo_, holdInfoPtr_);
+        for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
+            int startRow = window.interval_[intervalIndex];
+            int endRow = window.interval_[intervalIndex + 1];
+            vector<vector<vector<string>>> thisTrainFile;
+            for (auto &diffTrainFilePath : eachTrainFilePath) {
+                thisTrainFile.push_back(read_data(diffTrainFilePath[trainFileIndex]));
+            }
+            p_.reset();
+            size_t bestIndex = set_variables(thisTrainFile);
+            p_.print_train_test_data(window.windowName_, paths_.testFileOutputPath_ + window.windowName_, startRow, endRow, holdInfoPtr_, &thisTrainFile[bestIndex]);
+            print_test_holdInfo(window);
         }
-        p_.reset();
-        size_t bestIndex = set_variables(thisTrainFile);
-        p_.print_train_test_data(window.windowName_, paths_.testFileOutputPath_ + window.windowName_, startRow, endRow, holdInfoPtr_, &thisTrainFile[bestIndex]);
-        print_test_holdInfo(window);
     }
 }
 
@@ -2189,7 +2189,9 @@ class CalIRR {
         double algoIRR_;
         double traditionIRR_;
         int rank_;
+        vector<vector<int>> techChooseTimes_;
     };
+
     class Rank {
        public:
         string companyName_;
@@ -2209,6 +2211,8 @@ class CalIRR {
         vector<vector<WindowIRR>> &allCompanyWindowsIRR_;
         vector<Rank> &allCompanyWindowRank_;
         vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
+        WindowIRR tmp;
+        bool tradition_ = false;
         
         double cal_one_window_IRR(vector<string> &RoRoutInfo, string &window, string &stratgyFilePath);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR);
@@ -2238,7 +2242,7 @@ class CalIRR {
 CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPricePaths) {
     for (auto &companyPricePath : companyPricePaths_) {
         CompanyInfo company(companyPricePath);
-        CalOneCompanyIRR calONcompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_);
+        CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_);
     }
     output_all_IRR();
     output_all_window_rank();
@@ -2246,16 +2250,31 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
 
 void CalIRR::output_all_IRR() {
     ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR.csv");
-    for (auto &companyPricePath : companyPricePaths_) {
-        IRRout << "=====" << companyPricePath.stem().string() << "=====";
+    for (size_t companyIndex = 0; companyIndex < companyPricePaths_.size(); companyIndex++) {
+        IRRout << "=====" << companyPricePaths_[companyIndex].stem().string() << "=====";
         IRRout << "," << info_.techType_ << " " << info_.algoType_ << ",";
-        IRRout << info_.techType_ << " Tradition" << endl;
-        for (auto &companyIRR : allCompanyWindowsIRR_) {
-            for (auto &eachIRR : companyIRR) {
-                IRRout << eachIRR.windowName_ << ",";
-                IRRout << set_precision(eachIRR.algoIRR_) << ",";
-                IRRout << set_precision(eachIRR.traditionIRR_) << "\n";
+        IRRout << info_.techType_ << " Tradition,";
+        if (info_.mixedTech_) {
+            for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
+                IRRout << info_.allTech_[techIndex] << ",";
+            });
+            for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
+                IRRout << info_.allTech_[techIndex] << ",";
+            });
+        }
+        IRRout << "\n";
+        for (auto &eachIRR : allCompanyWindowsIRR_[companyIndex]) {
+            IRRout << eachIRR.windowName_ << ",";
+            IRRout << set_precision(eachIRR.algoIRR_) << ",";
+            IRRout << set_precision(eachIRR.traditionIRR_) << ",";
+            if (info_.mixedTech_) {
+                for_each(eachIRR.techChooseTimes_.begin(), eachIRR.techChooseTimes_.end(), [&](const vector<int> &i) {
+                    for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &j) {
+                        IRRout << i[j] << ",";
+                    });
+                });
             }
+            IRRout << "\n";
         }
     }
 }
@@ -2298,14 +2317,22 @@ vector<string> CalIRR::remove_A2A_and_sort() {
 CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<vector<WindowIRR>> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
     vector<WindowIRR> windowsIRR;
     CompanyAllRoRInfo allRoRInfo;
-    WindowIRR tmp;
     for (auto &window : company_.info_.slidingWindows_) {
         if (window != "A2A") {
+            if (company_.info_.mixedTech_) {
+                tmp.techChooseTimes_.resize(2);
+                for (auto &i : tmp.techChooseTimes_) {
+                    i.resize(company_.info_.allTech_.size());
+                }
+            }
             cout << window << endl;
-            tmp.windowName_ = window;
+            tradition_ = false;
             tmp.algoIRR_ = cal_one_window_IRR(allRoRInfo.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
+            tradition_ = true;
             tmp.traditionIRR_ = cal_one_window_IRR(allRoRInfo.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
+            tmp.windowName_ = window;
             windowsIRR.push_back(tmp);
+            tmp.techChooseTimes_.clear();
         }
     }
     windowsIRR.push_back(cal_BH_IRR(company_));
@@ -2359,6 +2386,14 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         push += ",";
     }
     push += file[10][1] + "\n";
+    if (company_.info_.mixedTech_) {
+        if (!tradition_) {
+            tmp.techChooseTimes_[0][techIndex]++;
+        }
+        else  {
+            tmp.techChooseTimes_[1][techIndex]++;
+        }
+    }
     return push;
 }
 
@@ -2368,6 +2403,15 @@ CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR(CompanyInfo &company_) {
     tmp.windowName_ = "B&H";
     tmp.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
     tmp.traditionIRR_ = tmp.algoIRR_;
+    if (company_.info_.mixedTech_) {
+        tmp.techChooseTimes_.resize(2);
+        for (auto &i : tmp.techChooseTimes_) {
+            i.resize(company_.info_.allTech_.size());
+        }
+        for (auto &i : tmp.techChooseTimes_) {
+            fill(i.begin(), i.end(), 0);
+        }
+    }
     return tmp;
 }
 
@@ -2386,7 +2430,7 @@ void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<CalIRR::Win
     for (auto &windowIRR : windowsIRR) {
         tmpRank.algoWindowRank_.push_back(windowIRR.rank_);
     }
-    sort_by_algo_IRR(windowsIRR);
+    // sort_by_algo_IRR(windowsIRR);
     allCompanyWindowRank_.push_back(tmpRank);
 }
 
@@ -2407,6 +2451,35 @@ void CalIRR::CalOneCompanyIRR::sort_by_window_name(vector<WindowIRR> &windowsIRR
 void CalIRR::CalOneCompanyIRR::sort_by_algo_IRR(vector<WindowIRR> &windowsIRR) {
     sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &window0, const WindowIRR &window1) { return window0.algoIRR_ > window1.algoIRR_; });
 }
+
+class MergeIRRFile {
+    public:
+    Info info_;
+    MergeIRRFile() {
+        if (info_.techIndexs_.size() > 1) {
+            vector<vector<vector<string>>> files;
+            for (auto &techIndex : info_.techIndexs_) {
+                files.push_back(read_data(info_.rootFolder_ + "/" + info_.allTech_[techIndex] + "_test_IRR.csv"));
+            }
+            vector<vector<string>> newFile = read_data(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR.csv");
+            for (auto &file : files) {
+                for (size_t row = 0; row < file.size(); row++) {
+                    for (size_t col = 0; col < file[row].size(); col++) {
+                       newFile[row].push_back(file[row][col]);
+                    }
+                }
+            }
+            ofstream n(info_.rootFolder_ + "/" + "merge_" + info_.techType_ + "_IRR.csv");
+            for (auto &row : newFile) {
+                for (auto &col : row) {
+                    n << col << ",";
+                }
+                n << "\n";
+            }
+            n.close();
+        }
+    }
+};
 
 static vector<path> set_company_price_paths(const Info &info) {
     vector<path> companiesPricePath = get_path(info.pricePath_);
@@ -2463,6 +2536,9 @@ int main(int argc, const char *argv[]) {
         }
         else if (_info.mode_ == 11) {
             CalIRR calIRR(companyPricePaths);
+        }
+        else if (_info.mode_ == 12) {
+            MergeIRRFile a;
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
