@@ -24,7 +24,7 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 12;
+    int mode_ = 10;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -57,10 +57,10 @@ class Info {
     path pricePath_ = "price";
     string rootFolder_ = "result";
 
-    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2"/* , "4D4" */, "4D3", "4D2"/* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
+    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
-    vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2"/* , "4D4" */, "4D3", "4D2"/* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
-    
+    vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
+
     map<string, string> slidingWindowPairs = {};
 
     int windowNumber_;
@@ -84,7 +84,7 @@ class Info {
             mixedTech_ = true;
         }
     }
-    
+
     void set_slidingWindow() {
         if (setWindow_ != "all") {
             size_t startIndex = find_index_of_string_in_vec(slidingWindows_, cut_string(setWindow_).front());
@@ -94,7 +94,7 @@ class Info {
             slidingWindowsEx_ = tmp;
         }
     }
-    
+
     Info() {
         set_techIndex_and_techType();
         set_slidingWindow();
@@ -2190,6 +2190,25 @@ class CalIRR {
         double traditionIRR_;
         int rank_;
         vector<vector<int>> techChooseTimes_;
+
+        void resize_vec(size_t allTechSize) {
+            techChooseTimes_.resize(2);
+            for (auto &row : techChooseTimes_) {
+                row.resize(allTechSize);
+            }
+        }
+
+        void fill_zero() {
+            for (auto &row : techChooseTimes_) {
+                fill(row.begin(), row.end(), 0);
+            }
+        }
+    };
+
+    class CompanyWindowIRRContainer {
+       public:
+        string companyName_;
+        vector<WindowIRR> windowsIRR_;
     };
 
     class Rank {
@@ -2208,35 +2227,36 @@ class CalIRR {
     class CalOneCompanyIRR {
        public:
         CompanyInfo &company_;
-        vector<vector<WindowIRR>> &allCompanyWindowsIRR_;
+        vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR_;
         vector<Rank> &allCompanyWindowRank_;
+        CompanyWindowIRRContainer thisCompanyWindowIRR_;
         vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
-        WindowIRR tmp;
+        WindowIRR tmpWinodwIRR_;
         bool tradition_ = false;
-        
+
         double cal_one_window_IRR(vector<string> &RoRoutInfo, string &window, string &stratgyFilePath);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR);
-        WindowIRR cal_BH_IRR(CompanyInfo &company_);
-        void rank_algo_and_tradition_window(vector<CalIRR::WindowIRR> &windowsIRR);
+        WindowIRR cal_BH_IRR();
+        void rank_algo_and_tradition_window(vector<WindowIRR> &windowsIRR);
         void sort_by_tradition_IRR(vector<WindowIRR> &windowsIRR);
         void rank_window(vector<WindowIRR> &windowsIRR);
         void sort_by_window_name(vector<WindowIRR> &windowsIRR);
         void sort_by_algo_IRR(vector<WindowIRR> &windowsIRR);
-        
-        CalOneCompanyIRR(CompanyInfo &company, vector<vector<WindowIRR>> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank);
+
+        CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank);
     };
 
     Info info_;
     vector<path> &companyPricePaths_;
     vector<Rank> allCompanyWindowRank_;
-    vector<vector<WindowIRR>> allCompanyWindowsIRR_;
+    vector<CompanyWindowIRRContainer> allCompanyWindowsIRR_;
 
     void output_all_IRR();
+    void output_IRR(ofstream &IRRout);
     void output_all_window_rank();
     vector<string> remove_A2A_and_sort();
-    
+
     CalIRR(vector<path> &companyPricePaths);
-    
 };
 
 CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPricePaths) {
@@ -2248,22 +2268,31 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
     output_all_window_rank();
 }
 
-void CalIRR::output_all_IRR() {
-    ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR.csv");
-    for (size_t companyIndex = 0; companyIndex < companyPricePaths_.size(); companyIndex++) {
-        IRRout << "=====" << companyPricePaths_[companyIndex].stem().string() << "=====";
-        IRRout << "," << info_.techType_ << " " << info_.algoType_ << ",";
-        IRRout << info_.techType_ << " Tradition,";
+void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
+    ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_name.csv");
+    output_IRR(IRRout);
+    for_each(allCompanyWindowsIRR_.begin(), allCompanyWindowsIRR_.end(), [](CompanyWindowIRRContainer &eachCompanyContainer) {
+        sort(eachCompanyContainer.windowsIRR_.begin(), eachCompanyContainer.windowsIRR_.end(), [](const WindowIRR &w1, const WindowIRR &w2) {
+            return w1.algoIRR_ > w2.algoIRR_;
+        });
+    });
+    IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_IRR.csv");
+    output_IRR(IRRout);
+}
+
+void CalIRR::output_IRR(ofstream &IRRout) {
+    for (auto &company : allCompanyWindowsIRR_) {
+        IRRout << "=====" << company.companyName_ << "=====";
+        IRRout << "," << info_.techType_ << "_algo," << info_.techType_ << " Tradition,";
         if (info_.mixedTech_) {
-            for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
-                IRRout << info_.allTech_[techIndex] << ",";
-            });
-            for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
-                IRRout << info_.allTech_[techIndex] << ",";
-            });
+            for (int loop = 0; loop < 2; loop++) {
+                for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
+                    IRRout << info_.allTech_[techIndex] << ",";
+                });
+            }
         }
         IRRout << "\n";
-        for (auto &eachIRR : allCompanyWindowsIRR_[companyIndex]) {
+        for (auto &eachIRR : company.windowsIRR_) {
             IRRout << eachIRR.windowName_ << ",";
             IRRout << set_precision(eachIRR.algoIRR_) << ",";
             IRRout << set_precision(eachIRR.traditionIRR_) << ",";
@@ -2277,6 +2306,7 @@ void CalIRR::output_all_IRR() {
             IRRout << "\n";
         }
     }
+    IRRout.close();
 }
 
 void CalIRR::output_all_window_rank() {
@@ -2314,40 +2344,36 @@ vector<string> CalIRR::remove_A2A_and_sort() {
     return windowSort;
 }
 
-CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<vector<WindowIRR>> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
-    vector<WindowIRR> windowsIRR;
+CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
+    thisCompanyWindowIRR_.companyName_ = company_.companyName_;
     CompanyAllRoRInfo allRoRInfo;
+    if (company_.info_.mixedTech_) {
+        tmpWinodwIRR_.resize_vec(company_.info_.allTech_.size());
+    }
     for (auto &window : company_.info_.slidingWindows_) {
         if (window != "A2A") {
-            if (company_.info_.mixedTech_) {
-                tmp.techChooseTimes_.resize(2);
-                for (auto &i : tmp.techChooseTimes_) {
-                    i.resize(company_.info_.allTech_.size());
-                }
-            }
             cout << window << endl;
             tradition_ = false;
-            tmp.algoIRR_ = cal_one_window_IRR(allRoRInfo.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
+            tmpWinodwIRR_.algoIRR_ = cal_one_window_IRR(allRoRInfo.algoRoRoutInfo_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_]);
             tradition_ = true;
-            tmp.traditionIRR_ = cal_one_window_IRR(allRoRInfo.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
-            tmp.windowName_ = window;
-            windowsIRR.push_back(tmp);
-            tmp.techChooseTimes_.clear();
+            tmpWinodwIRR_.traditionIRR_ = cal_one_window_IRR(allRoRInfo.traditionRoRoutInfo_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_]);  //若還沒有傳統的test這行可以註解
+            tmpWinodwIRR_.windowName_ = window;
+            thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
+            tmpWinodwIRR_.fill_zero();
         }
     }
-    windowsIRR.push_back(cal_BH_IRR(company_));
-    rank_algo_and_tradition_window(windowsIRR);
+    thisCompanyWindowIRR_.windowsIRR_.push_back(cal_BH_IRR());
+    rank_algo_and_tradition_window(thisCompanyWindowIRR_.windowsIRR_);
+    auto output_company_all_window_IRR = [](ofstream &out, const vector<string> &outputInfo) {
+        for (auto &info : outputInfo)
+            out << info;
+        out.close();
+    };
     ofstream out(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_testRoR.csv");
-    for (auto &info : allRoRInfo.algoRoRoutInfo_) {
-        out << info;
-    }
-    out.close();
+    output_company_all_window_IRR(out, allRoRInfo.algoRoRoutInfo_);
     out.open(company_.paths_.companyRootPaths_[company_.info_.techIndex_] + company_.companyName_ + "_traditionRoR.csv");
-    for (auto &info : allRoRInfo.traditionRoRoutInfo_) {
-        out << info;
-    }
-    out.close();
-    allCompanyWindowsIRR_.push_back(windowsIRR);
+    output_company_all_window_IRR(out, allRoRInfo.traditionRoRoutInfo_);
+    allCompanyWindowsIRR_.push_back(thisCompanyWindowIRR_);
 }
 
 double CalIRR::CalOneCompanyIRR::cal_one_window_IRR(vector<string> &RoRoutInfo, string &window, string &stratgyFilePath) {
@@ -2388,34 +2414,26 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     push += file[10][1] + "\n";
     if (company_.info_.mixedTech_) {
         if (!tradition_) {
-            tmp.techChooseTimes_[0][techIndex]++;
+            tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
         }
-        else  {
-            tmp.techChooseTimes_[1][techIndex]++;
+        else {
+            tmpWinodwIRR_.techChooseTimes_[1][techIndex]++;
         }
     }
     return push;
 }
 
-CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR(CompanyInfo &company_) {
+CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR() {
     BH bh(company_, company_.date_[company_.testStartRow_], company_.date_[company_.testEndRow_]);
     WindowIRR tmp;
     tmp.windowName_ = "B&H";
     tmp.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
     tmp.traditionIRR_ = tmp.algoIRR_;
-    if (company_.info_.mixedTech_) {
-        tmp.techChooseTimes_.resize(2);
-        for (auto &i : tmp.techChooseTimes_) {
-            i.resize(company_.info_.allTech_.size());
-        }
-        for (auto &i : tmp.techChooseTimes_) {
-            fill(i.begin(), i.end(), 0);
-        }
-    }
+    tmp.resize_vec(company_.info_.allTech_.size());
     return tmp;
 }
 
-void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<CalIRR::WindowIRR> &windowsIRR) {
+void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<WindowIRR> &windowsIRR) {
     Rank tmpRank;
     tmpRank.companyName_ = company_.companyName_;
     sort_by_tradition_IRR(windowsIRR);  //將視窗按照傳統的IRR排序
@@ -2435,7 +2453,7 @@ void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<CalIRR::Win
 }
 
 void CalIRR::CalOneCompanyIRR::sort_by_tradition_IRR(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &window0, const WindowIRR &window1) { return window0.traditionIRR_ > window1.traditionIRR_; });
+    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.traditionIRR_ > w2.traditionIRR_; });
 }
 
 void CalIRR::CalOneCompanyIRR::rank_window(vector<WindowIRR> &windowsIRR) {
@@ -2445,16 +2463,17 @@ void CalIRR::CalOneCompanyIRR::rank_window(vector<WindowIRR> &windowsIRR) {
 }
 
 void CalIRR::CalOneCompanyIRR::sort_by_window_name(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &window0, const WindowIRR &window1) { return window0.windowName_ < window1.windowName_; });
+    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.windowName_ < w2.windowName_; });
 }
 
 void CalIRR::CalOneCompanyIRR::sort_by_algo_IRR(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &window0, const WindowIRR &window1) { return window0.algoIRR_ > window1.algoIRR_; });
+    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.algoIRR_ > w2.algoIRR_; });
 }
 
-class MergeIRRFile {
-    public:
+class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一個csv方便比較，可能用不到，直接打開csv手動複製就好
+   public:
     Info info_;
+
     MergeIRRFile() {
         if (info_.techIndexs_.size() > 1) {
             vector<vector<vector<string>>> files;
@@ -2465,7 +2484,7 @@ class MergeIRRFile {
             for (auto &file : files) {
                 for (size_t row = 0; row < file.size(); row++) {
                     for (size_t col = 0; col < file[row].size(); col++) {
-                       newFile[row].push_back(file[row][col]);
+                        newFile[row].push_back(file[row][col]);
                     }
                 }
             }
@@ -2478,6 +2497,47 @@ class MergeIRRFile {
             }
             n.close();
         }
+    }
+};
+
+class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名稱排序，或是以IRR排序(用第幾個col調整)
+   public:
+    Info info_;
+    string sortBy_;
+    int colToSort = 1;
+
+    SortIRRFileBy(string sortBy = "IRR") : sortBy_(sortBy) {
+        string inpuFileName = "SMA_test_IRR.csv";
+        vector<vector<string>> inputFile = read_data(info_.rootFolder_ + "/" + inpuFileName);
+        vector<vector<vector<string>>::iterator> equalSignIter;
+        for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
+            if ((*iter).front().front() == '=') {
+                equalSignIter.push_back(iter);
+            }
+        }
+        equalSignIter.push_back(inputFile.end());
+        if (sortBy_ == "name") {
+            for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
+                sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
+                    return s1.front() < s2.front();
+                });
+            }
+        }
+        else if (sortBy_ == "IRR") {
+            for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
+                sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
+                    return stod(s1[colToSort]) > stod(s2[colToSort]);
+                });
+            }
+        }
+        ofstream sortedFile(info_.rootFolder_ + "/" + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
+        for (auto &row : inputFile) {
+            for (auto &col : row) {
+                sortedFile << col << ",";
+            }
+            sortedFile << "\n";
+        }
+        sortedFile.close();
     }
 };
 
@@ -2500,45 +2560,40 @@ int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
-        if (_info.mode_ <= 10) {
-            for (auto companyPricePath : companyPricePaths) {
-                CompanyInfo company(companyPricePath);
-                switch (company.info_.mode_) {
-                    case 0: {
-                        Train train(company, company.info_.setWindow_);
-                        break;
-                    }
-                    case 1: {
-                        Test test(company, company.info_.setWindow_, false, true);
-                        break;
-                    }
-                    case 2: {
-                        Tradition trainTradition(company, company.info_.setWindow_);
-                        break;
-                    }
-                    case 3: {
-                        Test testTradition(company, company.info_.setWindow_, true, true);
-                        break;
-                    }
-                    case 10: {
-                        //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                        //                    Tradition tradition(company);
-                        //                    Train train(company, "2011-12-01", "2011-12-30");
-                        //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                        //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                        //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                        //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                        //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                        break;
-                    }
+        for (auto companyPricePath : companyPricePaths) {
+            CompanyInfo company(companyPricePath);
+            switch (company.info_.mode_) {
+                case 0: {
+                    Train train(company, company.info_.setWindow_);
+                    break;
+                }
+                case 1: {
+                    Test test(company, company.info_.setWindow_, false, true);
+                    break;
+                }
+                case 2: {
+                    Tradition trainTradition(company, company.info_.setWindow_);
+                    break;
+                }
+                case 3: {
+                    Test testTradition(company, company.info_.setWindow_, true, true);
+                    break;
+                }
+                case 10: {
+                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    Tradition tradition(company);
+                    //                    Train train(company, "2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    CalIRR calIRR(companyPricePaths);
+                    //                    MergeIRRFile mergeFile;
+                    //                    SortIRRFileBy IRR("IRR");
+                    break;
                 }
             }
-        }
-        else if (_info.mode_ == 11) {
-            CalIRR calIRR(companyPricePaths);
-        }
-        else if (_info.mode_ == 12) {
-            MergeIRRFile a;
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
