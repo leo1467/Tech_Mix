@@ -913,7 +913,6 @@ class Particle {
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
     void instant_trade(string startDate, string endDate, bool hold = false);
-    void find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow);
     void push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr);
     string set_title_variables();
     void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
@@ -958,7 +957,8 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
     vector<TechTable> tmp = {TechTable(company_, techIndex_)};
     tables_ = &tmp;
     int startRow = -1, endRow = -1;
-    find_instant_trade_startRow_endRow(startDate, endDate, startRow, endRow);
+    startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
+    endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
     vector<string> holdInfo;
     vector<string> *holdInfoPtr = nullptr;
     push_holdInfo_column_Name(hold, holdInfo, holdInfoPtr);
@@ -968,19 +968,6 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
     print_trade_record(out);
     out.close();
     print_instant_trade_holdInfo(hold, holdInfo, startDate, endDate);
-}
-
-void Particle::find_instant_trade_startRow_endRow(const string &startDate, const string &endDate, int &startRow, int &endRow) {
-    startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
-    if (startRow == (*tables_)[0].date_.size()) {
-        cout << "instant trade startDate is not found" << endl;
-        exit(1);
-    }
-    endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
-    if (endRow == (*tables_)[0].date_.size()) {
-        cout << "instant trade endDate is not found" << endl;
-        exit(1);
-    }
 }
 
 void Particle::push_holdInfo_column_Name(bool hold, vector<string> &holdInfo, vector<string> *&holdInfoPtr) {
@@ -2056,10 +2043,6 @@ class BH {
     BH(CompanyInfo &company, string startDate, string endDate) {
         int startRow = find_index_of_string_in_vec(company.date_, startDate);
         int endRow = find_index_of_string_in_vec(company.date_, endDate);
-        if (startRow == company.totalDays_ || endRow == company.totalDays_) {
-            cout << "cant find B&H startRow or endRow" << endl;
-            exit(1);
-        }
         int stockHold = company.info_.totalCapitalLV_ / company.price_[startRow];
         double remain = company.info_.totalCapitalLV_ - stockHold * company.price_[startRow];
         remain += stockHold * company.price_[endRow];
