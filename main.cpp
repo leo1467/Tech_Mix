@@ -25,10 +25,10 @@ using namespace filesystem;
 class Info {
    public:
     int mode_ = 10;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {0};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -38,9 +38,9 @@ class Info {
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
-    double delta_ = 0.003;
-    int expNum_ = 1;
-    int genNum_ = 1;
+    double delta_ = 0.0002;
+    int expNum_ = 50;
+    int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
@@ -1822,6 +1822,7 @@ class Train {
     void train_a_company();
     
     Train(CompanyInfo &company);
+    Train(CompanyInfo &company, string startDate, string endDate);
 };
 
 Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}) {
@@ -1834,6 +1835,14 @@ Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&comp
             company_.info_.delta_ -= company_.info_.testDeltaGap_;
         }
     }
+}
+
+Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}) {
+    int startRow = find_index_of_string_in_vec(tables_[0].date_, startDate);
+    int endRow = find_index_of_string_in_vec(tables_[0].date_, endDate);
+    srand(343);
+    company_.paths_.trainFilePaths_[company_.info_.techIndex_].clear();
+    TrainAPeriod period(company, tables_, startRow, endRow);
 }
 
 void Train::train_a_company() {
@@ -2547,6 +2556,7 @@ int main(int argc, const char *argv[]) {
                     //                    CalIRR calIRR(companyPricePaths);
                     //                    MergeIRRFile mergeFile;
                     //                    SortIRRFileBy IRR("IRR");
+                    //                    Train t(company, "2011-12-01", "2011-12-30");
                     break;
                 }
             }

@@ -143,8 +143,13 @@ static bool is_week_changed(vector<string> date, int bigWeekDay, int smallWeekDa
             (stoi(date[big_i].substr(8, 2)) < stoi(date[small_i].substr(8, 2)) && stoi(date[big_i].substr(8, 2)) + 30 - stoi(date[small_i].substr(8, 2)) >= 7));
 }
 
-static int find_index_of_string_in_vec(const vector<string> &dateVec, const string &targetDate) {
-    return (int)distance(dateVec.begin(), find(dateVec.begin(), dateVec.end(), targetDate));
+static int find_index_of_string_in_vec(const vector<string> &stringVector, const string targetString) {
+    auto iter = find(stringVector.begin(), stringVector.end(), targetString);
+    if (iter == stringVector.end()) {
+        cout << "cant find " << targetString << endl;
+        exit(1);
+    }
+    return (int)distance(stringVector.begin(), iter);
 }
 
 static vector<string> set_certain_range_of_vec(const string &inputString, vector<string> &targetVector) {
