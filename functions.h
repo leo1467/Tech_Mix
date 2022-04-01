@@ -173,4 +173,13 @@ static vector<string> set_certain_range_of_vec(const string &inputString, vector
     return vector<string>(firstWindowIter, lastWindowIter);
 }
 
+static string remove_zeros_at_end(double n) {
+    string stringWOzeroAtEnd = set_precision(n);
+    stringWOzeroAtEnd.erase(stringWOzeroAtEnd.find_last_not_of('0') + 1, std::string::npos);
+    return stringWOzeroAtEnd;
+}
+
+static string get_date(vector<string> &date, int startRow, int endRow) {
+    return date[startRow] + "_" + date[endRow];
+}
 #endif /* functions_h */
