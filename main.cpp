@@ -44,6 +44,8 @@ class Info {
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
+    bool debug_ = false;
+    
     int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
@@ -103,7 +105,7 @@ class Info {
             slidingWindowPairs.insert({slidingWindows_[i], slidingWindowsEx_[i]});
         }
     }
-} const _info;
+} _info;
 
 class CompanyInfo {
    public:
@@ -132,7 +134,7 @@ class CompanyInfo {
         vector<string> trainTraditionBestHold_;
         vector<string> testTraditionBestHold_;
     };
-    Info info_;
+    Info &info_;
     string companyName_;
     Path paths_;
 
@@ -158,10 +160,10 @@ class CompanyInfo {
     void output_Tech();
     void set_techFile_title(ofstream &out, int techPerid);
 
-    CompanyInfo(path pricePath);
+    CompanyInfo(path pricePath, Info &info);
 };
 
-CompanyInfo::CompanyInfo(path pricePath) : companyName_(pricePath.stem().string()) {
+CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.stem().string()), info_(info) {
     set_paths(paths_);
     store_date_price(pricePath);
     create_folder(paths_);
@@ -195,6 +197,9 @@ void CompanyInfo::set_paths(Path &paths) {
 
         paths.trainTraditionBestHold_.push_back(companyRootFolder + "trainTraditionBestHold/");
         paths.testTraditionBestHold_.push_back(companyRootFolder + "testTraditionBestHold/");
+    }
+    if (info_.debug_) {
+        paths.trainFilePaths_[info_.techIndex_].clear();
     }
 }
 
@@ -1469,37 +1474,36 @@ string Particle::set_output_filePath(string windowName, string &outputPath, int 
     return outputPath;
 }
 
-class Train {
+class TrainAPeriod {
    private:
     CompanyInfo &company_;
-    vector<TechTable> tables_;
+    vector<TechTable> &tables_;
 
     vector<Particle> particles_;
     vector<Particle> globalP_;  // 0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
     BetaMatrix betaMatrix_;
-
-    int actualStartRow_ = -1;
-    int actualEndRow_ = -1;
+    
+    int startRow_ = -1;
+    int endRow_ = -1;
 
     double actualDelta_ = -1;
     int compareNew_ = -1;
     int compareOld_ = -1;
+    
+    ofstream debugOut_;
+    bool debug_ = false;
+    bool record_ = false;
 
-    void start_train(string targetWindow, string startDate, string endDate, bool debug);
-    void set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug);
-    void find_new_row(string &startDate, string &endDate);
-    void create_particles(bool debug);
+    void create_particles();
     void create_betaMatrix();
-    TrainWindow set_window(string &targetWindow, string &startDate, int &windowIndex);
-    void set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex);
-    ofstream set_debug_file(bool debug);
-    void start_exp(ofstream &out, int expCnt, bool debug);
+    ofstream set_debug_file();
+    void start_exp(int expCnt);
     void initialize_KNQTS();
-    void print_debug_exp(ofstream &out, int expCnt, bool debug);
-    void evolve_particles(ofstream &out, int i, bool debug);
-    void start_gen(ofstream &out, int expCnt, int genCnt, bool debug);
-    void print_debug_gen(ofstream &out, int genCnt, bool debug);
-    void print_debug_particle(ofstream &out, int i, bool debug);
+    void print_debug_exp(int expCnt);
+    void evolve_particles(int i);
+    void start_gen(int expCnt, int genCnt);
+    void print_debug_gen(int genCnt);
+    void print_debug_particle(int i);
     void store_exp_gen(int expCnt, int genCnt);
     void update_local();
     void update_global();
@@ -1509,88 +1513,31 @@ class Train {
     void GNQTS();
     void KNQTScompare();
     void KNQTSmultiply();
-    void print_debug_beta(ofstream &out, bool debug);
+    void print_debug_beta();
     void update_best(int renewBest);
-    void clear_STL();
 
    public:
-    Train(CompanyInfo &company, string targetWindow = "all", string startDate = "", string endDate = "", bool debug = false, bool record = false);
+    TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName = "", bool record = false);
 };
 
-Train::Train(CompanyInfo &company, string targetWindow, string startDate, string endDate, bool debug, bool record) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)}, actualDelta_(company.info_.delta_) {
-    if (company.info_.testDeltaLoop_ == 0) {
-        start_train(targetWindow, startDate, endDate, debug);
-    }
-    else {
-        for (int loop = 0; loop < company.info_.testDeltaLoop_; loop++) {
-            start_train(targetWindow, startDate, endDate, debug);
-            actualDelta_ = company_.info_.delta_;
-            actualDelta_ -= company.info_.testDeltaGap_ * (loop + 1);
-        }
-    }
-}
-
-void Train::start_train(string targetWindow, string startDate, string endDate, bool debug) {
-    set_variables_and_condition(targetWindow, startDate, endDate, debug);
-    find_new_row(startDate, endDate);
-    create_particles(debug);
+TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_{tables}, startRow_(startRow), endRow_(endRow), actualDelta_(company.info_.delta_), debug_(company.info_.debug_), record_(record) {
+    cout << tables_[0].date_[startRow_] << "~" << tables_[0].date_[endRow] << endl;
+    create_particles();
     create_betaMatrix();
-    for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-        TrainWindow window = set_window(targetWindow, startDate, windowIndex);
-        if (window.interval_[0] < 0) {
-            cout << "train window is too old, skip this window" << endl;
-            continue;
-        }
-        srand(343);
-        for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
-            set_row_and_break_condition(window, startDate, windowIndex, intervalIndex);
-            globalP_[0].reset();
-            ofstream out = set_debug_file(debug);
-            for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
-                start_exp(out, expCnt, debug);
-            }
-            out.close();
-            globalP_[0].print_train_test_data(window.windowName_, company_.paths_.trainFilePaths_[company_.info_.techIndex_] + window.windowName_, actualStartRow_, actualEndRow_);
-            cout << globalP_[0].RoR_ << "%" << endl;
-        }
-        cout << "==========" << endl;
+    globalP_[0].reset();
+    debugOut_ = set_debug_file();
+    for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
+        start_exp(expCnt);
     }
-    clear_STL();
+    debugOut_.close();
+    globalP_[0].print_train_test_data(windowName, company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName, startRow_, endRow_);
+    cout << globalP_[0].RoR_ << "%" << endl;
+    cout << "==========" << endl;
 }
 
-void Train::set_variables_and_condition(string &targetWindow, string &startDate, string &endDate, bool &debug) {
-    if (startDate == "debug" || endDate == "debug") {
-        debug = true;
-        company_.paths_.trainFilePaths_[company_.info_.techIndex_] = "";
-    }
-    if (targetWindow.length() == startDate.length()) {
-        endDate = startDate;
-        startDate = targetWindow;
-        targetWindow = "A2A";
-        company_.paths_.trainFilePaths_[company_.info_.techIndex_] = "";
-    }
-    else {
-        startDate = "";
-    }
-}
 
-void Train::find_new_row(string &startDate, string &endDate) {
-    if (startDate != "") {
-        actualStartRow_ = find_index_of_string_in_vec(tables_[0].date_, startDate);
-        actualEndRow_ = find_index_of_string_in_vec(tables_[0].date_, endDate);
-        if (actualStartRow_ == tables_[0].days_) {
-            cout << "input trainStartDate is not found" << endl;
-            exit(1);
-        }
-        if (actualEndRow_ == tables_[0].days_) {
-            cout << "input trainEndDate is not found" << endl;
-            exit(1);
-        }
-    }
-}
-
-void Train::create_particles(bool debug) {
-    Particle p(&company_, company_.info_.techIndex_, debug);
+void TrainAPeriod::create_particles() {
+    Particle p(&company_, company_.info_.techIndex_, debug_);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
     for (int i = 0; i < company_.info_.particleNum_; i++) {
@@ -1601,44 +1548,16 @@ void Train::create_particles(bool debug) {
     }
 }
 
-void Train::create_betaMatrix() {
+void TrainAPeriod::create_betaMatrix() {
     betaMatrix_.variableNum_ = particles_[0].variableNum_;
     betaMatrix_.eachVariableBitsNum_ = particles_[0].eachVariableBitsNum_;
     betaMatrix_.matrix_.resize(particles_[0].bitsNum_);
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
 
-TrainWindow Train::set_window(string &targetWindow, string &startDate, int &windowIndex) {
-    string accuallWindow = company_.info_.slidingWindows_[windowIndex];
-    if (targetWindow != "all") {
-        accuallWindow = targetWindow;
-        windowIndex = company_.info_.windowNumber_;
-    }
-    TrainWindow window(company_, accuallWindow);
-    if (startDate == "") {
-        window.print_train();
-    }
-    if (company_.paths_.trainFilePaths_[company_.info_.techIndex_] == "") {
-        window.windowName_ = "";
-    }
-    return window;
-}
-
-void Train::set_row_and_break_condition(TrainWindow &window, string &startDate, int &windowIndex, int &intervalIndex) {
-    if (startDate != "") {
-        windowIndex = company_.info_.windowNumber_;
-        intervalIndex = window.intervalSize_;
-    }
-    else {
-        actualStartRow_ = window.interval_[intervalIndex];
-        actualEndRow_ = window.interval_[intervalIndex + 1];
-    }
-    cout << tables_[0].date_[actualStartRow_] << "~" << tables_[0].date_[actualEndRow_] << endl;
-}
-
-ofstream Train::set_debug_file(bool debug) {
+ofstream TrainAPeriod::set_debug_file() {
     ofstream out;
-    if (debug) {
+    if (debug_) {
         string delta = set_precision(actualDelta_);
         delta.erase(delta.find_last_not_of('0') + 1, std::string::npos);
         string title;
@@ -1647,75 +1566,75 @@ ofstream Train::set_debug_file(bool debug) {
         title += company_.info_.techType_ + "_";
         title += company_.info_.algoType_ + "_";
         title += delta + "_";
-        title += tables_[0].date_[actualStartRow_] + "_";
-        title += tables_[0].date_[actualEndRow_] + ".csv";
+        title += tables_[0].date_[startRow_] + "_";
+        title += tables_[0].date_[endRow_] + ".csv";
         out.open(title);
     }
     return out;
 }
 
-void Train::start_exp(ofstream &out, int expCnt, bool debug) {
-    print_debug_exp(out, expCnt, debug);
+void TrainAPeriod::start_exp(int expCnt) {
+    print_debug_exp(expCnt);
     globalP_[1].reset();
     betaMatrix_.reset();
     initialize_KNQTS();
     for (int genCnt = 0; genCnt < company_.info_.genNum_; genCnt++) {
-        start_gen(out, expCnt, genCnt, debug);
+        start_gen(expCnt, genCnt);
     }
     update_best(0);
 }
 
-void Train::initialize_KNQTS() {
+void TrainAPeriod::initialize_KNQTS() {
     actualDelta_ = company_.info_.delta_;
     compareNew_ = 0;
     compareOld_ = 0;
 }
 
-void Train::print_debug_exp(ofstream &out, int expCnt, bool debug) {
-    if (debug)
-        out << "exp:" << expCnt << ",==========,==========" << endl;
+void TrainAPeriod::print_debug_exp(int expCnt) {
+    if (debug_)
+        debugOut_ << "exp:" << expCnt << ",==========,==========" << endl;
 }
 
-void Train::start_gen(ofstream &out, int expCnt, int genCnt, bool debug) {
-    print_debug_gen(out, genCnt, debug);
+void TrainAPeriod::start_gen(int expCnt, int genCnt) {
+    print_debug_gen(genCnt);
     globalP_[3].reset();
     globalP_[4].reset(company_.info_.totalCapitalLV_);
     for (int i = 0; i < company_.info_.particleNum_; i++) {
-        evolve_particles(out, i, debug);
+        evolve_particles(i);
     }
     store_exp_gen(expCnt, genCnt);
     update_local();
     update_global();
     run_algo();
-    print_debug_beta(out, debug);
+    print_debug_beta();
 }
 
-void Train::print_debug_gen(ofstream &out, int genCnt, bool debug) {
-    if (debug)
-        out << "gen:" << genCnt << ",=====" << endl;
+void TrainAPeriod::print_debug_gen(int genCnt) {
+    if (debug_)
+        debugOut_ << "gen:" << genCnt << ",=====" << endl;
 }
 
-void Train::evolve_particles(ofstream &out, int i, bool debug) {
+void TrainAPeriod::evolve_particles(int i) {
     particles_[i].reset();
     particles_[i].measure(betaMatrix_);
     particles_[i].convert_bi_dec();
-    particles_[i].trade(actualStartRow_, actualEndRow_);
-    print_debug_particle(out, i, debug);
+    particles_[i].trade(startRow_, endRow_);
+    print_debug_particle(i);
 }
 
-void Train::print_debug_particle(ofstream &out, int i, bool debug) {
-    if (debug)
-        particles_[i].print(out);
+void TrainAPeriod::print_debug_particle(int i) {
+    if (debug_)
+        particles_[i].print(debugOut_);
 }
 
-void Train::store_exp_gen(int expCnt, int genCnt) {
+void TrainAPeriod::store_exp_gen(int expCnt, int genCnt) {
     for_each(particles_.begin(), particles_.end(), [genCnt, expCnt](auto &p) {
         p.exp_ = expCnt;
         p.gen_ = genCnt;
     });
 }
 
-void Train::update_local() {
+void TrainAPeriod::update_local() {
     for (auto &p : particles_) {
         if (p.RoR_ > globalP_[3].RoR_) {
             globalP_[3] = p;
@@ -1726,13 +1645,13 @@ void Train::update_local() {
     }
 }
 
-void Train::update_global() {
+void TrainAPeriod::update_global() {
     if (globalP_[3].RoR_ > globalP_[1].RoR_) {
         globalP_[1] = globalP_[3];
     }
 }
 
-void Train::run_algo() {
+void TrainAPeriod::run_algo() {
     switch (company_.info_.algoIndex_) {
         case 0: {
             if (globalP_[3].RoR_ > 0) {
@@ -1767,7 +1686,7 @@ void Train::run_algo() {
     }
 }
 
-void Train::QTS() {
+void TrainAPeriod::QTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[3].binary_[i] == 1) {
             betaMatrix_.matrix_[i] += actualDelta_;
@@ -1778,7 +1697,7 @@ void Train::QTS() {
     }
 }
 
-void Train::GQTS() {
+void TrainAPeriod::GQTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[1].binary_[i] == 1) {
             betaMatrix_.matrix_[i] += actualDelta_;
@@ -1789,7 +1708,7 @@ void Train::GQTS() {
     }
 }
 
-void Train::GNQTS() {
+void TrainAPeriod::GNQTS() {
     for (int i = 0; i < betaMatrix_.bitsNum_; i++) {
         if (globalP_[1].binary_[i] == 1 && globalP_[4].binary_[i] == 0 && betaMatrix_.matrix_[i] < 0.5) {
             betaMatrix_.matrix_[i] = 1.0 - betaMatrix_.matrix_[i];
@@ -1801,7 +1720,7 @@ void Train::GNQTS() {
     GQTS();
 }
 
-void Train::KNQTScompare() {
+void TrainAPeriod::KNQTScompare() {
     switch (company_.info_.compareMode_) {
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
@@ -1826,7 +1745,7 @@ void Train::KNQTScompare() {
     }
 }
 
-void Train::KNQTSmultiply() {
+void TrainAPeriod::KNQTSmultiply() {
     if (compareNew_ > compareOld_) {
         actualDelta_ *= company_.info_.multiplyUp_;
     }
@@ -1837,40 +1756,40 @@ void Train::KNQTSmultiply() {
     compareNew_ = 0;
 }
 
-void Train::print_debug_beta(ofstream &out, bool debug) {
-    if (debug) {
+void TrainAPeriod::print_debug_beta() {
+    if (debug_) {
         switch (company_.info_.algoIndex_) {
             case 0: {
-                out << "local best" << endl;
-                globalP_[3].print(out);
-                out << "local worst" << endl;
-                globalP_[4].print(out);
+                debugOut_ << "local best" << endl;
+                globalP_[3].print(debugOut_);
+                debugOut_ << "local worst" << endl;
+                globalP_[4].print(debugOut_);
                 break;
             }
             case 1:
             case 2: {
-                out << "global best" << endl;
-                globalP_[1].print(out);
-                out << "local worst" << endl;
-                globalP_[4].print(out);
+                debugOut_ << "global best" << endl;
+                globalP_[1].print(debugOut_);
+                debugOut_ << "local worst" << endl;
+                globalP_[4].print(debugOut_);
                 break;
             }
             case 3: {
-                out << "global best" << endl;
-                globalP_[1].print(out);
-                out << "local best" << endl;
-                globalP_[3].print(out);
-                out << "local worst" << endl;
-                globalP_[4].print(out);
-                out << actualDelta_ << endl;
+                debugOut_ << "global best" << endl;
+                globalP_[1].print(debugOut_);
+                debugOut_ << "local best" << endl;
+                globalP_[3].print(debugOut_);
+                debugOut_ << "local worst" << endl;
+                globalP_[4].print(debugOut_);
+                debugOut_ << actualDelta_ << endl;
                 break;
             }
         }
-        betaMatrix_.print(out);
+        betaMatrix_.print(debugOut_);
     }
 }
 
-void Train::update_best(int renewBest) {
+void TrainAPeriod::update_best(int renewBest) {
     if (globalP_[0].RoR_ < globalP_[1].RoR_) {
         globalP_[0] = globalP_[1];
     }
@@ -1894,10 +1813,47 @@ void Train::update_best(int renewBest) {
     }
 }
 
-void Train::clear_STL() {
-    particles_.clear();
-    globalP_.clear();
-    betaMatrix_.matrix_.clear();
+class Train {
+    public:
+    CompanyInfo &company_;
+    vector<TechTable> tables_;
+    
+    void train_a_window(string windowName);
+    void train_a_company();
+    
+    Train(CompanyInfo &company);
+};
+
+Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}) {
+    if (company_.info_.testDeltaLoop_ == 0) {
+        train_a_company();
+    }
+    else {
+        for (int loop = 0; loop < company.info_.testDeltaLoop_; loop++) {
+            train_a_company();
+            company_.info_.delta_ -= company_.info_.testDeltaGap_;
+        }
+    }
+}
+
+void Train::train_a_company() {
+    for (auto windowName : company_.info_.slidingWindows_) {
+        train_a_window(windowName);
+    }
+}
+
+void Train::train_a_window(string windowName) {
+    TrainWindow window(company_, windowName);
+    if (window.interval_[0] >= 0) {
+        window.print_train();
+        srand(343);
+        for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
+            TrainAPeriod period(company_, tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+        }
+    }
+    else {
+        cout << "train window is too old, skip this window" << endl;
+    }
 }
 
 class Test {
@@ -2261,7 +2217,7 @@ class CalIRR {
 
 CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPricePaths) {
     for (auto &companyPricePath : companyPricePaths_) {
-        CompanyInfo company(companyPricePath);
+        CompanyInfo company(companyPricePath, info_);
         CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_);
     }
     output_all_IRR();
@@ -2561,10 +2517,10 @@ int main(int argc, const char *argv[]) {
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
         for (auto companyPricePath : companyPricePaths) {
-            CompanyInfo company(companyPricePath);
+            CompanyInfo company(companyPricePath, _info);
             switch (company.info_.mode_) {
                 case 0: {
-                    Train train(company, company.info_.setWindow_);
+                    Train train(company);
                     break;
                 }
                 case 1: {
