@@ -2055,7 +2055,6 @@ class Tradition {
 
     void create_particles();
     void set_strategy();
-    TrainWindow set_window(string &targetWindow, int &windowIndex);
     void train_a_tradition_window(TrainWindow &window);
     void set_variables(int index);
 
@@ -2067,8 +2066,8 @@ Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(compa
     set_strategy();
     create_particles();
     cout << "train " << company_.companyName_ << " tradition" << endl;
-    for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-        TrainWindow window = set_window(targetWindow, windowIndex);
+    for (auto windowName : company_.info_.slidingWindows_) {
+        TrainWindow window(company_, windowName);
         if (window.interval_[0] >= 0) {
             train_a_tradition_window(window);
         }
@@ -2090,17 +2089,6 @@ void Tradition::create_particles() {
     for (int i = 0; i < traditionStrategyNum_; i++) {
         particles_.push_back(p);
     }
-}
-
-TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
-    string actualWindow = company_.info_.slidingWindows_[windowIndex];
-    if (targetWindow != "all") {
-        actualWindow = targetWindow;
-        windowIndex = company_.info_.windowNumber_;
-    }
-    TrainWindow window(company_, actualWindow);
-    cout << actualWindow << endl;
-    return window;
 }
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
