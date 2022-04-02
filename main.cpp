@@ -898,7 +898,7 @@ class Particle {
     double RoR_ = 0;
     int buyNum_ = 0;
     int sellNum_ = 0;
-    vector<string> tradeRecord_;
+    string tradeRecord_;
     int gen_ = 0;
     int exp_ = 0;
     int bestCnt_ = 0;
@@ -1033,9 +1033,7 @@ string Particle::set_title_variables() {
 }
 
 void Particle::output_trade_record(ofstream &out) {
-    for (auto record : tradeRecord_) {
-        out << record;
-    }
+    out << tradeRecord_;
 }
 
 void Particle::set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate) {
@@ -1146,15 +1144,16 @@ void Particle::push_holdData_date_price(string *holdDataPtr, int i) {
 
 void Particle::push_tradeData_column_name() {
     if (isRecordOn_) {
+        tradeRecord_.clear();
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_.push_back(",date,price,preday 1,preday 2,today 1,today 2,stockHold,remain,capital lv\n");
+                tradeRecord_ += ",date,price,preday 1,preday 2,today 1,today 2,stockHold,remain,capital lv\n";
                 break;
             }
             case 3: {
-                tradeRecord_.push_back(",date,price,RSI,stockHold,remain,capital lv\n");
+                tradeRecord_ += ",date,price,RSI,stockHold,remain,capital lv\n";
                 break;
             }
         }
@@ -1163,29 +1162,27 @@ void Particle::push_tradeData_column_name() {
 
 void Particle::push_tradeData_buy(int stockHold, int i) {
     if (isRecordOn_) {
-        string push;
-        push += "buy,";
-        push += (*tables_)[0].date_[i] + ",";
-        push += set_precision((*tables_)[0].price_[i]) + ",";
+        tradeRecord_ += "buy,";
+        tradeRecord_ += (*tables_)[0].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[0].price_[i]) + ",";
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                push += set_precision((*tables_)[0].techTable_[i - 1][decimal_[0]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i - 1][decimal_[1]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[1]]) + ",";
                 break;
             }
             case 3: {
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
                 break;
             }
         }
-        push += to_string(stockHold) + ",";
-        push += set_precision(remain_) + ",";
-        push += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n";
-        tradeRecord_.push_back(push);
+        tradeRecord_ += to_string(stockHold) + ",";
+        tradeRecord_ += set_precision(remain_) + ",";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n";
     }
 }
 
@@ -1232,29 +1229,27 @@ void Particle::push_holdData_buy(string *holdDataPtr, int i) {
 
 void Particle::push_tradeData_sell(int stockHold, int i) {
     if (isRecordOn_) {
-        string push;
-        push += "sell,";
-        push += (*tables_)[0].date_[i] + ",";
-        push += set_precision((*tables_)[0].price_[i]) + ",";
+        tradeRecord_ += "sell,";
+        tradeRecord_ += (*tables_)[0].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[0].price_[i]) + ",";
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                push += set_precision((*tables_)[0].techTable_[i - 1][decimal_[2]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i - 1][decimal_[3]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[2]]) + ",";
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[3]]) + ",";
                 break;
             }
             case 3: {
-                push += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
                 break;
             }
         }
-        push += to_string(stockHold) + ",";
-        push += set_precision(remain_) + ",";
-        push += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n\n";
-        tradeRecord_.push_back(push);
+        tradeRecord_ += to_string(stockHold) + ",";
+        tradeRecord_ += set_precision(remain_) + ",";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n\n";
     }
 }
 
@@ -1292,16 +1287,17 @@ void Particle::push_holdData_not_holding(string *holdDataPtr, int i) {
 void Particle::check_buyNum_sellNum() {
     if (buyNum_ != sellNum_) {
         cout << "particle.buyNum_ = " << buyNum_ << ", particle.sellNum_ = " << sellNum_ << endl;
-        for (auto &record : tradeRecord_) {
-            cout << record << endl;
-        }
+        cout << tradeRecord_ << endl;
         exit(1);
     }
 }
 
 void Particle::push_tradeData_last(bool lastRecord) {
     if (isRecordOn_ && lastRecord) {
-        tradeRecord_.push_back("buyNum," + to_string(buyNum_) + ",sellNum," + to_string(sellNum_) + "\nremain," + set_precision(remain_) + "\nreturn rate," + set_precision(RoR_) + "%\n");
+        tradeRecord_ += "buyNum," + to_string(buyNum_);
+        tradeRecord_ += ",sellNum," + to_string(sellNum_) + "\n";
+        tradeRecord_ += "remain," + set_precision(remain_) + "\n";
+        tradeRecord_ += "return rate," + set_precision(RoR_) + "%\n";
     }
 }
 
@@ -1313,6 +1309,7 @@ void Particle::reset(double RoR) {
     remain_ = company_->info_.totalCapitalLV_;
     RoR_ = RoR;
     tradeRecord_.clear();
+    trainOrTestData_.clear();
     gen_ = 0;
     exp_ = 0;
     isRecordOn_ = false;
@@ -1413,9 +1410,7 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
     trainOrTestData_ += "best gen," + to_string(gen_) + "\n";
     trainOrTestData_ += "best cnt," + to_string(bestCnt_) + "\n\n";
     trainOrTestData_ += "trade," + to_string(sellNum_) + "\n";
-    for (auto s : tradeRecord_) {
-        trainOrTestData_ += s;
-    }
+    trainOrTestData_ += tradeRecord_;
 }
 
 class TrainAPeriod {
