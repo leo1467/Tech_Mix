@@ -938,7 +938,7 @@ class Particle {
     void measure(BetaMatrix &betaMatrix);
     void convert_bi_dec();
     void print(ostream &out);
-    void record_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
+    void record_train_test_data(int startRow, int endRow, vector<string> *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
 
     Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
 };
@@ -1371,11 +1371,11 @@ void Particle::print(ostream &out = cout) {
     out << set_precision(RoR_) << "%," << endl;
 }
 
-void Particle::record_train_test_data(string windowName, string outputPath, int actualStartRow, int actualEndRow, vector<string> *holdDataPtr, vector<vector<string>> *trainFile) {
+void Particle::record_train_test_data(int startRow, int endRow, vector<string> *holdDataPtr, vector<vector<string>> *trainFile) {
     isRecordOn_ = true;
     remain_ = company_->info_.totalCapitalLV_;
     if (decimal_[0]) {
-        trade(actualStartRow, actualEndRow, false, holdDataPtr);
+        trade(startRow, endRow, false, holdDataPtr);
     }
     else {
         reset();
@@ -1491,7 +1491,7 @@ TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int 
         start_exp(expCnt);
     }
     debugOut_.close();
-    globalP_[0].record_train_test_data(windowName, company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName, startRow_, endRow_);
+    globalP_[0].record_train_test_data(startRow_, endRow_);
     trainData_ = globalP_[0].trainOrTestData_;
     cout << globalP_[0].RoR_ << "%" << endl;
     cout << "==========" << endl;
@@ -1777,11 +1777,12 @@ class Train {
     public:
     CompanyInfo &company_;
     vector<TechTable> tables_;
+    ofstream out_;
     
     void train_a_window(string windowName);
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
-    void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData, string &windowName);
+    void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
     
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
@@ -1830,13 +1831,20 @@ void Train::train_a_company() {
 
 void Train::train_a_window(string windowName) {
     TrainWindow window(company_, windowName);
-    string ouputPath = company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName + "/";
+    string outputPath = [&company_ = this->company_, windowName]() {
+        if (company_.info_.testDeltaLoop_ > 0) {
+            string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
+            create_directories(dir);
+            return dir;
+        }
+        return company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName + "/";
+    }();
     if (window.interval_[0] >= 0) {
         window.print_train();
         srand(343);
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
             TrainAPeriod trainAPeriod(company_, tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
-            output_train_file(intervalIter, ouputPath, trainAPeriod.trainData_, window.windowName_);
+            output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
         }
     }
     else {
@@ -1844,18 +1852,10 @@ void Train::train_a_window(string windowName) {
     }
 }
 
-
-void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData, string &windowName) {
-    ofstream out;
-    if (!company_.info_.testDeltaLoop_)
-        out.open(ouputPath + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
-    else {
-        string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
-        create_directories(dir);
-        out.open(dir + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
-    }
-    out << trainData;
-    out.close();
+void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
+    out_.open(ouputPath + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+    out_ << trainData;
+    out_.close();
 }
 
 class Test {
@@ -1996,7 +1996,7 @@ void Test::test_a_window(TestWindow &window) {
             }
             p_.reset();
             size_t bestIndex = set_variables(thisTrainFile);
-            p_.record_train_test_data(window.windowName_, paths_.testFileOutputPath_ + window.windowName_, startRow, endRow, holdDataPtr_, &thisTrainFile[bestIndex]);
+            p_.record_train_test_data(startRow, endRow, holdDataPtr_, &thisTrainFile[bestIndex]);
             output_test_file(window, startRow, endRow);
             output_test_holdData(window);
         }
@@ -2077,6 +2077,7 @@ class Tradition {
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
     int traditionStrategyNum_ = -1;
+    ofstream out_;
 
     vector<vector<vector<int>>> allTraditionStrategy_{MA::traditionStrategy_, MA::traditionStrategy_, MA::traditionStrategy_, RSI::traditionStrategy_};
 
@@ -2139,10 +2140,10 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
             particles_[i].trade(startRow, endRow);
         }
         stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
-        particles_[0].record_train_test_data(window.windowName_, outputPath, startRow, endRow);
-        ofstream out(outputPath + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
-        out << particles_[0].trainOrTestData_;
-        out.close();
+        particles_[0].record_train_test_data(startRow, endRow);
+        out_.open(outputPath + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
+        out_ << particles_[0].trainOrTestData_;
+        out_.close();
     }
 }
 
