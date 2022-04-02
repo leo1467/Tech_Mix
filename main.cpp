@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 //#include "CompanyInfo.h"
@@ -33,6 +34,7 @@ class Info {
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     string techType_;
+    int mixedTechNum_;
 
     int algoIndex_ = 2;
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
@@ -85,6 +87,7 @@ class Info {
             allTech_.push_back(techType_);
             mixedTech_ = true;
         }
+        mixedTechNum_ = (int)techIndexs_.size();
     }
 
     void set_slidingWindow() {
@@ -974,7 +977,7 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
     if (hold) {
         holdData.clear();
         holdData += "Date,Price,Hold,buy,sell date,sell " + techType_ + ",";
-        if (company_->info_.techIndex_ == techIndex_) {
+        if (!company_->info_.mixedTech_) {
             switch (techIndex_) {
                 case 0:
                 case 1:
@@ -1809,15 +1812,15 @@ void Train::train_a_company() {
 
 void Train::train_a_window(string windowName) {
     TrainWindow window(company_, windowName);
-    string outputPath = [&company_ = this->company_, windowName]() {
-        if (company_.info_.testDeltaLoop_ > 0) {
-            string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
-            create_directories(dir);
-            return dir;
-        }
-        return company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName + "/";
-    }();
     if (window.interval_[0] >= 0) {
+        string outputPath = [&company_ = this->company_, windowName]() {
+            if (company_.info_.testDeltaLoop_ > 0) {
+                string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
+                create_directories(dir);
+                return dir;
+            }
+            return company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName + "/";
+        }();
         window.print_train();
         srand(343);
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
@@ -1826,7 +1829,7 @@ void Train::train_a_window(string windowName) {
         }
     }
     else {
-        cout << "train window is too old, skip this window" << endl;
+        cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
 }
 
@@ -1857,25 +1860,24 @@ class Test {
     void set_train_test_file_path();
     void set_normal_paths();
     void set_mixedTech_paths();
-    void test_a_window(TestWindow &window);
-    TestWindow set_window(string &targetWindow, string &actualWindow, int &windowIndex);
+    void test_a_window(TrainWindow &window);
     void check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &window);
     size_t set_variables(vector<vector<vector<string>>> &thisTrainFile);
     void output_test_file(TestWindow &window, int startRow, int endRow);
     void output_test_holdData(TestWindow &window);
 
    public:
-    Test(CompanyInfo &company, string targetWindow = "all", bool tradition = false, bool hold = false, vector<int> additionTable = {});
+    Test(CompanyInfo &company, bool tradition = false, bool hold = false, vector<int> additionTable = {});
 };
 
-Test::Test(CompanyInfo &company, string targetWindow, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company, 0), tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company, 0), tradition_(tradition), hold_(hold) {
     add_tables(additionTable);
     create_particle();
     set_train_test_file_path();
-    for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
-        string actualWindow = company_.info_.slidingWindows_[windowIndex];
-        if (actualWindow != "A2A") {
-            TestWindow window = set_window(targetWindow, actualWindow, windowIndex);
+    for (auto windowName : company_.info_.slidingWindows_) {
+        if (windowName != "A2A") {
+            TrainWindow window(company_, windowName);
+            cout << window.windowName_ << endl;
             test_a_window(window);
         }
     }
@@ -1945,39 +1947,33 @@ void Test::set_mixedTech_paths() {
     }
 }
 
-TestWindow Test::set_window(string &targetWindow, string &actualWindow, int &windowIndex) {
-    if (targetWindow != "all") {
-        actualWindow = targetWindow;
-        windowIndex = company_.info_.windowNumber_;
+void Test::test_a_window(TrainWindow &window) {
+    vector<vector<path>> diffTechTrainFilePath;
+    for (auto trainPath : paths_.trainFilePaths_) {
+        diffTechTrainFilePath.push_back(get_path(trainPath + window.windowName_));
     }
-    TestWindow window(company_, actualWindow);
-    cout << window.windowName_ << endl;
-    return window;
-}
-
-void Test::test_a_window(TestWindow &window) {
-    vector<vector<path>> eachTrainFilePath;
-    for (auto &trainPath : paths_.trainFilePaths_) {
-        eachTrainFilePath.push_back(get_path(trainPath + window.windowName_));
-    }
-    for (auto &eachPath : eachTrainFilePath) {
-        if (eachPath.size() == 0)
-            break;
-        check_exception(eachTrainFilePath, window);
+    if (window.interval_[0] >= 0) {
+        vector<vector<vector<string>>> aPeriodTrainFiles(company_.info_.mixedTechNum_);
+        check_exception(diffTechTrainFilePath, window);
         p_.push_holdData_column_Name(hold_, holdData_, holdDataPtr_);
-        for (int intervalIndex = 0, trainFileIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2, trainFileIndex++) {
-            int startRow = window.interval_[intervalIndex];
-            int endRow = window.interval_[intervalIndex + 1];
-            vector<vector<vector<string>>> thisTrainFile;
-            for (auto &diffTrainFilePath : eachTrainFilePath) {
-                thisTrainFile.push_back(read_data(diffTrainFilePath[trainFileIndex]));
+        auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
+        for (; intervalIter != window.TestWindow::interval_.end(); intervalIter += 2, filePathIndex++) {
+            for (auto &file : aPeriodTrainFiles) {
+                file.clear();
+            }
+            for (size_t index = 0; index < company_.info_.mixedTechNum_; index++) {
+                aPeriodTrainFiles[index] = read_data(diffTechTrainFilePath[index][filePathIndex]);
             }
             p_.reset();
-            size_t bestIndex = set_variables(thisTrainFile);
-            p_.record_train_test_data(startRow, endRow, holdDataPtr_, &thisTrainFile[bestIndex]);
-            output_test_file(window, startRow, endRow);
+            size_t bestIndex = set_variables(aPeriodTrainFiles);
+            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &aPeriodTrainFiles[bestIndex]);
+            output_test_file(window, *intervalIter, *(intervalIter + 1));
             output_test_holdData(window);
         }
+    }
+    else {
+        cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
+        cout << ", skip this window" << endl;
     }
 }
 
@@ -2073,11 +2069,13 @@ Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(compa
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (int windowIndex = 0; windowIndex < company_.info_.windowNumber_; windowIndex++) {
         TrainWindow window = set_window(targetWindow, windowIndex);
-        if (window.interval_[0] < 0) {
-            cout << "train window is too old, skip this window" << endl;
-            continue;
+        if (window.interval_[0] >= 0) {
+            train_a_tradition_window(window);
         }
-        train_a_tradition_window(window);
+        else {
+            cout << window.windowName_ << " train window is too old, skip this window" << endl;
+        }
+        
     }
 }
 
@@ -2107,17 +2105,15 @@ TrainWindow Tradition::set_window(string &targetWindow, int &windowIndex) {
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
     string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_;
-    for (int intervalIndex = 0; intervalIndex < window.intervalSize_; intervalIndex += 2) {
-        int startRow = window.interval_[intervalIndex];
-        int endRow = window.interval_[intervalIndex + 1];
+    for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
         for (int i = 0; i < traditionStrategyNum_; i++) {
             particles_[i].reset();
             set_variables(i);
-            particles_[i].trade(startRow, endRow);
+            particles_[i].trade(*intervalIter, *(intervalIter + 1));
         }
         stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
-        particles_[0].record_train_test_data(startRow, endRow);
-        out_.open(outputPath + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
+        particles_[0].record_train_test_data(*intervalIter, *(intervalIter + 1));
+        out_.open(outputPath + "/" + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
         out_ << particles_[0].trainOrTestData_;
         out_.close();
     }
@@ -2514,7 +2510,7 @@ int main(int argc, const char *argv[]) {
                     break;
                 }
                 case 1: {
-                    Test test(company, company.info_.setWindow_, false, true);
+                    Test test(company, false, true);
                     break;
                 }
                 case 2: {
@@ -2522,7 +2518,7 @@ int main(int argc, const char *argv[]) {
                     break;
                 }
                 case 3: {
-                    Test testTradition(company, company.info_.setWindow_, true, true);
+                    Test testTradition(company, true, true);
                     break;
                 }
                 case 10: {
@@ -2535,7 +2531,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
                     //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                                        CalIRR calIRR(companyPricePaths);
+                    //                    CalIRR calIRR(companyPricePaths);
                     //                    MergeIRRFile mergeFile;
                     //                    SortIRRFileBy IRR("IRR");
                     //                    Train t(company, "2011-12-01", "2011-12-30");
