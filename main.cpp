@@ -2367,12 +2367,10 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
 
 CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR() {
     BH bh(company_, company_.date_[company_.testStartRow_], company_.date_[company_.testEndRow_]);
-    WindowIRR tmp;
-    tmp.windowName_ = "B&H";
-    tmp.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
-    tmp.traditionIRR_ = tmp.algoIRR_;
-    tmp.resize_vec(company_.info_.allTech_.size());
-    return tmp;
+    tmpWinodwIRR_.windowName_ = "B&H";
+    tmpWinodwIRR_.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
+    tmpWinodwIRR_.traditionIRR_ = tmpWinodwIRR_.algoIRR_;
+    return tmpWinodwIRR_;
 }
 
 void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<WindowIRR> &windowsIRR) {
