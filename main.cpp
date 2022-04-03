@@ -2317,27 +2317,29 @@ CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyW
 }
 
 double CalIRR::CalOneCompanyIRR::cal_one_window_IRR(string &RoRoutData, string &window, string &stratgyFilePath, bool tradition) {
-    RoRoutData += "," + window + "\n";
+    RoRoutData += window + ",";
     double totalRoR = 0;
     vector<path> strategyPaths = get_path(stratgyFilePath + window);
     for (auto filePathIter = strategyPaths.begin(); filePathIter != strategyPaths.end(); filePathIter++) {
         RoRoutData += compute_and_record_window_RoR(strategyPaths, filePathIter, totalRoR, tradition);
     }
     double windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_.testLength_) - 1.0;
-    RoRoutData += ",,,,,," + window + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n";
+    RoRoutData += ",,,,,,," + window + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
     return windowIRR;
 }
 
 string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition) {
     vector<vector<string>> file = read_data(*filePathIter);
     double RoR = stod(file[10][1]);
+    string push;
     if (filePathIter == strategyPaths.begin()) {
         totalRoR = RoR / 100.0 + 1.0;
+        push += filePathIter->stem().string() + ",";
     }
     else {
         totalRoR = totalRoR * (RoR / 100.0 + 1.0);
+        push += "," + filePathIter->stem().string() + ",";
     }
-    string push = filePathIter->stem().string() + ",";
     int techIndex = -1;
     if (!company_.info_.mixedTech_) {
         techIndex = company_.info_.techIndex_;
