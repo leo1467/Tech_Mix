@@ -29,7 +29,7 @@ class Info {
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {0, 3};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -2211,40 +2211,49 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
 }
 
 void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
-    ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_name.csv");
+    ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_IRR.csv");
     output_IRR(IRRout);
     for_each(allCompanyWindowsIRR_.begin(), allCompanyWindowsIRR_.end(), [](CompanyWindowIRRContainer &eachCompanyContainer) {
         sort(eachCompanyContainer.windowsIRR_.begin(), eachCompanyContainer.windowsIRR_.end(), [](const WindowIRR &w1, const WindowIRR &w2) {
-            return w1.algoIRR_ > w2.algoIRR_;
+            return w1.windowName_ < w2.windowName_;
         });
     });
-    IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_IRR.csv");
+    IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_name.csv");
     output_IRR(IRRout);
-}
-
-void CalIRR::output_IRR(ofstream &IRRout) {
-    for (auto &company : allCompanyWindowsIRR_) {
-        IRRout << "=====" << company.companyName_ << "=====";
-        IRRout << "," << info_.techType_ << "_algo," << info_.techType_ << " Tradition,";
-        if (info_.mixedTech_) {
+    if (info_.mixedTech_) {
+        IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_tech_choosed.csv");
+        vector<string> algoOrTradition{"algo", "tradition"};
+        for (auto &company : allCompanyWindowsIRR_) {
+            IRRout << "=====" << company.companyName_ << "=====,";
             for (int loop = 0; loop < 2; loop++) {
                 for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
-                    IRRout << info_.allTech_[techIndex] << ",";
+                    IRRout << algoOrTradition[loop] << " choose " << info_.allTech_[techIndex] << ",";
                 });
             }
-        }
-        IRRout << "\n";
-        for (auto &eachIRR : company.windowsIRR_) {
-            IRRout << eachIRR.windowName_ << ",";
-            IRRout << set_precision(eachIRR.algoIRR_) << ",";
-            IRRout << set_precision(eachIRR.traditionIRR_) << ",";
-            if (info_.mixedTech_) {
+            IRRout << "\n";
+            for (auto &eachIRR : company.windowsIRR_) {
+                IRRout << eachIRR.windowName_ << ",";
                 for_each(eachIRR.techChooseTimes_.begin(), eachIRR.techChooseTimes_.end(), [&](const vector<int> &i) {
                     for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &j) {
                         IRRout << i[j] << ",";
                     });
                 });
+                IRRout << "\n";
             }
+        }
+        IRRout.close();
+    }
+}
+
+void CalIRR::output_IRR(ofstream &IRRout) {
+    for (auto &company : allCompanyWindowsIRR_) {
+        IRRout << "=====" << company.companyName_ << "=====";
+        IRRout << "," << info_.techType_ << " algo," << info_.techType_ << " Tradition,";
+        IRRout << "\n";
+        for (auto &eachIRR : company.windowsIRR_) {
+            IRRout << eachIRR.windowName_ << ",";
+            IRRout << set_precision(eachIRR.algoIRR_) << ",";
+            IRRout << set_precision(eachIRR.traditionIRR_) << ",";
             IRRout << "\n";
         }
     }
@@ -2379,7 +2388,7 @@ void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<WindowIRR> 
     for (auto &windowIRR : windowsIRR) {
         tmpRank.algoWindowRank_.push_back(windowIRR.rank_);
     }
-    // sort_by_algo_IRR(windowsIRR);
+    sort_by_algo_IRR(windowsIRR);
     allCompanyWindowRank_.push_back(tmpRank);
 }
 
@@ -2519,7 +2528,7 @@ int main(int argc, const char *argv[]) {
                     //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
                     //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
                     //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                    //                    CalIRR calIRR(companyPricePaths);
+                                        CalIRR calIRR(companyPricePaths);
                     //                    MergeIRRFile mergeFile;
                     //                    SortIRRFileBy IRR("IRR");
                     //                    Train t(company, "2011-12-01", "2011-12-30");
