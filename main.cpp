@@ -63,8 +63,6 @@ class Info {
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
-    vector<string> slidingWindowsEx_ = {"A2A", "36M36", "36M24", "36M18", "36M12", "36M6", "36M3", "36M1", "24M24", "24M18", "24M12", "24M6", "24M3", "24M1", "18M18", "18M12", "18M6", "18M3", "18M1", "12M12", "12M6", "12M3", "12M1", "6M6", "6M3", "6M1", "3M3", "3M1", "1M1", "6M", "3M", "1M", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
-
     map<string, string> slidingWindowPairs = {};
 
     int windowNumber_;
@@ -89,23 +87,39 @@ class Info {
         }
         mixedTechNum_ = (int)techIndexs_.size();
     }
-
-    void set_slidingWindow() {
-        if (setWindow_ != "all") {
-            size_t startIndex = find_index_of_string_in_vec(slidingWindows_, cut_string(setWindow_).front());
-            size_t endIndex = find_index_of_string_in_vec(slidingWindows_, cut_string(setWindow_).back()) + 1;
-            slidingWindows_ = set_certain_range_of_vec(setWindow_, slidingWindows_);
-            slidingWindowsEx_ = vector<string>(slidingWindowsEx_.begin() + startIndex, slidingWindowsEx_.begin() + endIndex);;
+    
+    void slidingWindowToEx() {
+        map<char, int> componentLength{{'Y', 12}, {'H', 6}, {'Q', 3}, {'M', 1}};
+        for (auto windowName : slidingWindows_) {
+            string slidingWindowEx;
+            if (isalpha(windowName.front()) && windowName != "A2A") {
+                vector<string> trainTestPair = cut_string(windowName, '2');
+                if (trainTestPair.size() == 2) {
+                    for_each(trainTestPair.begin(), trainTestPair.end(), [&](string windowComp) {
+                        int totalComponentLength = 0;
+                        for_each(windowComp.begin(), windowComp.end(), [&](char component) {
+                            totalComponentLength += componentLength.at(component);
+                        });
+                        slidingWindowEx += to_string(totalComponentLength) + "M";
+                    });
+                    slidingWindowEx.pop_back();
+                }
+                else if (trainTestPair.size() == 1) {
+                    slidingWindowEx += to_string(componentLength.at(trainTestPair[0][0])) + "M";
+                }
+            }
+            else {
+                slidingWindowEx = windowName;
+            }
+            slidingWindowPairs.insert({windowName, slidingWindowEx});
         }
     }
 
     Info() {
         set_techIndex_and_techType();
-        set_slidingWindow();
+        slidingWindows_ = set_certain_range_of_vec(setWindow_, slidingWindows_);
         windowNumber_ = (int)slidingWindows_.size();
-        for (size_t i = 0; i < windowNumber_; i++) {
-            slidingWindowPairs.insert({slidingWindows_[i], slidingWindowsEx_[i]});
-        }
+        slidingWindowToEx();
     }
 } _info;
 
@@ -252,8 +266,8 @@ void CompanyInfo::create_folder(Path &paths) {
 void CompanyInfo::find_table_start_row() {
     char delimiter;
     int longestTrainMonth = -1;
-    for (int i = 0; i < info_.windowNumber_; i++) {
-        vector<int> trainTest = find_train_and_test_len(info_.slidingWindowsEx_[i], delimiter);
+    for (auto windowName : info_.slidingWindows_) {
+        vector<int> trainTest = find_train_and_test_len(info_.slidingWindowPairs.at(windowName), delimiter);
         int trainMonth;
         if (trainTest.size() == 1) {
             trainMonth = 12;
