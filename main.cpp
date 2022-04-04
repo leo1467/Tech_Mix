@@ -25,11 +25,11 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 10;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 0;
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {0};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -40,9 +40,9 @@ class Info {
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
-    double delta_ = 0.0002;
-    int expNum_ = 1;
-    int genNum_ = 1;
+    double delta_ = 0.00016;
+    int expNum_ = 50;
+    int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
@@ -63,7 +63,7 @@ class Info {
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
-    map<string, string> slidingWindowPairs = {};
+    map<string, tuple<string, char, int, int>> slidingWindowPairs_;
 
     int windowNumber_;
 
@@ -90,31 +90,40 @@ class Info {
     
     void slidingWindowToEx() {
         map<char, int> componentLength{{'Y', 12}, {'H', 6}, {'Q', 3}, {'M', 1}};
+        tuple<string, char, int, int> tmp;
+        vector<int> trainTest;
+        char delimiter;
+        string slidingWindowEx;
         for (auto windowName : slidingWindows_) {
-            string slidingWindowEx;
-            if (isalpha(windowName.front()) && windowName != "A2A") {
+            if (isalpha(windowName.front()) && windowName != "A2A") {  //做10個傳統滑動視窗
                 vector<string> trainTestPair = cut_string(windowName, '2');
                 if (trainTestPair.size() == 2) {
                     for_each(trainTestPair.begin(), trainTestPair.end(), [&](string windowComp) {
                         int totalComponentLength = 0;
-                        for_each(windowComp.begin(), windowComp.end(), [&](char component) {
+                        for_each(windowComp.begin(), windowComp.end(), [&](char component) {  //計算訓練期及測試期長度
                             totalComponentLength += componentLength.at(component);
                         });
+                        trainTest.push_back(totalComponentLength);
                         slidingWindowEx += to_string(totalComponentLength) + "M";
                     });
                     slidingWindowEx.pop_back();
+                    tmp = {slidingWindowEx, 'M', trainTest[0], trainTest[1]};
                 }
-                else if (trainTestPair.size() == 1) {
+                else if (trainTestPair.size() == 1) {  //做*滑動視窗
                     slidingWindowEx += to_string(componentLength.at(trainTestPair[0][0])) + "M";
+                    tmp = {slidingWindowEx, 'S', componentLength.at(trainTestPair[0][0]), componentLength.at(trainTestPair[0][0])};
                 }
             }
-            else {
-                slidingWindowEx = windowName;
+            else {  //做A2A及其餘自訂滑動視窗
+                trainTest = find_train_and_test_len(windowName, delimiter);
+                tmp = {windowName, delimiter, trainTest[0], trainTest[1]};
             }
-            slidingWindowPairs.insert({windowName, slidingWindowEx});
+            slidingWindowPairs_.insert({windowName, tmp});
+            trainTest.clear();
+            slidingWindowEx.clear();
         }
     }
-
+    
     Info() {
         set_techIndex_and_techType();
         slidingWindows_ = set_certain_range_of_vec(setWindow_, slidingWindows_);
@@ -264,18 +273,17 @@ void CompanyInfo::create_folder(Path &paths) {
 }
 
 void CompanyInfo::find_table_start_row() {
-    char delimiter;
     int longestTrainMonth = -1;
-    for (auto windowName : info_.slidingWindows_) {
-        vector<int> trainTest = find_train_and_test_len(info_.slidingWindowPairs.at(windowName), delimiter);
+    for (auto windowComponent : info_.slidingWindowPairs_) {
         int trainMonth;
-        if (trainTest.size() == 1) {
-            trainMonth = 12;
+        if (get<1>(windowComponent.second) == 'M') {
+            trainMonth = get<2>(windowComponent.second);
+            
         }
         else {
-            trainMonth = trainTest[0];
+            trainMonth = 12;
         }
-        if (delimiter == 'M' && trainMonth > longestTrainMonth) {
+        if (get<1>(windowComponent.second) == 'M' && trainMonth > longestTrainMonth) {
             longestTrainMonth = trainMonth;
         }
     }
@@ -546,7 +554,7 @@ class TestWindow {
 
    public:
     string windowName_;
-    string windowNameEx_;
+    tuple<string, char, int, int> windowComponent_;
     int tableStartRow_ = -1;
     int trainLength_ = -1;
     int testLength_ = -1;
@@ -563,7 +571,7 @@ class TestWindow {
     TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowNameEx_(company.info_.slidingWindowPairs.at(window)), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowComponent_(company.info_.slidingWindowPairs_.at(window)), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval();
     }
@@ -578,25 +586,9 @@ TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company),
 }
 
 void TestWindow::find_test_interval() {
-    vector<int> trainTestType = find_train_and_test_len(windowNameEx_, windowType_);
-    if (trainTestType.size() == 0) {
-        cout << "testType.size() cant be 0" << endl;
-        exit(1);
-    }
-    if (trainTestType.size() == 1) {
-        trainLength_ = trainTestType[0];
-        testLength_ = trainLength_;
-        windowType_ = 'S';
-    }
-    else {
-        trainLength_ = trainTestType[0];
-        testLength_ = trainTestType[1];
-    }
-    if (testLength_ == -1) {
-        cout << "cant find testLength" << endl;
-        exit(1);
-    }
-    switch (windowType_) {
+    trainLength_ = get<2>(windowComponent_);
+    testLength_ = get<3>(windowComponent_);
+    switch (get<1>(windowComponent_)) {
         case 'M':
         case 'S': {
             find_M_test();
@@ -686,7 +678,7 @@ void TestWindow::find_D_test() {
 }
 
 void TestWindow::print_test() {
-    cout << "test window: " << windowName_ << "=" << windowNameEx_ << endl;
+    cout << "test window: " << windowName_ << "=" << get<0>(windowComponent_) << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
         cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
     }
@@ -721,7 +713,7 @@ TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(compa
 }
 
 void TrainWindow::find_train_interval() {
-    switch (windowType_) {
+    switch (get<1>(windowComponent_)) {
         case 'M':
         case 'S': {
             find_M_train();
@@ -744,7 +736,7 @@ void TrainWindow::find_train_interval() {
 
 void TrainWindow::find_M_train() {
     vector<int> startRow, endRow;
-    switch (windowType_) {
+    switch (get<1>(windowComponent_)) {
         case 'M': {
             find_regular_M_train(endRow, startRow);
             break;
@@ -823,7 +815,7 @@ void TrainWindow::find_D_train() {
 }
 
 void TrainWindow::print_train() {
-    cout << "train window: " << windowName_ << "=" << windowNameEx_ << endl;
+    cout << "train window: " << windowName_ << "=" << get<0>(windowComponent_) << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
         cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
     }
@@ -1769,16 +1761,16 @@ void TrainAPeriod::update_best(int renewBest) {
 }
 
 class Train {
-    public:
+private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
-    ofstream out_;
     
     void train_a_window(string windowName);
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
     
+public:
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
 };
@@ -1848,9 +1840,9 @@ void Train::train_a_window(string windowName) {
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
-    out_.open(ouputPath + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
-    out_ << trainData;
-    out_.close();
+    ofstream out(ouputPath + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+    out << trainData;
+    out.close();
 }
 
 class Test {
@@ -2218,7 +2210,6 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.algoRoRoutData_);
         out.open(company.paths_.companyRootPaths_[company.info_.techIndex_] + company.companyName_ + "_traditionRoR.csv");
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.traditionRoRoutData_);
-
     }
     output_all_IRR();
     output_all_window_rank();
@@ -2513,42 +2504,45 @@ int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
-        for (auto companyPricePath : companyPricePaths) {
-            CompanyInfo company(companyPricePath, _info);
-            switch (company.info_.mode_) {
-                case 0: {
-                    Train train(company);
-                    break;
-                }
-                case 1: {
-                    Test test(company, false, true);
-                    break;
-                }
-                case 2: {
-                    Tradition trainTradition(company, company.info_.setWindow_);
-                    break;
-                }
-                case 3: {
-                    Test testTradition(company, true, true);
-                    break;
-                }
-                case 10: {
-                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                    Tradition tradition(company);
-                    //                    Train train(company, "2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                                        CalIRR calIRR(companyPricePaths);
-                    //                    MergeIRRFile mergeFile;
-                    //                    SortIRRFileBy IRR("IRR");
-                    //                    Train t(company, "2011-12-01", "2011-12-30");
-                    break;
+        if (_info.mode_ <= 10) {
+            for (auto companyPricePath : companyPricePaths) {
+                CompanyInfo company(companyPricePath, _info);
+                switch (company.info_.mode_) {
+                    case 0: {
+                        Train train(company);
+                        break;
+                    }
+                    case 1: {
+                        Test test(company, false, true);
+                        break;
+                    }
+                    case 2: {
+                        Tradition trainTradition(company, company.info_.setWindow_);
+                        break;
+                    }
+                    case 3: {
+                        Test testTradition(company, true, true);
+                        break;
+                    }
+                    case 10: {
+                        //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                        //                    Tradition tradition(company);
+                        //                    Train train(company, "2011-12-01", "2011-12-30");
+                        //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                        //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                        //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                        //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                        //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                        //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                        break;
+                    }
                 }
             }
+        }
+        else {
+            //                    CalIRR calIRR(companyPricePaths);
+            //                    MergeIRRFile mergeFile;
+            //                    SortIRRFileBy IRR("IRR");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
