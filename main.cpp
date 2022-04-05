@@ -25,11 +25,11 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 0;
+    int mode_ = 11;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {0, 3};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -58,8 +58,8 @@ class Info {
     string testEndYear_ = "2021-01";
     double testLength_;
 
-    path pricePath_ = "price";
-    string rootFolder_ = "result";
+    path priceFolder_ = "price/";
+    string rootFolder_ = "result/";
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
@@ -200,9 +200,9 @@ void CompanyInfo::set_paths(Path &paths) {
     for (auto tech : info_.allTech_) {
         paths.techOuputPaths_.push_back("tech/" + tech + "/" + companyName_ + "/");
 
-        paths.resultOutputPaths_.push_back(info_.rootFolder_ + "/" + tech + "_result/");
+        paths.resultOutputPaths_.push_back(info_.rootFolder_ + "result_" + tech + "/");
 
-        string companyRootFolder = info_.rootFolder_ + "/" + tech + "_result/" + companyName_ + "/";
+        string companyRootFolder = info_.rootFolder_ + "result_" + tech + "/" + companyName_ + "/";
         paths.companyRootPaths_.push_back(companyRootFolder);
 
         paths.trainFilePaths_.push_back(companyRootFolder + "train/");
@@ -278,7 +278,6 @@ void CompanyInfo::find_table_start_row() {
         int trainMonth;
         if (get<1>(windowComponent.second) == 'M') {
             trainMonth = get<2>(windowComponent.second);
-            
         }
         else {
             trainMonth = 12;
@@ -2216,17 +2215,17 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
 }
 
 void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
-    ofstream IRRout(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_IRR.csv");
+    ofstream IRRout(info_.rootFolder_ + "test_IRR_IRR_sorted_" + info_.techType_ + ".csv");
     output_IRR(IRRout);
     for_each(allCompanyWindowsIRR_.begin(), allCompanyWindowsIRR_.end(), [](CompanyWindowIRRContainer &eachCompanyContainer) {
         sort(eachCompanyContainer.windowsIRR_.begin(), eachCompanyContainer.windowsIRR_.end(), [](const WindowIRR &w1, const WindowIRR &w2) {
             return w1.windowName_ < w2.windowName_;
         });
     });
-    IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR_sorted_by_name.csv");
+    IRRout.open(info_.rootFolder_ + "test_IRR_name_sorted_" + info_.techType_ + ".csv");
     output_IRR(IRRout);
     if (info_.mixedTech_) {
-        IRRout.open(info_.rootFolder_ + "/" + info_.techType_ + "_tech_choosed.csv");
+        IRRout.open(info_.rootFolder_ + info_.techType_ + "_tech_choosed.csv");
         vector<string> algoOrTradition{"algo", "tradition"};
         for (auto &company : allCompanyWindowsIRR_) {
             IRRout << "=====" << company.companyName_ << "=====,";
@@ -2267,7 +2266,7 @@ void CalIRR::output_IRR(ofstream &IRRout) {
 
 void CalIRR::output_all_window_rank() {
     vector<string> windowSort = remove_A2A_and_sort();
-    ofstream rankOut(info_.rootFolder_ + "/" + info_.techType_ + "_windowRank.csv");
+    ofstream rankOut(info_.rootFolder_ + "windowRank_" + info_.techType_ + ".csv");
     rankOut << "algo window rank\n,";
     for (auto &windowName : windowSort) {
         rankOut << windowName << ",";
@@ -2423,9 +2422,9 @@ class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一
         if (info_.techIndexs_.size() > 1) {
             vector<vector<vector<string>>> files;
             for (auto &techIndex : info_.techIndexs_) {
-                files.push_back(read_data(info_.rootFolder_ + "/" + info_.allTech_[techIndex] + "_test_IRR.csv"));
+                files.push_back(read_data(info_.rootFolder_ + info_.allTech_[techIndex] + "_test_IRR.csv"));
             }
-            vector<vector<string>> newFile = read_data(info_.rootFolder_ + "/" + info_.techType_ + "_test_IRR.csv");
+            vector<vector<string>> newFile = read_data(info_.rootFolder_ + info_.techType_ + "_test_IRR.csv");
             for (auto &file : files) {
                 for (size_t row = 0; row < file.size(); row++) {
                     for (size_t col = 0; col < file[row].size(); col++) {
@@ -2433,7 +2432,7 @@ class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一
                     }
                 }
             }
-            ofstream n(info_.rootFolder_ + "/" + "merge_" + info_.techType_ + "_IRR.csv");
+            ofstream n(info_.rootFolder_ + "merge_" + info_.techType_ + "_IRR.csv");
             for (auto &row : newFile) {
                 for (auto &col : row) {
                     n << col << ",";
@@ -2453,7 +2452,7 @@ class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名�
 
     SortIRRFileBy(string sortBy = "IRR") : sortBy_(sortBy) {
         string inpuFileName = "SMA_test_IRR.csv";
-        vector<vector<string>> inputFile = read_data(info_.rootFolder_ + "/" + inpuFileName);
+        vector<vector<string>> inputFile = read_data(info_.rootFolder_ + inpuFileName);
         vector<vector<vector<string>>::iterator> equalSignIter;
         for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
             if ((*iter).front().front() == '=') {
@@ -2475,7 +2474,7 @@ class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名�
                 });
             }
         }
-        ofstream sortedFile(info_.rootFolder_ + "/" + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
+        ofstream sortedFile(info_.rootFolder_ + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
         for (auto &row : inputFile) {
             for (auto &col : row) {
                 sortedFile << col << ",";
@@ -2487,7 +2486,7 @@ class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名�
 };
 
 static vector<path> set_company_price_paths(const Info &info) {
-    vector<path> companiesPricePath = get_path(info.pricePath_);
+    vector<path> companiesPricePath = get_path(info.priceFolder_);
     if (info.setCompany_ != "all") {
         vector<string> setCcompany = cut_string(info.setCompany_);
         auto find_Index = [&](string &traget) {
@@ -2540,7 +2539,7 @@ int main(int argc, const char *argv[]) {
             }
         }
         else {
-            //                    CalIRR calIRR(companyPricePaths);
+            CalIRR calIRR(companyPricePaths);
             //                    MergeIRRFile mergeFile;
             //                    SortIRRFileBy IRR("IRR");
         }
