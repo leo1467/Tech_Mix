@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <ctime>
 #include <exception>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -25,11 +27,11 @@ using namespace filesystem;
 
 class Info {
    public:
-    int mode_ = 11;
+    int mode_ = 0;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {0};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -41,10 +43,12 @@ class Info {
     string algoType_;
 
     double delta_ = 0.00016;
-    int expNum_ = 50;
-    int genNum_ = 10000;
+    int expNum_ = 10;
+    int genNum_ = 1000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
+    
+    int threadNum_ = 4;
 
     bool debug_ = false;
     
@@ -1759,10 +1763,34 @@ void TrainAPeriod::update_best(int renewBest) {
     }
 }
 
+class Semaphore {
+private:
+    mutex mtx;
+    condition_variable cv;
+    int count;
+    
+public:
+    inline void notify() {
+        unique_lock<mutex> lock(mtx);
+        count++;
+        cv.notify_one();
+    }
+    
+    inline void wait() {
+        unique_lock<mutex> lock(mtx);
+        cv.wait(lock, [&count = this->count]() { return count > 0; });
+        count--;
+    }
+    
+    Semaphore (int count_ = 1) : count(count_) {}
+};
+
 class Train {
 private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
+    
+    Semaphore sem_;
     
     void train_a_window(string windowName);
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
@@ -1775,7 +1803,7 @@ public:
 };
 
 
-Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}) {
+Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.threadNum_) {
     int startRow = find_index_of_string_in_vec(tables_[0].date_, startDate);
     int endRow = find_index_of_string_in_vec(tables_[0].date_, endDate);
     srand(343);
@@ -1796,7 +1824,7 @@ void Train::print_date_train_file(string &trainData, string startDate, string en
     out.close();
 }
 
-Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}) {
+Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.threadNum_) {
     if (company_.info_.testDeltaLoop_ == 0) {
         train_a_company();
     }
@@ -1810,12 +1838,17 @@ Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&comp
 }
 
 void Train::train_a_company() {
+    vector<thread> t;
     for (auto windowName : company_.info_.slidingWindows_) {
-        train_a_window(windowName);
+        t.push_back(thread(&Train::train_a_window, this, windowName));
+//        train_a_window(windowName);
     }
+    for (auto &ts : t)
+        ts.join();
 }
 
 void Train::train_a_window(string windowName) {
+    sem_.wait();
     TrainWindow window(company_, windowName);
     if (window.interval_[0] >= 0) {
         string outputPath = [&company_ = this->company_, windowName]() {
@@ -1836,6 +1869,7 @@ void Train::train_a_window(string windowName) {
     else {
         cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
+    sem_.notify();
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
