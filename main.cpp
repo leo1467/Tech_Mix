@@ -48,7 +48,8 @@ class Info {
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
     
-    int threadNum_ = 4;
+    int companyThreadNum_ = 2;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
+    int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
     
@@ -1803,7 +1804,7 @@ public:
 };
 
 
-Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.threadNum_) {
+Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.windowThreadNum_) {
     int startRow = find_index_of_string_in_vec(tables_[0].date_, startDate);
     int endRow = find_index_of_string_in_vec(tables_[0].date_, endDate);
     srand(343);
@@ -1824,8 +1825,8 @@ void Train::print_date_train_file(string &trainData, string startDate, string en
     out.close();
 }
 
-Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.threadNum_) {
-    if (company_.info_.testDeltaLoop_ == 0) {
+Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.windowThreadNum_) {
+    if (!company_.info_.testDeltaLoop_) {
         train_a_company();
     }
     else {
@@ -1838,21 +1839,28 @@ Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&comp
 }
 
 void Train::train_a_company() {
-    vector<thread> t;
+    vector<thread> windowThreads;
     for (auto windowName : company_.info_.slidingWindows_) {
-        t.push_back(thread(&Train::train_a_window, this, windowName));
-//        train_a_window(windowName);
+        if (company_.info_.windowThreadNum_) {
+            windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
+        }
+        else {
+            train_a_window(windowName);
+        }
     }
-    for (auto &ts : t)
-        ts.join();
+    for (auto &thread : windowThreads) {
+        thread.join();
+    }
 }
 
 void Train::train_a_window(string windowName) {
-    sem_.wait();
+    if (company_.info_.windowThreadNum_) {
+        sem_.wait();
+    }
     TrainWindow window(company_, windowName);
     if (window.interval_[0] >= 0) {
         string outputPath = [&company_ = this->company_, windowName]() {
-            if (company_.info_.testDeltaLoop_ > 0) {
+            if (company_.info_.testDeltaLoop_) {
                 string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
                 create_directories(dir);
                 return dir;
@@ -1869,7 +1877,9 @@ void Train::train_a_window(string windowName) {
     else {
         cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
-    sem_.notify();
+    if (company_.info_.windowThreadNum_) {
+        sem_.notify();
+    }
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
@@ -2533,44 +2543,79 @@ static vector<path> set_company_price_paths(const Info &info) {
     return companiesPricePath;
 }
 
+class RunMode {
+private:
+    Info &info_;
+    vector<path> &companyPricePaths_;
+    
+    Semaphore sem_;
+    
+    void run_mode(CompanyInfo &company) {
+        if (info_.companyThreadNum_) {
+            sem_.wait();
+        }
+        switch (company.info_.mode_) {
+            case 0: {
+                Train train(company);
+                break;
+            }
+            case 1: {
+                Test test(company, false, true);
+                break;
+            }
+            case 2: {
+                Tradition trainTradition(company, company.info_.setWindow_);
+                break;
+            }
+            case 3: {
+                Test testTradition(company, true, true);
+                break;
+            }
+            case 10: {
+                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    Tradition tradition(company);
+                    //                    Train train(company, "2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                    //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                break;
+            }
+        }
+        if (info_.companyThreadNum_) {
+            sem_.notify();
+        }
+    }
+
+public:
+    RunMode(Info &info, vector<path> &companyPricePaths) : info_(info), companyPricePaths_(companyPricePaths), sem_(info.companyThreadNum_) {
+        vector<thread> companyThread;
+        vector<CompanyInfo> companiesInfo;
+        for (auto companyPricePath : companyPricePaths) {
+            companiesInfo.push_back(CompanyInfo(companyPricePath, _info));
+        }
+        for (auto &company : companiesInfo) {
+            if (info_.companyThreadNum_) {
+                companyThread.push_back(thread(&RunMode::run_mode, this, ref(company)));
+            }
+            else {
+                run_mode(company);
+            }
+        }
+        for (auto &thread : companyThread) {
+            thread.join();
+        }
+    }
+};
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
         if (_info.mode_ <= 10) {
-            for (auto companyPricePath : companyPricePaths) {
-                CompanyInfo company(companyPricePath, _info);
-                switch (company.info_.mode_) {
-                    case 0: {
-                        Train train(company);
-                        break;
-                    }
-                    case 1: {
-                        Test test(company, false, true);
-                        break;
-                    }
-                    case 2: {
-                        Tradition trainTradition(company, company.info_.setWindow_);
-                        break;
-                    }
-                    case 3: {
-                        Test testTradition(company, true, true);
-                        break;
-                    }
-                    case 10: {
-                        //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                        //                    Tradition tradition(company);
-                        //                    Train train(company, "2011-12-01", "2011-12-30");
-                        //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                        //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                        //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                        //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                        //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                        //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                        break;
-                    }
-                }
-            }
+            RunMode runMode(_info, companyPricePaths);
         }
         else {
             CalIRR calIRR(companyPricePaths);
