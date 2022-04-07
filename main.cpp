@@ -43,12 +43,12 @@ class Info {
     string algoType_;
 
     double delta_ = 0.00016;
-    int expNum_ = 10;
-    int genNum_ = 1000;
+    int expNum_ = 50;
+    int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
     
-    int companyThreadNum_ = 2;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
+    int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
     int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
@@ -1402,7 +1402,7 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
         case 1:
         case 2: {
             trainOrTestData_ += "buy1," + to_string(decimal_[0]) + "\n";
-            trainOrTestData_ += "buy1," + to_string(decimal_[1]) + "\n";
+            trainOrTestData_ += "buy2," + to_string(decimal_[1]) + "\n";
             trainOrTestData_ += "sell1," + to_string(decimal_[2]) + "\n";
             trainOrTestData_ += "sell2," + to_string(decimal_[3]) + "\n\n";
             break;
