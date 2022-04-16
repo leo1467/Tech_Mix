@@ -26,12 +26,12 @@ using namespace chrono;
 using namespace filesystem;
 
 class Info {
-   public:
-    int mode_ = 0;
+public:
+    int mode_ = 11;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {0, 3};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -47,12 +47,12 @@ class Info {
     int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
-    
+
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
     int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
-    
+
     int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
@@ -92,7 +92,7 @@ class Info {
         }
         mixedTechNum_ = (int)techIndexs_.size();
     }
-    
+
     void slidingWindowToEx() {
         map<char, int> componentLength{{'Y', 12}, {'H', 6}, {'Q', 3}, {'M', 1}};
         tuple<string, char, int, int> tmp;
@@ -128,7 +128,7 @@ class Info {
             slidingWindowEx.clear();
         }
     }
-    
+
     Info() {
         set_techIndex_and_techType();
         slidingWindows_ = set_certain_range_of_vec(setWindow_, slidingWindows_);
@@ -138,9 +138,9 @@ class Info {
 } _info;
 
 class CompanyInfo {
-   public:
+public:
     class Path {
-       public:
+    public:
         vector<string> techOuputPaths_;
 
         vector<string> resultOutputPaths_;
@@ -440,10 +440,10 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
 }
 
 class TechTable {
-   private:
+private:
     CompanyInfo *company_;
 
-   public:
+public:
     int techIndex_;
     string techType_;
     int days_;
@@ -553,10 +553,10 @@ class TechTables {
 };
 
 class TestWindow {
-   protected:
+protected:
     CompanyInfo &company_;
 
-   public:
+public:
     string windowName_;
     tuple<string, char, int, int> windowComponent_;
     int tableStartRow_ = -1;
@@ -690,7 +690,7 @@ void TestWindow::print_test() {
 }
 
 class TrainWindow : public TestWindow {
-   public:
+public:
     vector<int> interval_;
 
     void find_train_interval();
@@ -827,9 +827,9 @@ void TrainWindow::print_train() {
 }
 
 class MA {
-   public:
+public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
-    static const inline vector<vector<int>> traditionStrategy_ = {{5, 10, 5, 10}, {5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 60, 20, 60}, {120, 240, 120, 240}};
+    static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 120, 20, 120}, {20, 240, 20, 240}, {60, 120, 60, 120}, {60, 240, 60, 240}};
 
     static bool buy_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
         double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][decimal[0]];
@@ -849,7 +849,7 @@ class MA {
 };
 
 class RSI {
-   public:
+public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
 
@@ -865,7 +865,7 @@ class RSI {
 };
 
 class BetaMatrix {
-   public:
+public:
     int variableNum_ = 0;
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
@@ -891,10 +891,10 @@ void BetaMatrix::print(ostream &out = cout) {
 }
 
 class Particle {
-   private:
+private:
     CompanyInfo *company_;
 
-   public:
+public:
     int techIndex_;
     string techType_;
 
@@ -917,7 +917,7 @@ class Particle {
     bool isRecordOn_ = false;
 
     double actualDelta_ = -1;
-    
+
     string trainOrTestData_;
 
     typedef vector<bool (*)(vector<TechTable> *, vector<int> &, int)> buy_sell;
@@ -1426,25 +1426,25 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
 }
 
 class TrainAPeriod {
-   public:
+public:
     CompanyInfo &company_;
     vector<TechTable> &tables_;
 
     vector<Particle> particles_;
     vector<Particle> globalP_;  // 0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
     BetaMatrix betaMatrix_;
-    
+
     int startRow_ = -1;
     int endRow_ = -1;
 
     double actualDelta_ = -1;
     int compareNew_ = -1;
     int compareOld_ = -1;
-    
+
     ofstream debugOut_;
     bool debug_ = false;
     bool record_ = false;
-    
+
     string trainData_;
 
     void create_particles();
@@ -1487,7 +1487,6 @@ TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int 
     cout << globalP_[0].RoR_ << "%" << endl;
     cout << "==========" << endl;
 }
-
 
 void TrainAPeriod::create_particles() {
     Particle p(&company_, company_.info_.techIndex_, debug_);
@@ -1769,40 +1768,39 @@ private:
     mutex mtx;
     condition_variable cv;
     int count;
-    
+
 public:
     inline void notify() {
         unique_lock<mutex> lock(mtx);
         count++;
         cv.notify_one();
     }
-    
+
     inline void wait() {
         unique_lock<mutex> lock(mtx);
         cv.wait(lock, [&count = this->count]() { return count > 0; });
         count--;
     }
-    
-    Semaphore (int count_ = 1) : count(count_) {}
+
+    Semaphore(int count_ = 1) : count(count_) {}
 };
 
 class Train {
 private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
-    
+
     Semaphore sem_;
-    
+
     void train_a_window(string windowName);
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
-    
+
 public:
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
 };
-
 
 Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.windowThreadNum_) {
     int startRow = find_index_of_string_in_vec(tables_[0].date_, startDate);
@@ -1889,9 +1887,9 @@ void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouput
 }
 
 class Test {
-   private:
+private:
     class Path {
-       public:
+    public:
         vector<string> trainFilePaths_;
         string testFileOutputPath_;
     };
@@ -1915,7 +1913,7 @@ class Test {
     void output_test_file(TestWindow &window, int startRow, int endRow);
     void output_test_holdData(TestWindow &window);
 
-   public:
+public:
     Test(CompanyInfo &company, bool tradition = false, bool hold = false, vector<int> additionTable = {});
 };
 
@@ -2079,7 +2077,7 @@ void Test::output_test_holdData(TestWindow &window) {
 }
 
 class BH {
-   public:
+public:
     double BHRoR;
     BH(CompanyInfo &company, string startDate, string endDate) {
         int startRow = find_index_of_string_in_vec(company.date_, startDate);
@@ -2092,7 +2090,7 @@ class BH {
 };
 
 class Tradition {
-   private:
+private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
     vector<Particle> particles_;
@@ -2107,7 +2105,7 @@ class Tradition {
     void train_a_tradition_window(TrainWindow &window);
     void set_variables(int index);
 
-   public:
+public:
     Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
@@ -2123,7 +2121,6 @@ Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(compa
         else {
             cout << window.windowName_ << " train window is too old, skip this window" << endl;
         }
-        
     }
 }
 
@@ -2163,9 +2160,9 @@ void Tradition::set_variables(int index) {
 }
 
 class CalIRR {
-   public:
+public:
     class WindowIRR {
-       public:
+    public:
         string windowName_;
         double algoIRR_;
         double traditionIRR_;
@@ -2187,33 +2184,33 @@ class CalIRR {
     };
 
     class CompanyWindowIRRContainer {
-       public:
+    public:
         string companyName_;
         vector<WindowIRR> windowsIRR_;
     };
 
     class Rank {
-       public:
+    public:
         string companyName_;
         vector<int> algoWindowRank_;
         vector<int> traditionWindowRank_;
     };
 
     class CompanyAllRoRData {
-       public:
+    public:
         string algoRoRoutData_;
         string traditionRoRoutData_;
     };
 
     class CalOneCompanyIRR {
-       public:
+    public:
         CompanyInfo &company_;
         vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR_;
         vector<Rank> &allCompanyWindowRank_;
         CompanyWindowIRRContainer thisCompanyWindowIRR_;
         CompanyAllRoRData allRoRData_;
         WindowIRR tmpWinodwIRR_;
-        
+
         vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
 
         double cal_one_window_IRR(string &RoRoutData, string &window, string &stratgyFilePath, bool tradition);
@@ -2459,7 +2456,7 @@ void CalIRR::CalOneCompanyIRR::sort_by_algo_IRR(vector<WindowIRR> &windowsIRR) {
 }
 
 class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一個csv方便比較，可能用不到，直接打開csv手動複製就好
-   public:
+public:
     Info info_;
 
     MergeIRRFile() {
@@ -2489,13 +2486,13 @@ class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一
 };
 
 class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名稱排序，或是以IRR排序(用第幾個col調整)
-   public:
+public:
     Info info_;
     string sortBy_;
     int colToSort = 1;
 
-    SortIRRFileBy(string sortBy = "IRR") : sortBy_(sortBy) {
-        string inpuFileName = "SMA_test_IRR.csv";
+    SortIRRFileBy(string inpuFileName, string sortBy = "IRR") : sortBy_(sortBy) {
+        inpuFileName += ".csv";
         vector<vector<string>> inputFile = read_data(info_.rootFolder_ + inpuFileName);
         vector<vector<vector<string>>::iterator> equalSignIter;
         for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
@@ -2547,9 +2544,9 @@ class RunMode {
 private:
     Info &info_;
     vector<path> &companyPricePaths_;
-    
+
     Semaphore sem_;
-    
+
     void run_mode(CompanyInfo &company) {
         if (info_.companyThreadNum_) {
             sem_.wait();
@@ -2572,15 +2569,15 @@ private:
                 break;
             }
             case 10: {
-                    //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                    Tradition tradition(company);
-                    //                    Train train(company, "2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                    //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                    //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                    //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                    //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                    //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                //                    Tradition tradition(company);
+                //                    Train train(company, "2011-12-01", "2011-12-30");
+                //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 break;
             }
         }
@@ -2618,9 +2615,9 @@ int main(int argc, const char *argv[]) {
             RunMode runMode(_info, companyPricePaths);
         }
         else {
-            CalIRR calIRR(companyPricePaths);
-            //                    MergeIRRFile mergeFile;
-            //                    SortIRRFileBy IRR("IRR");
+            // CalIRR calIRR(companyPricePaths);
+            // MergeIRRFile mergeFile;
+            // SortIRRFileBy IRR("test_IRR_name_sorted_SMA_RSI", "IRR");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
