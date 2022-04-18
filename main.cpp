@@ -164,7 +164,7 @@ public:
         vector<string> trainTraditionBestHold_;
         vector<string> testTraditionBestHold_;
     };
-    Info &info_;
+    Info *info_;
     string companyName_;
     Path paths_;
 
@@ -193,7 +193,7 @@ public:
     CompanyInfo(path pricePath, Info &info);
 };
 
-CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.stem().string()), info_(info) {
+CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.stem().string()), info_(&info) {
     set_paths(paths_);
     store_date_price(pricePath);
     create_folder(paths_);
@@ -202,12 +202,12 @@ CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.st
 }
 
 void CompanyInfo::set_paths(Path &paths) {
-    for (auto tech : info_.allTech_) {
+    for (auto tech : info_->allTech_) {
         paths.techOuputPaths_.push_back("tech/" + tech + "/" + companyName_ + "/");
 
-        paths.resultOutputPaths_.push_back(info_.rootFolder_ + "result_" + tech + "/");
+        paths.resultOutputPaths_.push_back(info_->rootFolder_ + "result_" + tech + "/");
 
-        string companyRootFolder = info_.rootFolder_ + "result_" + tech + "/" + companyName_ + "/";
+        string companyRootFolder = info_->rootFolder_ + "result_" + tech + "/" + companyName_ + "/";
         paths.companyRootPaths_.push_back(companyRootFolder);
 
         paths.trainFilePaths_.push_back(companyRootFolder + "train/");
@@ -228,8 +228,8 @@ void CompanyInfo::set_paths(Path &paths) {
         paths.trainTraditionBestHold_.push_back(companyRootFolder + "trainTraditionBestHold/");
         paths.testTraditionBestHold_.push_back(companyRootFolder + "testTraditionBestHold/");
     }
-    if (info_.debug_) {
-        paths.trainFilePaths_[info_.techIndex_].clear();
+    if (info_->debug_) {
+        paths.trainFilePaths_[info_->techIndex_].clear();
     }
 }
 
@@ -246,11 +246,11 @@ void CompanyInfo::store_date_price(path priceFilePath) {
         else {
             price_[i - 1] = stod(priceFile[i][4]);
         }
-        if (j == 0 && date_[i - 1].substr(0, 7) == info_.testStartYear_) {
+        if (j == 0 && date_[i - 1].substr(0, 7) == info_->testStartYear_) {
             testStartRow_ = i - 1;
             j++;
         }
-        else if (j == 1 && date_[i - 1].substr(0, 7) == info_.testEndYear_) {
+        else if (j == 1 && date_[i - 1].substr(0, 7) == info_->testEndYear_) {
             testEndRow_ = i - 2;
             j++;
         }
@@ -258,28 +258,28 @@ void CompanyInfo::store_date_price(path priceFilePath) {
 }
 
 void CompanyInfo::create_folder(Path &paths) {
-    if (!info_.mixedTech_) {
-        create_directories(paths.techOuputPaths_[info_.techIndex_]);
+    if (!info_->mixedTech_) {
+        create_directories(paths.techOuputPaths_[info_->techIndex_]);
     }
-    // create_directories(paths.trainHoldFilePaths_[info_.techIndex_]);
-    create_directories(paths.testHoldFilePaths_[info_.techIndex_]);
-    // create_directories(paths.trainTraditionHoldFilePaths_[info_.techIndex_]);
-    create_directories(paths.testTraditionHoldFilePaths_[info_.techIndex_]);
-    // create_directories(paths.trainBestHold_[info_.techIndex_]);
-    // create_directories(paths.testBestHold_[info_.techIndex_]);
-    // create_directories(paths.trainTraditionBestHold_[info_.techIndex_]);
-    // create_directories(paths.testTraditionBestHold_[info_.techIndex_]);
-    for (auto i : info_.slidingWindows_) {
-        create_directories(paths.trainFilePaths_[info_.techIndex_] + i);
-        create_directories(paths.testFilePaths_[info_.techIndex_] + i);
-        create_directories(paths.trainTraditionFilePaths_[info_.techIndex_] + i);
-        create_directories(paths.testTraditionFilePaths_[info_.techIndex_] + i);
+    // create_directories(paths.trainHoldFilePaths_[info_->techIndex_]);
+    create_directories(paths.testHoldFilePaths_[info_->techIndex_]);
+    // create_directories(paths.trainTraditionHoldFilePaths_[info_->techIndex_]);
+    create_directories(paths.testTraditionHoldFilePaths_[info_->techIndex_]);
+    // create_directories(paths.trainBestHold_[info_->techIndex_]);
+    // create_directories(paths.testBestHold_[info_->techIndex_]);
+    // create_directories(paths.trainTraditionBestHold_[info_->techIndex_]);
+    // create_directories(paths.testTraditionBestHold_[info_->techIndex_]);
+    for (auto i : info_->slidingWindows_) {
+        create_directories(paths.trainFilePaths_[info_->techIndex_] + i);
+        create_directories(paths.testFilePaths_[info_->techIndex_] + i);
+        create_directories(paths.trainTraditionFilePaths_[info_->techIndex_] + i);
+        create_directories(paths.testTraditionFilePaths_[info_->techIndex_] + i);
     }
 }
 
 void CompanyInfo::find_table_start_row() {
     int longestTrainMonth = -1;
-    for (auto windowComponent : info_.slidingWindowPairs_) {
+    for (auto windowComponent : info_->slidingWindowPairs_) {
         int trainMonth;
         if (get<1>(windowComponent.second) == 'M') {
             trainMonth = get<2>(windowComponent.second);
@@ -310,10 +310,10 @@ void CompanyInfo::find_table_start_row() {
 }
 
 void CompanyInfo::store_tech_to_vector() {
-    cout << "calculating " << companyName_ << " " << info_.techType_ << endl;
+    cout << "calculating " << companyName_ << " " << info_->techType_ << endl;
     vector<double> tmp;
     techTable_.push_back(tmp);
-    (this->*cal_tech_[info_.techIndex_])(tmp);  // or (*this.*cal_tech_[info_.techIndex_])(tmp);
+    (this->*cal_tech_[info_->techIndex_])(tmp);  // or (*this.*cal_tech_[info_->techIndex_])(tmp);
     cout << "done calculating" << endl;
 }
 
@@ -393,7 +393,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
 
 void CompanyInfo::output_Tech() {
     store_tech_to_vector();
-    cout << "saving " << info_.techType_ << " file" << endl;
+    cout << "saving " << info_->techType_ << " file" << endl;
     for (int techPeriod = 1; techPeriod < 257; techPeriod++) {
         if (techPeriod % 10 == 0) {
             cout << ".";
@@ -402,7 +402,7 @@ void CompanyInfo::output_Tech() {
         set_techFile_title(out, techPeriod);
         int techSize = (int)techTable_[techPeriod].size();
         int dateRow = 0;
-        switch (info_.techIndex_) {
+        switch (info_->techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -429,13 +429,13 @@ void CompanyInfo::output_Tech() {
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
     if (techPerid < 10) {
-        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_00" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_00" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 10 && techPerid < 100) {
-        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_0" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_0" + to_string(techPerid) + ".csv");
     }
     else if (techPerid >= 100) {
-        out.open(paths_.techOuputPaths_[info_.techIndex_] + companyName_ + "_" + info_.techType_ + "_" + to_string(techPerid) + ".csv");
+        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
 
@@ -459,7 +459,7 @@ public:
     TechTable(CompanyInfo *company, int techIndex);
 };
 
-TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_.allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_) {
+TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_->allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_) {
     create_techTable();
 }
 
@@ -532,7 +532,7 @@ void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) 
 
 void TechTable::output_techTable() {
     ofstream out;
-    out.open(company_->companyName_ + "_" + company_->info_.techType_ + "_table.csv");
+    out.open(company_->companyName_ + "_" + company_->info_->techType_ + "_table.csv");
     for (int i = 1; i < 257; i++) {
         out << "," << i;
     }
@@ -575,7 +575,7 @@ public:
     TestWindow(CompanyInfo &company, string window);
 };
 
-TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowComponent_(company.info_.slidingWindowPairs_.at(window)), tableStartRow_(company.tableStartRow_) {
+TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowComponent_(company.info_->slidingWindowPairs_.at(window)), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval();
     }
@@ -955,7 +955,7 @@ public:
     Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
 };
 
-Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) : company_(company), techIndex_(techIndex), techType_(company_->info_.techType_), remain_(company->info_.totalCapitalLV_), isRecordOn_(isRecordOn) {
+Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) : company_(company), techIndex_(techIndex), techType_(company_->info_->techType_), remain_(company->info_->totalCapitalLV_), isRecordOn_(isRecordOn) {
     eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
@@ -987,7 +987,7 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
     if (hold) {
         holdData.clear();
         holdData += "Date,Price,Hold,buy,sell date,sell " + techType_ + ",";
-        if (!company_->info_.mixedTech_) {
+        if (!company_->info_->mixedTech_) {
             switch (techIndex_) {
                 case 0:
                 case 1:
@@ -1051,7 +1051,7 @@ void Particle::output_trade_record(ofstream &out) {
 void Particle::set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate) {
     if (hold) {
         string titleVariables = set_title_variables();
-        ofstream holdFile(company_->companyName_ + "_" + company_->info_.techType_ + titleVariables + "_hold_" + startDate + "_" + endDate + ".csv");
+        ofstream holdFile(company_->companyName_ + "_" + company_->info_->techType_ + titleVariables + "_hold_" + startDate + "_" + endDate + ".csv");
         holdFile << holdData;
         holdFile.close();
     }
@@ -1095,7 +1095,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
         }
     }
     check_buyNum_sellNum();
-    RoR_ = (remain_ - company_->info_.totalCapitalLV_) / company_->info_.totalCapitalLV_ * 100.0;
+    RoR_ = (remain_ - company_->info_->totalCapitalLV_) / company_->info_->totalCapitalLV_ * 100.0;
     push_tradeData_last(lastRecord);
 }
 
@@ -1120,7 +1120,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
     //     bool MAbuy = false;
     //     bool MAsell = false;
     //     if (!RSIhold) {
-    //         RSIbuy = !RSIhold && (*buy[info_.techIndex_])(tables_, decimal_, i) && i != endRow;
+    //         RSIbuy = !RSIhold && (*buy[info_->techIndex_])(tables_, decimal_, i) && i != endRow;
     //         if (RSIbuy)
     //             RSIhold = true;
     //     }
@@ -1130,7 +1130,7 @@ void Particle::set_buy_sell_condition(bool &buyCondition, bool &sellCondition, i
     //             MAhold = true;
     //     }
 
-    //     RSIsell = RSIhold && ((*sell[info_.techIndex_])(tables_, decimal_, i) || i == endRow);
+    //     RSIsell = RSIhold && ((*sell[info_->techIndex_])(tables_, decimal_, i) || i == endRow);
     //     MAsell = MAhold && ((*tables_)[1].techTable_[i][sell1] <= (*tables_)[1].techTable_[i][sell2] || i == endRow);
 
     //     buyCondition = !stockHold && RSIhold && MAhold && i != endRow;
@@ -1318,7 +1318,7 @@ void Particle::reset(double RoR) {
     fill(decimal_.begin(), decimal_.end(), 0);
     buyNum_ = 0;
     sellNum_ = 0;
-    remain_ = company_->info_.totalCapitalLV_;
+    remain_ = company_->info_->totalCapitalLV_;
     RoR_ = RoR;
     tradeRecord_.clear();
     trainOrTestData_.clear();
@@ -1370,7 +1370,7 @@ void Particle::print(ostream &out = cout) {
 
 void Particle::record_train_test_data(int startRow, int endRow, string *holdDataPtr, vector<vector<string>> *trainFile) {
     isRecordOn_ = true;
-    remain_ = company_->info_.totalCapitalLV_;
+    remain_ = company_->info_->totalCapitalLV_;
     trade(startRow, endRow, false, holdDataPtr);
     if (all_of(decimal_.begin(), decimal_.end(), [](int i) { return !i; })) {
         reset();
@@ -1387,15 +1387,15 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
     }
     else {
         trainOrTestData_ += "tech type," + techType_ + "\n";
-        trainOrTestData_ += "algo," + company_->info_.algoType_ + "\n";
-        trainOrTestData_ += "delta," + set_precision(company_->info_.delta_) + "\n";
-        trainOrTestData_ += "exp," + to_string(company_->info_.expNum_) + "\n";
-        trainOrTestData_ += "gen," + to_string(company_->info_.genNum_) + "\n";
-        trainOrTestData_ += "p number," + to_string(company_->info_.particleNum_) + "\n\n";
+        trainOrTestData_ += "algo," + company_->info_->algoType_ + "\n";
+        trainOrTestData_ += "delta," + set_precision(company_->info_->delta_) + "\n";
+        trainOrTestData_ += "exp," + to_string(company_->info_->expNum_) + "\n";
+        trainOrTestData_ += "gen," + to_string(company_->info_->genNum_) + "\n";
+        trainOrTestData_ += "p number," + to_string(company_->info_->particleNum_) + "\n\n";
     }
-    trainOrTestData_ += "initial capital," + set_precision(company_->info_.totalCapitalLV_) + "\n";
+    trainOrTestData_ += "initial capital," + set_precision(company_->info_->totalCapitalLV_) + "\n";
     trainOrTestData_ += "final capital," + set_precision(remain_) + "\n";
-    trainOrTestData_ += "final return," + set_precision(remain_ - company_->info_.totalCapitalLV_) + "\n";
+    trainOrTestData_ += "final return," + set_precision(remain_ - company_->info_->totalCapitalLV_) + "\n";
     trainOrTestData_ += "return rate," + set_precision(RoR_) + "%\n\n";
     switch (techIndex_) {
         case 0:
@@ -1472,13 +1472,13 @@ public:
     TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName = "", bool record = false);
 };
 
-TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_{tables}, startRow_(startRow), endRow_(endRow), actualDelta_(company.info_.delta_), debug_(company.info_.debug_), record_(record) {
+TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_{tables}, startRow_(startRow), endRow_(endRow), actualDelta_(company.info_->delta_), debug_(company.info_->debug_), record_(record) {
     cout << tables_[0].date_[startRow_] << "~" << tables_[0].date_[endRow] << endl;
     create_particles();
     create_betaMatrix();
     globalP_[0].reset();
     debugOut_ = set_debug_file();
-    for (int expCnt = 0; expCnt < company_.info_.expNum_; expCnt++) {
+    for (int expCnt = 0; expCnt < company_.info_->expNum_; expCnt++) {
         start_exp(expCnt);
     }
     debugOut_.close();
@@ -1489,10 +1489,10 @@ TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int 
 }
 
 void TrainAPeriod::create_particles() {
-    Particle p(&company_, company_.info_.techIndex_, debug_);
+    Particle p(&company_, company_.info_->techIndex_, debug_);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
-    for (int i = 0; i < company_.info_.particleNum_; i++) {
+    for (int i = 0; i < company_.info_->particleNum_; i++) {
         particles_.push_back(p);
     }
     for (int i = 0; i < 5; i++) {
@@ -1514,8 +1514,8 @@ ofstream TrainAPeriod::set_debug_file() {
         string title;
         title += "debug_";
         title += company_.companyName_ + "_";
-        title += company_.info_.techType_ + "_";
-        title += company_.info_.algoType_ + "_";
+        title += company_.info_->techType_ + "_";
+        title += company_.info_->algoType_ + "_";
         title += delta + "_";
         title += get_date(tables_[0].date_, startRow_, endRow_) + ".csv";
         out.open(title);
@@ -1528,14 +1528,14 @@ void TrainAPeriod::start_exp(int expCnt) {
     globalP_[1].reset();
     betaMatrix_.reset();
     initialize_KNQTS();
-    for (int genCnt = 0; genCnt < company_.info_.genNum_; genCnt++) {
+    for (int genCnt = 0; genCnt < company_.info_->genNum_; genCnt++) {
         start_gen(expCnt, genCnt);
     }
     update_best(0);
 }
 
 void TrainAPeriod::initialize_KNQTS() {
-    actualDelta_ = company_.info_.delta_;
+    actualDelta_ = company_.info_->delta_;
     compareNew_ = 0;
     compareOld_ = 0;
 }
@@ -1548,8 +1548,8 @@ void TrainAPeriod::output_debug_exp(int expCnt) {
 void TrainAPeriod::start_gen(int expCnt, int genCnt) {
     output_debug_gen(genCnt);
     globalP_[3].reset();
-    globalP_[4].reset(company_.info_.totalCapitalLV_);
-    for (int i = 0; i < company_.info_.particleNum_; i++) {
+    globalP_[4].reset(company_.info_->totalCapitalLV_);
+    for (int i = 0; i < company_.info_->particleNum_; i++) {
         evolve_particles(i);
     }
     store_exp_gen(expCnt, genCnt);
@@ -1602,7 +1602,7 @@ void TrainAPeriod::update_global() {
 }
 
 void TrainAPeriod::run_algo() {
-    switch (company_.info_.algoIndex_) {
+    switch (company_.info_->algoIndex_) {
         case 0: {
             if (globalP_[3].RoR_ > 0) {
                 QTS();
@@ -1671,7 +1671,7 @@ void TrainAPeriod::GNQTS() {
 }
 
 void TrainAPeriod::KNQTScompare() {
-    switch (company_.info_.compareMode_) {
+    switch (company_.info_->compareMode_) {
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
             for (; localBestBinaryIter != globalP_[3].binary_.end();) {
@@ -1697,10 +1697,10 @@ void TrainAPeriod::KNQTScompare() {
 
 void TrainAPeriod::KNQTSmultiply() {
     if (compareNew_ > compareOld_) {
-        actualDelta_ *= company_.info_.multiplyUp_;
+        actualDelta_ *= company_.info_->multiplyUp_;
     }
     else {
-        actualDelta_ *= company_.info_.multiplyDown_;
+        actualDelta_ *= company_.info_->multiplyDown_;
     }
     compareOld_ = compareNew_;
     compareNew_ = 0;
@@ -1708,7 +1708,7 @@ void TrainAPeriod::KNQTSmultiply() {
 
 void TrainAPeriod::output_debug_beta() {
     if (debug_) {
-        switch (company_.info_.algoIndex_) {
+        switch (company_.info_->algoIndex_) {
             case 0: {
                 debugOut_ << "local best" << endl;
                 globalP_[3].print(debugOut_);
@@ -1787,8 +1787,8 @@ public:
 
 class Train {
 private:
-    CompanyInfo &company_;
-    vector<TechTable> tables_;
+    CompanyInfo *company_;
+    vector<TechTable> *tables_;
 
     Semaphore sem_;
 
@@ -1798,24 +1798,36 @@ private:
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
 public:
+    Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem);
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
 };
 
-Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.windowThreadNum_) {
-    int startRow = find_index_of_string_in_vec(tables_[0].date_, startDate);
-    int endRow = find_index_of_string_in_vec(tables_[0].date_, endDate);
+Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tables_(&tables) {
+    sem.wait();
+    Info info = *company.info_;
+    company.info_ = &info;
+    company_ = &company;
+    train_a_company();
+    sem.notify();
+}
+
+Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(&company), sem_(company.info_->windowThreadNum_) {
+    vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
+    tables_ = &tables;
+    int startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
+    int endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
     srand(343);
-    company_.paths_.trainFilePaths_[company_.info_.techIndex_].clear();
-    TrainAPeriod trainAPeriod(company, tables_, startRow, endRow);
+    company_->paths_.trainFilePaths_[company_->info_->techIndex_].clear();
+    TrainAPeriod trainAPeriod(*company_, *tables_, startRow, endRow);
     print_date_train_file(trainAPeriod.trainData_, startDate, endDate);
 }
 
 void Train::print_date_train_file(string &trainData, string startDate, string endDate) {
-    string title = company_.info_.techType_ + "_";
-    title += company_.companyName_ + "_";
-    title += company_.info_.algoType_ + "_";
-    title += remove_zeros_at_end(company_.info_.delta_) + "_";
+    string title = company_->info_->techType_ + "_";
+    title += company_->companyName_ + "_";
+    title += company_->info_->algoType_ + "_";
+    title += remove_zeros_at_end(company_->info_->delta_) + "_";
     title += startDate + "_";
     title += endDate + ".csv";
     ofstream out(title);
@@ -1823,23 +1835,16 @@ void Train::print_date_train_file(string &trainData, string startDate, string en
     out.close();
 }
 
-Train::Train(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_.techIndex_)}), sem_(company.info_.windowThreadNum_) {
-    if (!company_.info_.testDeltaLoop_) {
-        train_a_company();
-    }
-    else {
-        company_.paths_.trainFilePaths_[company_.info_.techIndex_].clear();
-        for (int loop = 0; loop < company.info_.testDeltaLoop_; loop++) {
-            train_a_company();
-            company_.info_.delta_ -= company_.info_.testDeltaGap_;
-        }
-    }
+Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->windowThreadNum_) {
+    vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
+    tables_ = &tables;
+    train_a_company();
 }
 
 void Train::train_a_company() {
     vector<thread> windowThreads;
-    for (auto windowName : company_.info_.slidingWindows_) {
-        if (company_.info_.windowThreadNum_) {
+    for (auto windowName : company_->info_->slidingWindows_) {
+        if (company_->info_->windowThreadNum_) {
             windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
         }
         else {
@@ -1852,38 +1857,61 @@ void Train::train_a_company() {
 }
 
 void Train::train_a_window(string windowName) {
-    if (company_.info_.windowThreadNum_) {
+    if (company_->info_->windowThreadNum_) {
         sem_.wait();
     }
-    TrainWindow window(company_, windowName);
+    TrainWindow window(*company_, windowName);
     if (window.interval_[0] >= 0) {
         string outputPath = [&company_ = this->company_, windowName]() {
-            if (company_.info_.testDeltaLoop_) {
-                string dir = windowName + "_" + to_string(company_.info_.delta_) + "/";
+            if (company_->info_->testDeltaLoop_) {
+                string dir = windowName + "_" + to_string(company_->info_->delta_) + "/";
                 create_directories(dir);
                 return dir;
             }
-            return company_.paths_.trainFilePaths_[company_.info_.techIndex_] + windowName + "/";
+            return company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName + "/";
         }();
         window.print_train();
         srand(343);
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-            TrainAPeriod trainAPeriod(company_, tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+            TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
             output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
         }
     }
     else {
         cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
-    if (company_.info_.windowThreadNum_) {
+    if (company_->info_->windowThreadNum_) {
         sem_.notify();
     }
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
-    ofstream out(ouputPath + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+    ofstream out(ouputPath + get_date((*tables_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
     out << trainData;
     out.close();
+}
+
+class TrainLoop{
+private:
+    CompanyInfo &company_;
+    vector<TechTable> tables_;
+
+    Semaphore sem_;
+public:
+    TrainLoop(CompanyInfo &company);
+};
+
+TrainLoop::TrainLoop(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_->techIndex_)}), sem_(company.info_->companyThreadNum_){
+    vector<thread> loopThread;
+    company_.paths_.trainFilePaths_[company_.info_->techIndex_].clear();
+    for (int loop = 0; loop < company_.info_->testDeltaLoop_; loop++) {
+        loopThread.push_back(thread([&]() { Train(company_, tables_, sem_); }));
+        this_thread::sleep_for(1s);
+        company_.info_->delta_ -= company_.info_->testDeltaGap_;
+    }
+    for (auto &t : loopThread) {
+        t.join();
+    }
 }
 
 class Test {
@@ -1921,7 +1949,7 @@ Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> addition
     add_tables(additionTable);
     create_particle();
     set_train_test_file_path();
-    for (auto windowName : company_.info_.slidingWindows_) {
+    for (auto windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
             TrainWindow window(company_, windowName);
             cout << window.windowName_ << endl;
@@ -1931,11 +1959,11 @@ Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> addition
 }
 
 void Test::add_tables(vector<int> addtionTable) {
-    if (!company_.info_.mixedTech_) {
-        tables_.push_back(TechTable(&company_, company_.info_.techIndex_));
+    if (!company_.info_->mixedTech_) {
+        tables_.push_back(TechTable(&company_, company_.info_->techIndex_));
     }
     else {
-        for (auto &techIndex : company_.info_.techIndexs_) {
+        for (auto &techIndex : company_.info_->techIndexs_) {
             tables_.push_back(TechTable(&company_, techIndex));
         }
     }
@@ -1947,10 +1975,10 @@ void Test::add_tables(vector<int> addtionTable) {
 }
 
 void Test::create_particle() {
-    if (!company_.info_.mixedTech_) {
-        switch (company_.info_.techIndex_) {
+    if (!company_.info_->mixedTech_) {
+        switch (company_.info_->techIndex_) {
             case 3: {
-                p_ = Particle(&company_, company_.info_.techIndex_);
+                p_ = Particle(&company_, company_.info_->techIndex_);
                 break;
             }
         }
@@ -1959,10 +1987,10 @@ void Test::create_particle() {
 }
 
 void Test::set_train_test_file_path() {
-    if (!company_.info_.mixedTech_) {
+    if (!company_.info_->mixedTech_) {
         set_normal_paths();
     }
-    else if (company_.info_.mixedTech_) {
+    else if (company_.info_->mixedTech_) {
         set_mixedTech_paths();
     }
     cout << "test " << company_.companyName_ << endl;
@@ -1970,27 +1998,27 @@ void Test::set_train_test_file_path() {
 
 void Test::set_normal_paths() {
     if (tradition_) {
-        paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_];
+        paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
     }
     else {
-        paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[company_.info_.techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_.techIndex_];
+        paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[company_.info_->techIndex_]);
+        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
     }
 }
 
 void Test::set_mixedTech_paths() {
     if (tradition_) {
-        for (auto &techIndex : company_.info_.techIndexs_) {
+        for (auto &techIndex : company_.info_->techIndexs_) {
             paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[techIndex]);
         }
-        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
     }
     else {
-        for (auto &techIndex : company_.info_.techIndexs_) {
+        for (auto &techIndex : company_.info_->techIndexs_) {
             paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[techIndex]);
         }
-        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_.techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
     }
 }
 
@@ -2000,7 +2028,7 @@ void Test::test_a_window(TrainWindow &window) {
         diffTechTrainFilePath.push_back(get_path(trainPath + window.windowName_));
     }
     if (window.interval_[0] >= 0) {
-        vector<vector<vector<string>>> aPeriodTrainFiles(company_.info_.mixedTechNum_);
+        vector<vector<vector<string>>> aPeriodTrainFiles(company_.info_->mixedTechNum_);
         check_exception(diffTechTrainFilePath, window);
         p_.push_holdData_column_Name(hold_, holdData_, holdDataPtr_);
         auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
@@ -2008,7 +2036,7 @@ void Test::test_a_window(TrainWindow &window) {
             for (auto &file : aPeriodTrainFiles) {
                 file.clear();
             }
-            for (size_t index = 0; index < company_.info_.mixedTechNum_; index++) {
+            for (size_t index = 0; index < company_.info_->mixedTechNum_; index++) {
                 aPeriodTrainFiles[index] = read_data(diffTechTrainFilePath[index][filePathIndex]);
             }
             p_.reset();
@@ -2035,13 +2063,13 @@ void Test::check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &
 
 size_t Test::set_variables(vector<vector<vector<string>>> &thisTrainFile) {
     size_t bestRoRIndex = 0;
-    if (company_.info_.mixedTech_) {
+    if (company_.info_->mixedTech_) {
         vector<double> everyRoR;
         for (auto &trainFile : thisTrainFile) {
             everyRoR.push_back(stod(trainFile[10][1]));
         }
         bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
-        p_ = Particle(&company_, company_.info_.techIndexs_[bestRoRIndex]);
+        p_ = Particle(&company_, company_.info_->techIndexs_[bestRoRIndex]);
         p_.tables_ = &tables_;
     }
     for (int i = 0; i < p_.variableNum_; i++) {
@@ -2053,10 +2081,10 @@ size_t Test::set_variables(vector<vector<vector<string>>> &thisTrainFile) {
 void Test::output_test_file(TestWindow &window, int startRow, int endRow) {
     ofstream out;
     if (!tradition_) {
-        out.open(company_.paths_.testFilePaths_[company_.info_.techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
+        out.open(company_.paths_.testFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
     }
     else {
-        out.open(company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
+        out.open(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
     }
     out << p_.trainOrTestData_;
     out.close();
@@ -2066,10 +2094,10 @@ void Test::output_test_holdData(TestWindow &window) {
     if (hold_) {
         ofstream holdFile;
         if (!tradition_) {
-            holdFile.open(company_.paths_.testHoldFilePaths_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
+            holdFile.open(company_.paths_.testHoldFilePaths_[company_.info_->techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         else if (tradition_) {
-            holdFile.open(company_.paths_.testTraditionHoldFilePaths_[company_.info_.techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
+            holdFile.open(company_.paths_.testTraditionHoldFilePaths_[company_.info_->techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
         }
         holdFile << holdData_;
         holdFile.close();
@@ -2082,10 +2110,10 @@ public:
     BH(CompanyInfo &company, string startDate, string endDate) {
         int startRow = find_index_of_string_in_vec(company.date_, startDate);
         int endRow = find_index_of_string_in_vec(company.date_, endDate);
-        int stockHold = company.info_.totalCapitalLV_ / company.price_[startRow];
-        double remain = company.info_.totalCapitalLV_ - stockHold * company.price_[startRow];
+        int stockHold = company.info_->totalCapitalLV_ / company.price_[startRow];
+        double remain = company.info_->totalCapitalLV_ - stockHold * company.price_[startRow];
         remain += stockHold * company.price_[endRow];
-        BHRoR = ((remain - company.info_.totalCapitalLV_) / company.info_.totalCapitalLV_);
+        BHRoR = ((remain - company.info_->totalCapitalLV_) / company.info_->totalCapitalLV_);
     }
 };
 
@@ -2109,11 +2137,11 @@ public:
     Tradition(CompanyInfo &company, string targetWindow = "all");
 };
 
-Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company, company.info_.techIndex_)} {
+Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company, company.info_->techIndex_)} {
     set_strategy();
     create_particles();
     cout << "train " << company_.companyName_ << " tradition" << endl;
-    for (auto windowName : company_.info_.slidingWindows_) {
+    for (auto windowName : company_.info_->slidingWindows_) {
         TrainWindow window(company_, windowName);
         if (window.interval_[0] >= 0) {
             train_a_tradition_window(window);
@@ -2125,12 +2153,12 @@ Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(compa
 }
 
 void Tradition::set_strategy() {
-    traditionStrategy_ = allTraditionStrategy_[company_.info_.techIndex_];
+    traditionStrategy_ = allTraditionStrategy_[company_.info_->techIndex_];
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
 
 void Tradition::create_particles() {
-    Particle p(&company_, company_.info_.techIndex_);
+    Particle p(&company_, company_.info_->techIndex_);
     p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++) {
         particles_.push_back(p);
@@ -2138,7 +2166,7 @@ void Tradition::create_particles() {
 }
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
-    string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_.techIndex_] + window.windowName_;
+    string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_;
     for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
         for (int i = 0; i < traditionStrategyNum_; i++) {
             particles_[i].reset();
@@ -2246,9 +2274,9 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
             out << outputData;
             out.close();
         };
-        ofstream out(company.paths_.companyRootPaths_[company.info_.techIndex_] + company.companyName_ + "_testRoR.csv");
+        ofstream out(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_testRoR.csv");
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.algoRoRoutData_);
-        out.open(company.paths_.companyRootPaths_[company.info_.techIndex_] + company.companyName_ + "_traditionRoR.csv");
+        out.open(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_traditionRoR.csv");
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.traditionRoRoutData_);
     }
     output_all_IRR();
@@ -2343,14 +2371,14 @@ vector<string> CalIRR::remove_A2A_and_sort() {
 
 CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
     thisCompanyWindowIRR_.companyName_ = company_.companyName_;
-    if (company_.info_.mixedTech_) {
-        tmpWinodwIRR_.resize_vec(company_.info_.allTech_.size());
+    if (company_.info_->mixedTech_) {
+        tmpWinodwIRR_.resize_vec(company_.info_->allTech_.size());
     }
-    for (auto &window : company_.info_.slidingWindows_) {
+    for (auto &window : company_.info_->slidingWindows_) {
         if (window != "A2A") {
             cout << window << endl;
-            tmpWinodwIRR_.algoIRR_ = cal_one_window_IRR(allRoRData_.algoRoRoutData_, window, company_.paths_.testFilePaths_[company_.info_.techIndex_], false);
-            tmpWinodwIRR_.traditionIRR_ = cal_one_window_IRR(allRoRData_.traditionRoRoutData_, window, company_.paths_.testTraditionFilePaths_[company_.info_.techIndex_], true);  //若還沒有傳統的test這行可以註解
+            tmpWinodwIRR_.algoIRR_ = cal_one_window_IRR(allRoRData_.algoRoRoutData_, window, company_.paths_.testFilePaths_[company_.info_->techIndex_], false);
+            tmpWinodwIRR_.traditionIRR_ = cal_one_window_IRR(allRoRData_.traditionRoRoutData_, window, company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_], true);  //若還沒有傳統的test這行可以註解
             tmpWinodwIRR_.windowName_ = window;
             thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
             tmpWinodwIRR_.fill_zero();
@@ -2368,7 +2396,7 @@ double CalIRR::CalOneCompanyIRR::cal_one_window_IRR(string &RoRoutData, string &
     for (auto filePathIter = strategyPaths.begin(); filePathIter != strategyPaths.end(); filePathIter++) {
         RoRoutData += compute_and_record_window_RoR(strategyPaths, filePathIter, totalRoR, tradition);
     }
-    double windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_.testLength_) - 1.0;
+    double windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_->testLength_) - 1.0;
     RoRoutData += ",,,,,,," + window + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
     return windowIRR;
 }
@@ -2386,11 +2414,11 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         push += "," + filePathIter->stem().string() + ",";
     }
     int techIndex = -1;
-    if (!company_.info_.mixedTech_) {
-        techIndex = company_.info_.techIndex_;
+    if (!company_.info_->mixedTech_) {
+        techIndex = company_.info_->techIndex_;
     }
     else {
-        techIndex = find_index_of_string_in_vec(company_.info_.allTech_, file[0][1]);
+        techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
     }
     for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
         push += file[i + 12][1] + ",";
@@ -2399,7 +2427,7 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         push += ",";
     }
     push += file[10][1] + "\n";
-    if (company_.info_.mixedTech_) {
+    if (company_.info_->mixedTech_) {
         if (!tradition) {
             tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
         }
@@ -2413,7 +2441,7 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
 CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR() {
     BH bh(company_, company_.date_[company_.testStartRow_], company_.date_[company_.testEndRow_]);
     tmpWinodwIRR_.windowName_ = "B&H";
-    tmpWinodwIRR_.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_.testLength_) - 1.0;
+    tmpWinodwIRR_.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_->testLength_) - 1.0;
     tmpWinodwIRR_.traditionIRR_ = tmpWinodwIRR_.algoIRR_;
     return tmpWinodwIRR_;
 }
@@ -2551,7 +2579,7 @@ private:
         if (info_.companyThreadNum_) {
             sem_.wait();
         }
-        switch (company.info_.mode_) {
+        switch (company.info_->mode_) {
             case 0: {
                 Train train(company);
                 break;
@@ -2561,7 +2589,7 @@ private:
                 break;
             }
             case 2: {
-                Tradition trainTradition(company, company.info_.setWindow_);
+                Tradition trainTradition(company, company.info_->setWindow_);
                 break;
             }
             case 3: {
@@ -2569,15 +2597,16 @@ private:
                 break;
             }
             case 10: {
-                //                    Test(company, company.info_.setWindow_, false, true, vector<int>{0});
+                //                    Test(company, company.info_->setWindow_, false, true, vector<int>{0});
                 //                    Tradition tradition(company);
                 //                    Train train(company, "2011-12-01", "2011-12-30");
                 //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                 //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                 //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
                 //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                //                    Test test(company, company.info_.setWindow_, false, true, vector<int>{0});
-                //                    Particle(&company, company.info_.techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                //                    Test test(company, company.info_->setWindow_, false, true, vector<int>{0});
+                //                    Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                TrainLoop loop(company);
                 break;
             }
         }
