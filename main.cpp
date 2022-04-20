@@ -27,11 +27,11 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 11;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "all";
+    int mode_ = 10;
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
+    string setWindow_ = "M2M";
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {3};
     bool mixedTech_ = false;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -42,18 +42,18 @@ public:
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
-    double delta_ = 0.00016;
+    double delta_ = 0.005;
     int expNum_ = 50;
-    int genNum_ = 10000;
+    int genNum_ = 1000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
-    int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
+    int companyThreadNum_ = 2;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
     int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
-    int testDeltaLoop_ = 0;
+    int testDeltaLoop_ = 499;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
     double multiplyDown_ = 0.99;
@@ -1804,10 +1804,10 @@ public:
 };
 
 Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tables_(&tables) {
-    sem.wait();
     Info info = *company.info_;
     company.info_ = &info;
     company_ = &company;
+    sem.wait();
     train_a_company();
     sem.notify();
 }
