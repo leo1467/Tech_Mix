@@ -27,12 +27,12 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 10;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "M2M";
+    int mode_ = 0;
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {3};
-    bool mixedTech_ = false;
+    vector<int> techIndexs_ = {0};
+    bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     string techType_;
@@ -42,18 +42,18 @@ public:
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
-    double delta_ = 0.005;
+    double delta_ = 0.00016;
     int expNum_ = 50;
-    int genNum_ = 1000;
+    int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
 
-    int companyThreadNum_ = 2;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
+    int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
     int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
-    int testDeltaLoop_ = 499;
+    int testDeltaLoop_ = 0;
     double testDeltaGap_ = 0.00001;
     double multiplyUp_ = 1.01;
     double multiplyDown_ = 0.99;
@@ -318,13 +318,13 @@ void CompanyInfo::store_tech_to_vector() {
 }
 
 void CompanyInfo::cal_SMA(vector<double> &tmp) {
-    for (int MA = 1; MA < 257; MA++) {
-        for (int dateRow = MA - 1; dateRow < totalDays_; dateRow++) {
+    for (int period = 1; period < 257; period++) {
+        for (int dateRow = 0; dateRow < totalDays_; dateRow++) {
             double MARangePriceSum = 0;
-            for (int i = dateRow, j = MA; j > 0; i--, j--) {
+            for (int i = dateRow, j = period; j > 0; i--, j--) {
                 MARangePriceSum += price_[i];
             }
-            tmp.push_back(MARangePriceSum / MA);
+            tmp.push_back(MARangePriceSum / period);
         }
         techTable_.push_back(tmp);
         tmp.clear();
@@ -332,11 +332,11 @@ void CompanyInfo::cal_SMA(vector<double> &tmp) {
 }
 
 void CompanyInfo::cal_WMA(vector<double> &tmp) {
-    for (int WMA = 1; WMA < 257; WMA++) {
-        for (int dateRow = WMA - 1; dateRow < totalDays_; dateRow++) {
+    for (int period = 1; period < 257; period++) {
+        for (int dateRow = period - 1; dateRow < totalDays_; dateRow++) {
             double weightedPriceSum = 0;
             int totalWeight = 0;
-            for (int weight = WMA, tmpDateRow = dateRow; weight > 0; weight--, tmpDateRow--) {
+            for (int weight = period, tmpDateRow = dateRow; weight > 0; weight--, tmpDateRow--) {
                 weightedPriceSum += price_[tmpDateRow] * weight;
                 totalWeight += weight;
             }
@@ -348,6 +348,21 @@ void CompanyInfo::cal_WMA(vector<double> &tmp) {
 }
 
 void CompanyInfo::cal_EMA(vector<double> &tmp) {
+    for (int period = 1; period < 257; period++) {
+        double alpha = 2.0 / (double(period) + 1.0);
+        double EMA = 0;
+        for (int dateRow = 0; dateRow < totalDays_; dateRow++) {
+            if (dateRow == 0) {
+                EMA = price_[dateRow];
+            }
+            else {
+                EMA = price_[dateRow] * alpha + (1.0 - alpha) * tmp[dateRow - 1];
+            }
+            tmp.push_back(EMA);
+        }
+        techTable_.push_back(tmp);
+        tmp.clear();
+    }
 }
 
 void CompanyInfo::cal_RSI(vector<double> &tmp) {
@@ -405,8 +420,10 @@ void CompanyInfo::output_Tech() {
         switch (info_->techIndex_) {
             case 0:
             case 1:
-            case 2: {
                 dateRow = techPeriod - 1;
+                break;
+            case 2: {
+                dateRow = 0;
                 break;
             }
             case 3: {
@@ -1891,17 +1908,18 @@ void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouput
     out.close();
 }
 
-class TrainLoop{
+class TrainLoop {
 private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
 
     Semaphore sem_;
+
 public:
     TrainLoop(CompanyInfo &company);
 };
 
-TrainLoop::TrainLoop(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_->techIndex_)}), sem_(company.info_->companyThreadNum_){
+TrainLoop::TrainLoop(CompanyInfo &company) : company_(company), tables_({TechTable(&company, company.info_->techIndex_)}), sem_(company.info_->companyThreadNum_) {
     vector<thread> loopThread;
     company_.paths_.trainFilePaths_[company_.info_->techIndex_].clear();
     for (int loop = 0; loop < company_.info_->testDeltaLoop_; loop++) {
@@ -2597,16 +2615,17 @@ private:
                 break;
             }
             case 10: {
-                //                    Test(company, company.info_->setWindow_, false, true, vector<int>{0});
-                //                    Tradition tradition(company);
-                //                    Train train(company, "2011-12-01", "2011-12-30");
-                //                    Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                //                    Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                //                    Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                //                    Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                //                    Test test(company, company.info_->setWindow_, false, true, vector<int>{0});
-                //                    Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                TrainLoop loop(company);
+                // Test(company, company.info_->setWindow_, false, true, vector<int>{0});
+                // Tradition tradition(company);
+                // Train train(company, "2011-12-01", "2011-12-30");
+                // Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
+                // Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
+                // Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
+                // Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
+                // Test test(company, company.info_->setWindow_, false, true, vector<int>{0});
+                // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
+                // TrainLoop loop(company);
+                // company.output_Tech();
                 break;
             }
         }
