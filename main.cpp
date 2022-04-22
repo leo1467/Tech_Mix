@@ -27,8 +27,8 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 11;
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0};
@@ -2257,7 +2257,11 @@ public:
         CompanyAllRoRData allRoRData_;
         WindowIRR tmpWinodwIRR_;
 
-        vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
+        vector<size_t> eachVariableNum_;
+
+        int target_;
+        vector<string> targetPaths_;
+
 
         double cal_one_window_IRR(string &RoRoutData, string &window, string &stratgyFilePath, bool tradition);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition);
@@ -2268,7 +2272,7 @@ public:
         void sort_by_window_name(vector<WindowIRR> &windowsIRR);
         void sort_by_algo_IRR(vector<WindowIRR> &windowsIRR);
 
-        CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank);
+        CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, vector<size_t> eachVariableNum, int target);
     };
 
     Info info_;
@@ -2276,25 +2280,30 @@ public:
     vector<Rank> allCompanyWindowRank_;
     vector<CompanyWindowIRRContainer> allCompanyWindowsIRR_;
 
+    vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
+
+    int target_;
+    vector<string> trainOrTest_ = {"train", "test"};
+
     void output_all_IRR();
     void output_IRR(ofstream &IRRout);
     void output_all_window_rank();
     vector<string> remove_A2A_and_sort();
 
-    CalIRR(vector<path> &companyPricePaths);
+    CalIRR(vector<path> &companyPricePaths, int target);
 };
 
-CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPricePaths) {
+CalIRR::CalIRR(vector<path> &companyPricePaths, int target) : companyPricePaths_(companyPricePaths), target_(target) {
     for (auto &companyPricePath : companyPricePaths_) {
         CompanyInfo company(companyPricePath, info_);
-        CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_);
+        CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_, eachVariableNum_, target_);
         auto output_company_all_window_IRR = [](ofstream &out, const string &outputData) {
             out << outputData;
             out.close();
         };
-        ofstream out(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_testRoR.csv");
+        ofstream out(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_" + trainOrTest_[target_] + "RoR.csv");
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.algoRoRoutData_);
-        out.open(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_traditionRoR.csv");
+        out.open(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_" + trainOrTest_[target_] + "TraditionRoR.csv");
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.traditionRoRoutData_);
     }
     output_all_IRR();
@@ -2302,14 +2311,14 @@ CalIRR::CalIRR(vector<path> &companyPricePaths) : companyPricePaths_(companyPric
 }
 
 void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
-    ofstream IRRout(info_.rootFolder_ + "test_IRR_IRR_sorted_" + info_.techType_ + ".csv");
+    ofstream IRRout(info_.rootFolder_ + trainOrTest_[target_] + "_IRR_IRR_sorted_" + info_.techType_ + ".csv");
     output_IRR(IRRout);
     for_each(allCompanyWindowsIRR_.begin(), allCompanyWindowsIRR_.end(), [](CompanyWindowIRRContainer &eachCompanyContainer) {
         sort(eachCompanyContainer.windowsIRR_.begin(), eachCompanyContainer.windowsIRR_.end(), [](const WindowIRR &w1, const WindowIRR &w2) {
             return w1.windowName_ < w2.windowName_;
         });
     });
-    IRRout.open(info_.rootFolder_ + "test_IRR_name_sorted_" + info_.techType_ + ".csv");
+    IRRout.open(info_.rootFolder_ + trainOrTest_[target_] + "_IRR_name_sorted_" + info_.techType_ + ".csv");
     output_IRR(IRRout);
     if (info_.mixedTech_) {
         IRRout.open(info_.rootFolder_ + info_.techType_ + "_tech_choosed.csv");
@@ -2353,7 +2362,7 @@ void CalIRR::output_IRR(ofstream &IRRout) {
 
 void CalIRR::output_all_window_rank() {
     vector<string> windowSort = remove_A2A_and_sort();
-    ofstream rankOut(info_.rootFolder_ + "windowRank_" + info_.techType_ + ".csv");
+    ofstream rankOut(info_.rootFolder_ + trainOrTest_[target_] + "_windowRank_" + info_.techType_ + ".csv");
     rankOut << "algo window rank\n,";
     for (auto &windowName : windowSort) {
         rankOut << windowName << ",";
@@ -2387,7 +2396,7 @@ vector<string> CalIRR::remove_A2A_and_sort() {
     return windowSort;
 }
 
-CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank) {
+CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, vector<size_t> eachVariableNum, int target) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank), eachVariableNum_(eachVariableNum), target_(target), targetPaths_({company_.paths_.trainFilePaths_[company_.info_->techIndex_], company_.paths_.testFilePaths_[company_.info_->techIndex_], company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_], company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_]}) {
     thisCompanyWindowIRR_.companyName_ = company_.companyName_;
     if (company_.info_->mixedTech_) {
         tmpWinodwIRR_.resize_vec(company_.info_->allTech_.size());
@@ -2395,8 +2404,8 @@ CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyW
     for (auto &window : company_.info_->slidingWindows_) {
         if (window != "A2A") {
             cout << window << endl;
-            tmpWinodwIRR_.algoIRR_ = cal_one_window_IRR(allRoRData_.algoRoRoutData_, window, company_.paths_.testFilePaths_[company_.info_->techIndex_], false);
-            tmpWinodwIRR_.traditionIRR_ = cal_one_window_IRR(allRoRData_.traditionRoRoutData_, window, company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_], true);  //若還沒有傳統的test這行可以註解
+            tmpWinodwIRR_.algoIRR_ = cal_one_window_IRR(allRoRData_.algoRoRoutData_, window, targetPaths_[target_], false);
+            tmpWinodwIRR_.traditionIRR_ = cal_one_window_IRR(allRoRData_.traditionRoRoutData_, window, targetPaths_[target_ + 2], true);  //若還沒有傳統的test這行可以註解
             tmpWinodwIRR_.windowName_ = window;
             thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
             tmpWinodwIRR_.fill_zero();
@@ -2414,7 +2423,29 @@ double CalIRR::CalOneCompanyIRR::cal_one_window_IRR(string &RoRoutData, string &
     for (auto filePathIter = strategyPaths.begin(); filePathIter != strategyPaths.end(); filePathIter++) {
         RoRoutData += compute_and_record_window_RoR(strategyPaths, filePathIter, totalRoR, tradition);
     }
-    double windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_->testLength_) - 1.0;
+    double windowIRR = 0;
+    if (target_)
+        windowIRR = pow(totalRoR--, 1.0 / (double)company_.info_->testLength_) - 1.0;
+    else {
+        double trainLength = get<2>(company_.info_->slidingWindowPairs_.at(window));
+        double yearDividen = 0;
+        switch (get<1>(company_.info_->slidingWindowPairs_.at(window))) {
+            case 'S':
+            case 'M': {
+                yearDividen = 12.0;
+                break;
+            }
+            case 'W': {
+                yearDividen = 48.0;
+                break;
+            }
+            case 'D': {
+                yearDividen = 240.0;
+                break;
+            }
+        }
+        windowIRR = pow(totalRoR / strategyPaths.size() / trainLength + 1.0, yearDividen) - 1.0;
+    }
     RoRoutData += ",,,,,,," + window + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
     return windowIRR;
 }
@@ -2424,11 +2455,17 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     double RoR = stod(file[10][1]);
     string push;
     if (filePathIter == strategyPaths.begin()) {
-        totalRoR = RoR / 100.0 + 1.0;
+        if (target_)
+            totalRoR = RoR / 100.0 + 1.0;
+        else
+            totalRoR += RoR / 100.0;
         push += filePathIter->stem().string() + ",";
     }
     else {
-        totalRoR = totalRoR * (RoR / 100.0 + 1.0);
+        if (target_)
+            totalRoR = totalRoR * (RoR / 100.0 + 1.0);
+        else
+            totalRoR += RoR / 100.0;
         push += "," + filePathIter->stem().string() + ",";
     }
     int techIndex = -1;
@@ -2663,7 +2700,7 @@ int main(int argc, const char *argv[]) {
             RunMode runMode(_info, companyPricePaths);
         }
         else {
-            // CalIRR calIRR(companyPricePaths);
+            CalIRR calIRR(companyPricePaths, 0);  //0: train, 1: test
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR("test_IRR_name_sorted_SMA_RSI", "IRR");
         }
