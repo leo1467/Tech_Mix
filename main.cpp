@@ -27,11 +27,11 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 11;
+    int mode_ = 0;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {0, 3};
     bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -1799,7 +1799,41 @@ public:
         count--;
     }
 
-    Semaphore(int count_ = 1) : count(count_) {}
+    Semaphore(int count_ = 1) : count(count_) { if (count_ == 0) count_ = 1; }
+};
+
+class MixedTechChooseTrainFile {
+private:
+    CompanyInfo *company_;
+    TrainWindow *window_;
+    
+public:
+    vector<string> goodTrainFile;
+    
+    MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window), goodTrainFile(window->intervalSize_ / 2) {
+        cout << "copying " << window->windowName_ << "train files" << endl;
+        vector<string> trainFilePaths;
+        for (auto &techIndex : company_->info_->techIndexs_) {
+            trainFilePaths.push_back(techTrainFilePath[techIndex]);
+        }
+        vector<vector<path>> diffTechTrainFilePath;
+        for (auto trainPath : trainFilePaths) {
+            diffTechTrainFilePath.push_back(get_path(trainPath + window->windowName_));
+        }
+        vector<vector<vector<string>>> aPeriodTrainFiles(company_->info_->mixedTechNum_);
+        for (int colIndex = 0; colIndex < window_->intervalSize_ / 2; colIndex++) {
+            for (int rowIndex = 0; rowIndex < company_->info_->mixedTechNum_; rowIndex++) {
+                aPeriodTrainFiles[rowIndex] = read_data(diffTechTrainFilePath[rowIndex][colIndex]);
+            }
+            size_t bestRoRIndex = 0;
+            vector<double> everyRoR;
+            for (auto &trainFile : aPeriodTrainFiles) {
+                everyRoR.push_back(stod(trainFile[10][1]));
+            }
+            bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
+            goodTrainFile[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
+        }
+    }
 };
 
 class Train {
@@ -1853,8 +1887,10 @@ void Train::print_date_train_file(string &trainData, string startDate, string en
 }
 
 Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->windowThreadNum_) {
-    vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
-    tables_ = &tables;
+    if (!company_->info_->mixedTech_) {        
+        vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
+        tables_ = &tables;
+    }
     train_a_company();
 }
 
@@ -1887,11 +1923,19 @@ void Train::train_a_window(string windowName) {
             }
             return company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName + "/";
         }();
-        window.print_train();
-        srand(343);
-        for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-            TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
-            output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
+        if (company_->info_->mixedTech_) {
+            MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
+            for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
+                filesystem::copy(from, outputPath, copy_options::overwrite_existing);
+            }
+        }
+        else {
+            window.print_train();
+            srand(343);
+            for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
+                TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+                output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
+            }
         }
     }
     else {
@@ -1936,7 +1980,7 @@ class Test {
 private:
     class Path {
     public:
-        vector<string> trainFilePaths_;
+        string trainFilePaths_;
         string testFileOutputPath_;
     };
     CompanyInfo &company_;
@@ -1951,11 +1995,9 @@ private:
     void add_tables(vector<int> addtionTable);
     void create_particle();
     void set_train_test_file_path();
-    void set_normal_paths();
-    void set_mixedTech_paths();
     void test_a_window(TrainWindow &window);
-    void check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &window);
-    size_t set_variables(vector<vector<vector<string>>> &thisTrainFile);
+    void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
+    void set_variables(vector<vector<string>> &thisTrainFile);
     void output_test_file(TestWindow &window, int startRow, int endRow);
     void output_test_holdData(TestWindow &window);
 
@@ -2005,61 +2047,29 @@ void Test::create_particle() {
 }
 
 void Test::set_train_test_file_path() {
-    if (!company_.info_->mixedTech_) {
-        set_normal_paths();
+    if (tradition_) {
+        paths_.trainFilePaths_ = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
     }
-    else if (company_.info_->mixedTech_) {
-        set_mixedTech_paths();
+    else {
+        paths_.trainFilePaths_ = company_.paths_.trainFilePaths_[company_.info_->techIndex_];
+        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
     }
     cout << "test " << company_.companyName_ << endl;
 }
 
-void Test::set_normal_paths() {
-    if (tradition_) {
-        paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
-    }
-    else {
-        paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[company_.info_->techIndex_]);
-        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
-    }
-}
-
-void Test::set_mixedTech_paths() {
-    if (tradition_) {
-        for (auto &techIndex : company_.info_->techIndexs_) {
-            paths_.trainFilePaths_.push_back(company_.paths_.trainTraditionFilePaths_[techIndex]);
-        }
-        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
-    }
-    else {
-        for (auto &techIndex : company_.info_->techIndexs_) {
-            paths_.trainFilePaths_.push_back(company_.paths_.trainFilePaths_[techIndex]);
-        }
-        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
-    }
-}
-
 void Test::test_a_window(TrainWindow &window) {
-    vector<vector<path>> diffTechTrainFilePath;
-    for (auto trainPath : paths_.trainFilePaths_) {
-        diffTechTrainFilePath.push_back(get_path(trainPath + window.windowName_));
-    }
+    vector<path> trainFilePaths = get_path(paths_.trainFilePaths_ + window.windowName_);
     if (window.interval_[0] >= 0) {
-        vector<vector<vector<string>>> aPeriodTrainFiles(company_.info_->mixedTechNum_);
-        check_exception(diffTechTrainFilePath, window);
+        vector<vector<string>> thisTrainFiles;
+        check_exception(trainFilePaths, window);
         p_.push_holdData_column_Name(hold_, holdData_, holdDataPtr_);
         auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
         for (; intervalIter != window.TestWindow::interval_.end(); intervalIter += 2, filePathIndex++) {
-            for (auto &file : aPeriodTrainFiles) {
-                file.clear();
-            }
-            for (size_t index = 0; index < company_.info_->mixedTechNum_; index++) {
-                aPeriodTrainFiles[index] = read_data(diffTechTrainFilePath[index][filePathIndex]);
-            }
+            thisTrainFiles = read_data(trainFilePaths[filePathIndex]);
             p_.reset();
-            size_t bestIndex = set_variables(aPeriodTrainFiles);
-            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &aPeriodTrainFiles[bestIndex]);
+            set_variables(thisTrainFiles);
+            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &thisTrainFiles);
             output_test_file(window, *intervalIter, *(intervalIter + 1));
             output_test_holdData(window);
         }
@@ -2070,30 +2080,23 @@ void Test::test_a_window(TrainWindow &window) {
     }
 }
 
-void Test::check_exception(vector<vector<path>> &eachTrainFilePath, TestWindow &window) {
-    for (auto &trainFilePath : eachTrainFilePath) {
-        if (trainFilePath.size() != window.intervalSize_ / 2) {
-            cout << company_.companyName_ << " " << window.windowName_ << " test interval number is not equal to train fle number" << endl;
-            exit(1);
-        }
+void Test::check_exception(vector<path> &trainFilePaths, TestWindow &window) {
+    if (trainFilePaths.size() != window.intervalSize_ / 2) {
+        cout << company_.companyName_ << " " << window.windowName_ << " test interval number is not equal to train fle number" << endl;
+        exit(1);
     }
 }
 
-size_t Test::set_variables(vector<vector<vector<string>>> &thisTrainFile) {
-    size_t bestRoRIndex = 0;
+void Test::set_variables(vector<vector<string>> &thisTrainFile) {
     if (company_.info_->mixedTech_) {
-        vector<double> everyRoR;
-        for (auto &trainFile : thisTrainFile) {
-            everyRoR.push_back(stod(trainFile[10][1]));
-        }
-        bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
-        p_ = Particle(&company_, company_.info_->techIndexs_[bestRoRIndex]);
+        string techUse = thisTrainFile[0][1];
+        int techUseIndex = find_index_of_string_in_vec(company_.info_->allTech_, techUse);
+        p_ = Particle(&company_, company_.info_->techIndexs_[techUseIndex]);
         p_.tables_ = &tables_;
     }
     for (int i = 0; i < p_.variableNum_; i++) {
-        p_.decimal_[i] = stoi(thisTrainFile[bestRoRIndex][i + 12][1]);
+        p_.decimal_[i] = stoi(thisTrainFile[i + 12][1]);
     }
-    return bestRoRIndex;
 }
 
 void Test::output_test_file(TestWindow &window, int startRow, int endRow) {
@@ -2702,7 +2705,7 @@ int main(int argc, const char *argv[]) {
         else {
             CalIRR calIRR(companyPricePaths, 0);  //0: train, 1: test
             // MergeIRRFile mergeFile;
-            // SortIRRFileBy IRR("test_IRR_name_sorted_SMA_RSI", "IRR");
+            // SortIRRFileBy IRR("train_IRR_name_sorted_RSI_2", "IRR");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
