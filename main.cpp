@@ -27,9 +27,9 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 1;
+    int mode_ = 2;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "all";
+    string setWindow_ = "Y2Y";
 
     vector<int> techIndexs_ = {0, 3};
     bool mixedTech_;
@@ -1822,7 +1822,7 @@ public:
     vector<string> goodTrainFile;
     
     MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window), goodTrainFile(window->intervalSize_ / 2) {
-        cout << "copying " << window->windowName_ << "train files" << endl;
+        cout << "copying " << window->windowName_ << " train files" << endl;
         vector<string> trainFilePaths;
         for (auto &techIndex : company_->info_->techIndexs_) {
             trainFilePaths.push_back(techTrainFilePath[techIndex]);
@@ -2003,7 +2003,7 @@ private:
     string holdData_;
     string *holdDataPtr_ = nullptr;
 
-    void add_tables(vector<int> addtionTable);
+    void add_tables(vector<int> additionTable);
     void set_particle();
     void set_train_test_file_path();
     void test_a_window(TrainWindow &window);
@@ -2029,7 +2029,7 @@ Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> addition
     }
 }
 
-void Test::add_tables(vector<int> addtionTable) {
+void Test::add_tables(vector<int> additionTable) {
     if (!company_.info_->mixedTech_) {
         tables_.push_back(TechTable(&company_, company_.info_->techIndex_));
     }
@@ -2038,9 +2038,9 @@ void Test::add_tables(vector<int> addtionTable) {
             tables_.push_back(TechTable(&company_, techIndex));
         }
     }
-    if (addtionTable.size() > 0) {
-        for (int i = 0; i < addtionTable.size(); i++) {
-            tables_.push_back(TechTable(&company_, addtionTable[i]));
+    if (additionTable.size() > 0) {
+        for (int i = 0; i < additionTable.size(); i++) {
+            tables_.push_back(TechTable(&company_, additionTable[i]));
         }
     }
 }
@@ -2163,12 +2163,16 @@ private:
     void set_variables(int index);
 
 public:
-    Tradition(CompanyInfo &company, string targetWindow = "all");
+    Tradition(CompanyInfo &company);
 };
 
-Tradition::Tradition(CompanyInfo &company, string targetWindow) : company_(company), tables_{TechTable(&company, company.info_->techIndex_)} {
-    set_strategy();
-    create_particles();
+Tradition::Tradition(CompanyInfo &company) : company_(company) {
+    if (!company_.info_->mixedTech_) {
+        vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
+        tables_ = tables;
+        set_strategy();
+        create_particles();
+    }
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (auto windowName : company_.info_->slidingWindows_) {
         TrainWindow window(company_, windowName);
@@ -2195,18 +2199,26 @@ void Tradition::create_particles() {
 }
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
-    string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_;
-    for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-        for (int i = 0; i < traditionStrategyNum_; i++) {
-            particles_[i].reset();
-            set_variables(i);
-            particles_[i].trade(*intervalIter, *(intervalIter + 1));
+    if (company_.info_->mixedTech_) {
+        MixedTechChooseTrainFile mixedTechChooseTrainFile(&company_, &window, company_.paths_.trainTraditionFilePaths_);
+        for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
+            filesystem::copy(from, company_.paths_.trainFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/", copy_options::overwrite_existing);
         }
-        stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
-        particles_[0].record_train_test_data(*intervalIter, *(intervalIter + 1));
-        out_.open(outputPath + "/" + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
-        out_ << particles_[0].trainOrTestData_;
-        out_.close();
+    }
+    else {
+        string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_;
+        for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
+            for (int i = 0; i < traditionStrategyNum_; i++) {
+                particles_[i].reset();
+                set_variables(i);
+                particles_[i].trade(*intervalIter, *(intervalIter + 1));
+            }
+            stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
+            particles_[0].record_train_test_data(*intervalIter, *(intervalIter + 1));
+            out_.open(outputPath + "/" + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+            out_ << particles_[0].trainOrTestData_;
+            out_.close();
+        }
     }
 }
 
@@ -2655,7 +2667,7 @@ private:
                 break;
             }
             case 2: {
-                Tradition trainTradition(company, company.info_->setWindow_);
+                Tradition trainTradition(company);
                 break;
             }
             case 3: {
