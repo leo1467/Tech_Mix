@@ -27,7 +27,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 1;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -909,7 +909,7 @@ void BetaMatrix::print(ostream &out = cout) {
 
 class Particle {
 private:
-    CompanyInfo *company_;
+    CompanyInfo *company_ = nullptr;
 
 public:
     int techIndex_;
@@ -943,6 +943,7 @@ public:
 
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
+    void init(CompanyInfo *company, int techIndex, bool isRecordOn = false, vector<int> variables = {});
     void instant_trade(string startDate, string endDate, bool hold = false);
     void push_holdData_column_Name(bool hold, string &holdData, string *&holdDataPtr);
     string set_title_variables();
@@ -970,9 +971,19 @@ public:
     void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
 
     Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
+    Particle() {};
 };
 
-Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) : company_(company), techIndex_(techIndex), techType_(company_->info_->techType_), remain_(company->info_->totalCapitalLV_), isRecordOn_(isRecordOn) {
+Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) {
+    init(company, techIndex, isRecordOn, variables);
+}
+
+void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) {
+    company_ = company;
+    techIndex_ = techIndex;
+    techType_ = company_->info_->techType_;
+    remain_  = company->info_->totalCapitalLV_;
+    isRecordOn_ = isRecordOn;
     eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
@@ -1993,7 +2004,7 @@ private:
     string *holdDataPtr_ = nullptr;
 
     void add_tables(vector<int> addtionTable);
-    void create_particle();
+    void set_particle();
     void set_train_test_file_path();
     void test_a_window(TrainWindow &window);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
@@ -2005,9 +2016,9 @@ public:
     Test(CompanyInfo &company, bool tradition = false, bool hold = false, vector<int> additionTable = {});
 };
 
-Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> additionTable) : company_(company), p_(&company, 0), tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> additionTable) : company_(company), tradition_(tradition), hold_(hold) {
     add_tables(additionTable);
-    create_particle();
+    set_particle();
     set_train_test_file_path();
     for (auto windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
@@ -2034,14 +2045,12 @@ void Test::add_tables(vector<int> addtionTable) {
     }
 }
 
-void Test::create_particle() {
+void Test::set_particle() {
     if (!company_.info_->mixedTech_) {
-        switch (company_.info_->techIndex_) {
-            case 3: {
-                p_ = Particle(&company_, company_.info_->techIndex_);
-                break;
-            }
-        }
+        p_.init(&company_, company_.info_->techIndex_);
+    }
+    else {
+        p_.init(&company_, 0);
     }
     p_.tables_ = &tables_;
 }
@@ -2091,8 +2100,7 @@ void Test::set_variables(vector<vector<string>> &thisTrainFile) {
     if (company_.info_->mixedTech_) {
         string techUse = thisTrainFile[0][1];
         int techUseIndex = find_index_of_string_in_vec(company_.info_->allTech_, techUse);
-        p_ = Particle(&company_, company_.info_->techIndexs_[techUseIndex]);
-        p_.tables_ = &tables_;
+        p_.init(&company_, techUseIndex);
     }
     for (int i = 0; i < p_.variableNum_; i++) {
         p_.decimal_[i] = stoi(thisTrainFile[i + 12][1]);
