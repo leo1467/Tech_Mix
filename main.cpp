@@ -28,8 +28,8 @@ using namespace filesystem;
 class Info {
 public:
     int mode_ = 10;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "Y2Y";
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0};
     bool mixedTech_;
@@ -43,7 +43,7 @@ public:
     string algoType_;
 
     double delta_ = 0.00016;
-    int expNum_ = 1;
+    int expNum_ = 50;
     int genNum_ = 10000;
     int particleNum_ = 10;
     double totalCapitalLV_ = 10000000;
@@ -971,7 +971,7 @@ public:
     void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
 
     Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
-    Particle() {};
+    Particle(){};
 };
 
 Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) {
@@ -982,7 +982,7 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
     company_ = company;
     techIndex_ = techIndex;
     techType_ = company_->info_->techType_;
-    remain_  = company->info_->totalCapitalLV_;
+    remain_ = company->info_->totalCapitalLV_;
     isRecordOn_ = isRecordOn;
     eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
@@ -1402,9 +1402,9 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
     isRecordOn_ = true;
     remain_ = company_->info_->totalCapitalLV_;
     trade(startRow, endRow, false, holdDataPtr);
-//    if (all_of(decimal_.begin(), decimal_.end(), [](int i) { return !i; })) {
-//        reset();
-//    }
+    // if (all_of(decimal_.begin(), decimal_.end(), [](int i) { return !i; })) {
+    //     reset();
+    // }
     trainOrTestData_.clear();
     if (holdDataPtr == nullptr) {
         if (trainFile != nullptr) {
@@ -1814,17 +1814,20 @@ public:
         count_--;
     }
 
-    Semaphore(int count = 1) : count_(count) { if (count_ == 0) count_ = 1; }
+    Semaphore(int count = 1) : count_(count) {
+        if (count_ == 0)
+            count_ = 1;
+    }
 };
 
 class MixedTechChooseTrainFile {
 private:
     CompanyInfo *company_;
     TrainWindow *window_;
-    
+
 public:
-    vector<string> goodTrainFile;
-    
+    vector<path> goodTrainFile;
+
     MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window), goodTrainFile(window->intervalSize_ / 2) {
         cout << "copying " << window->windowName_ << " train files" << endl;
         vector<string> trainFilePaths;
@@ -2014,8 +2017,8 @@ protected:
     void output_test_file(TestWindow &window, int startRow, int endRow);
 
 public:
-    Test(CompanyInfo &company, bool tradition = false, vector<int> additionTable = {});
-    Test(CompanyInfo &company, int tmp) : company_(company) {};
+    Test(CompanyInfo &company, bool tradition, vector<int> additionTable = {});
+    Test(CompanyInfo &company) : company_(company){};
 };
 
 Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : company_(company), tradition_(tradition) {
@@ -2220,14 +2223,14 @@ private:
     bool isTrain_;
     string targetWindowPaths_;
     string holdFileOuputPath_;
-    
+
     string holdData_;
     string *holdDataPtr_ = nullptr;
-    
+
     ofstream out_;
-    
+
 public:
-    void cal_hold(vector<path> &filePaths, vector<vector<string> > &thisTargetFile, TrainWindow &window) {
+    void cal_hold(vector<path> &filePaths, vector<vector<string>> &thisTargetFile, TrainWindow &window) {
         cout << "output " << window.windowName_ << " hold" << endl;
         vector<int> interval;
         if (isTrain_)
@@ -2245,12 +2248,14 @@ public:
         out_ << holdData_;
         out_.close();
     }
-    
-    HoldFile(CompanyInfo *company, bool isTrain, string targetWindowPaths, string holdFileOuputPath) : Test(*company, 0), company_(company), isTrain_(isTrain), targetWindowPaths_(targetWindowPaths), holdFileOuputPath_(holdFileOuputPath) {
+
+    HoldFile(CompanyInfo *company, bool isTrain, string targetWindowPaths, string holdFileOuputPath) : Test(*company), company_(company), isTrain_(isTrain), targetWindowPaths_(targetWindowPaths), holdFileOuputPath_(holdFileOuputPath) {
         add_tables();
         set_particle();
         vector<vector<string>> thisTargetFile;
         for (auto windowName : company_->info_->slidingWindows_) {
+            if (windowName == "A2A" && isTrain_ == false)
+                continue;
             vector<path> filePaths = get_path(targetWindowPaths_ + windowName);
             p_.push_holdData_column_Name(true, holdData_, holdDataPtr_);
             TrainWindow window(*company_, windowName);
@@ -2259,7 +2264,6 @@ public:
             }
         }
     }
-    
 };
 
 class CalIRR {
@@ -2318,7 +2322,6 @@ public:
 
         int target_;
         vector<string> targetPaths_;
-
 
         double cal_one_window_IRR(string &RoRoutData, string &window, string &stratgyFilePath, bool tradition);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition);
@@ -2694,12 +2697,10 @@ private:
         switch (company.info_->mode_) {
             case 0: {
                 Train train(company);
-                HoldFile holdFile(&company, true, company.paths_.trainFilePaths_[company.info_->techIndex_], company.paths_.trainHoldFilePaths_[company.info_->techIndex_]);
                 break;
             }
             case 1: {
                 Test test(company, false);
-                HoldFile holdFile(&company, true, company.paths_.testFilePaths_[company.info_->techIndex_], company.paths_.testHoldFilePaths_[company.info_->techIndex_]);
                 break;
             }
             case 2: {
@@ -2722,7 +2723,8 @@ private:
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
                 // company.output_Tech();
-                HoldFile holdFile(&company, true, company.paths_.trainFilePaths_[company.info_->techIndex_], company.paths_.trainHoldFilePaths_[company.info_->techIndex_]);
+                // HoldFile holdFile(&company, true, company.paths_.trainFilePaths_[company.info_->techIndex_], company.paths_.trainHoldFilePaths_[company.info_->techIndex_]);
+                // HoldFile holdFile(&company, false, company.paths_.testFilePaths_[company.info_->techIndex_], company.paths_.testHoldFilePaths_[company.info_->techIndex_]);
                 break;
             }
         }
