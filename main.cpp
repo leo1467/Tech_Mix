@@ -1916,12 +1916,7 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
 void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
-        if (company_->info_->windowThreadNum_) {
-            windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
-        }
-        else {
-            train_a_window(windowName);
-        }
+        windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
     }
     for (auto &thread : windowThreads) {
         thread.join();
@@ -1929,9 +1924,7 @@ void Train::train_a_company() {
 }
 
 void Train::train_a_window(string windowName) {
-    if (company_->info_->windowThreadNum_) {
-        sem_.wait();
-    }
+    sem_.wait();
     TrainWindow window(*company_, windowName);
     if (window.interval_[0] >= 0) {
         string outputPath = [&company_ = this->company_, windowName]() {
@@ -1960,9 +1953,7 @@ void Train::train_a_window(string windowName) {
     else {
         cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
-    if (company_->info_->windowThreadNum_) {
-        sem_.notify();
-    }
+    sem_.notify();
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
@@ -2691,9 +2682,7 @@ private:
     Semaphore sem_;
 
     void run_mode(CompanyInfo &company) {
-        if (info_.companyThreadNum_) {
-            sem_.wait();
-        }
+        sem_.wait();
         switch (company.info_->mode_) {
             case 0: {
                 Train train(company);
@@ -2728,9 +2717,7 @@ private:
                 break;
             }
         }
-        if (info_.companyThreadNum_) {
-            sem_.notify();
-        }
+        sem_.notify();
     }
 
 public:
@@ -2741,12 +2728,7 @@ public:
             companiesInfo.push_back(CompanyInfo(companyPricePath, _info));
         }
         for (auto &company : companiesInfo) {
-            if (info_.companyThreadNum_) {
-                companyThread.push_back(thread(&RunMode::run_mode, this, ref(company)));
-            }
-            else {
-                run_mode(company);
-            }
+            companyThread.push_back(thread(&RunMode::run_mode, this, ref(company)));
         }
         for (auto &thread : companyThread) {
             thread.join();
@@ -2759,6 +2741,14 @@ int main(int argc, const char *argv[]) {
     vector<path> companyPricePaths = set_company_price_paths(_info);
     try {
         if (_info.mode_ <= 10) {
+            if (_info.mode_ == 0) {
+                cout << "this is train, will probably contaminate the existing train files" << endl;
+                cout << "y to continue, n to abort" << endl;
+                char check;
+                cin >> check;
+                if (check == 'n')
+                    exit(0);
+            }
             RunMode runMode(_info, companyPricePaths);
         }
         else {
