@@ -1799,22 +1799,22 @@ class Semaphore {
 private:
     mutex mtx;
     condition_variable cv;
-    int count;
+    int count_;
 
 public:
     inline void notify() {
         unique_lock<mutex> lock(mtx);
-        count++;
+        count_++;
         cv.notify_one();
     }
 
     inline void wait() {
         unique_lock<mutex> lock(mtx);
-        cv.wait(lock, [&count = this->count]() { return count > 0; });
-        count--;
+        cv.wait(lock, [&count_ = this->count_]() { return count_ > 0; });
+        count_--;
     }
 
-    Semaphore(int count_ = 1) : count(count_) { if (count_ == 0) count_ = 1; }
+    Semaphore(int count = 1) : count_(count) { if (count_ == 0) count_ = 1; }
 };
 
 class MixedTechChooseTrainFile {
@@ -2004,9 +2004,6 @@ protected:
     Particle p_;
     vector<TechTable> tables_;
     bool tradition_ = false;
-    bool hold_ = false;
-    string holdData_;
-    string *holdDataPtr_ = nullptr;
 
     void add_tables(vector<int> additionTable = {});
     void set_particle();
@@ -2015,14 +2012,13 @@ protected:
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
     void set_variables(vector<vector<string>> &thisTrainFile);
     void output_test_file(TestWindow &window, int startRow, int endRow);
-    void output_test_holdData(TestWindow &window);
 
 public:
-    Test(CompanyInfo &company, bool tradition = false, bool hold = false, vector<int> additionTable = {});
+    Test(CompanyInfo &company, bool tradition = false, vector<int> additionTable = {});
     Test(CompanyInfo &company, int tmp) : company_(company) {};
 };
 
-Test::Test(CompanyInfo &company, bool tradition, bool hold, vector<int> additionTable) : company_(company), tradition_(tradition), hold_(hold) {
+Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : company_(company), tradition_(tradition) {
     add_tables(additionTable);
     set_particle();
     set_train_test_file_path();
@@ -2078,15 +2074,13 @@ void Test::test_a_window(TrainWindow &window) {
     if (window.interval_[0] >= 0) {
         vector<vector<string>> thisTrainFiles;
         check_exception(trainFilePaths, window);
-        p_.push_holdData_column_Name(hold_, holdData_, holdDataPtr_);
         auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
         for (; intervalIter != window.TestWindow::interval_.end(); intervalIter += 2, filePathIndex++) {
             thisTrainFiles = read_data(trainFilePaths[filePathIndex]);
             p_.reset();
             set_variables(thisTrainFiles);
-            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &thisTrainFiles);
+            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), nullptr, &thisTrainFiles);
             output_test_file(window, *intervalIter, *(intervalIter + 1));
-            output_test_holdData(window);
         }
     }
     else {
@@ -2123,20 +2117,6 @@ void Test::output_test_file(TestWindow &window, int startRow, int endRow) {
     }
     out << p_.trainOrTestData_;
     out.close();
-}
-
-void Test::output_test_holdData(TestWindow &window) {
-    if (hold_) {
-        ofstream holdFile;
-        if (!tradition_) {
-            holdFile.open(company_.paths_.testHoldFilePaths_[company_.info_->techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
-        }
-        else if (tradition_) {
-            holdFile.open(company_.paths_.testTraditionHoldFilePaths_[company_.info_->techIndex_] + company_.companyName_ + "_" + window.windowName_ + ".csv");
-        }
-        holdFile << holdData_;
-        holdFile.close();
-    }
 }
 
 class BH {
@@ -2237,7 +2217,7 @@ void Tradition::set_variables(int index) {
 class HoldFile : public Test {
 private:
     CompanyInfo *company_;
-    bool train_;
+    bool isTrain_;
     string targetWindowPaths_;
     string holdFileOuputPath_;
     
@@ -2247,7 +2227,26 @@ private:
     ofstream out_;
     
 public:
-    HoldFile(CompanyInfo *company, bool train, string targetWindowPaths, string holdFileOuputPath) : Test(*company, 0), company_(company), train_(train), targetWindowPaths_(targetWindowPaths), holdFileOuputPath_(holdFileOuputPath) {
+    void cal_hold(vector<path> &filePaths, vector<vector<string> > &thisTargetFile, TrainWindow &window) {
+        cout << "output " << window.windowName_ << " hold" << endl;
+        vector<int> interval;
+        if (isTrain_)
+            interval = window.interval_;
+        else
+            interval = window.TestWindow::interval_;
+        auto [filePathIter, intervalIter] = tuple{filePaths.begin(), interval.begin()};
+        for (int periodIndex = 0; periodIndex < window.intervalSize_ / 2; periodIndex++, filePathIter++, intervalIter += 2) {
+            thisTargetFile = read_data(*filePathIter);
+            p_.reset();
+            set_variables(thisTargetFile);
+            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &thisTargetFile);
+        }
+        out_.open(holdFileOuputPath_ + company_->companyName_ + "_" + window.windowName_ + "_hold.csv");
+        out_ << holdData_;
+        out_.close();
+    }
+    
+    HoldFile(CompanyInfo *company, bool isTrain, string targetWindowPaths, string holdFileOuputPath) : Test(*company, 0), company_(company), isTrain_(isTrain), targetWindowPaths_(targetWindowPaths), holdFileOuputPath_(holdFileOuputPath) {
         add_tables();
         set_particle();
         vector<vector<string>> thisTargetFile;
@@ -2256,22 +2255,7 @@ public:
             p_.push_holdData_column_Name(true, holdData_, holdDataPtr_);
             TrainWindow window(*company_, windowName);
             if (window.interval_[0] > 0) {
-                cout << "output " << window.windowName_ << " hold" << endl;
-                vector<int> interval;
-                if (train_)
-                    interval = window.interval_;
-                else
-                    interval = window.TestWindow::interval_;
-                auto [filePathIter, intervalIter] = tuple{filePaths.begin(), interval.begin()};
-                for (; filePathIter != filePaths.end() || intervalIter != interval.end(); filePathIter++, intervalIter += 2) {
-                    thisTargetFile = read_data(*filePathIter);
-                    p_.reset();
-                    set_variables(thisTargetFile);
-                    p_.record_train_test_data(*intervalIter, *(intervalIter + 1), holdDataPtr_, &thisTargetFile);
-                }
-                out_.open(holdFileOuputPath_ + company_->companyName_ + "_" + window.windowName_ + ".csv");
-                out_ << holdData_;
-                out_.close();
+                cal_hold(filePaths, thisTargetFile, window);
             }
         }
     }
@@ -2714,7 +2698,7 @@ private:
                 break;
             }
             case 1: {
-                Test test(company, false, true);
+                Test test(company, false);
                 HoldFile holdFile(&company, true, company.paths_.testFilePaths_[company.info_->techIndex_], company.paths_.testHoldFilePaths_[company.info_->techIndex_]);
                 break;
             }
@@ -2723,7 +2707,7 @@ private:
                 break;
             }
             case 3: {
-                Test testTradition(company, true, true);
+                Test testTradition(company, true);
                 break;
             }
             case 10: {
