@@ -1481,7 +1481,7 @@ public:
 
     void create_particles();
     void create_betaMatrix();
-    ofstream set_debug_file();
+    ofstream set_debug_file(int expCnt);
     void start_exp(int expCnt);
     void initialize_KNQTS();
     void output_debug_exp(int expCnt);
@@ -1504,20 +1504,20 @@ public:
     TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName = "", bool record = false);
 };
 
-TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_{tables}, startRow_(startRow), endRow_(endRow), actualDelta_(company.info_->delta_), debug_(company.info_->debug_), record_(record) {
+TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_(tables), startRow_(startRow), endRow_(endRow), actualDelta_(company.info_->delta_), debug_(company.info_->debug_), record_(record) {
     cout << tables_[0].date_[startRow_] << "~" << tables_[0].date_[endRow] << endl;
     create_particles();
     create_betaMatrix();
     globalP_[0].reset();
-    debugOut_ = set_debug_file();
     for (int expCnt = 0; expCnt < company_.info_->expNum_; expCnt++) {
+        debugOut_ = set_debug_file(expCnt);
         start_exp(expCnt);
+        debugOut_.close();
     }
-    debugOut_.close();
     globalP_[0].record_train_test_data(startRow_, endRow_);
     trainData_ = globalP_[0].trainOrTestData_;
-    cout << globalP_[0].RoR_ << "%" << endl;
-    cout << "==========" << endl;
+    // cout << globalP_[0].RoR_ << "%" << endl;
+    // cout << "==========" << endl;
 }
 
 void TrainAPeriod::create_particles() {
@@ -1539,7 +1539,7 @@ void TrainAPeriod::create_betaMatrix() {
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
 
-ofstream TrainAPeriod::set_debug_file() {
+ofstream TrainAPeriod::set_debug_file(int expCnt) {
     ofstream out;
     if (debug_) {
         string delta = remove_zeros_at_end(actualDelta_);
@@ -1549,7 +1549,8 @@ ofstream TrainAPeriod::set_debug_file() {
         title += company_.info_->techType_ + "_";
         title += company_.info_->algoType_ + "_";
         title += delta + "_";
-        title += get_date(tables_[0].date_, startRow_, endRow_) + ".csv";
+        title += get_date(tables_[0].date_, startRow_, endRow_) + "_";
+        title += "exp_" + to_string(expCnt) + ".csv";
         out.open(title);
     }
     return out;
@@ -2685,18 +2686,26 @@ private:
         sem_.wait();
         switch (company.info_->mode_) {
             case 0: {
+                cout << "start train" << endl;
+                this_thread::sleep_for(3s);
                 Train train(company);
                 break;
             }
             case 1: {
+                cout << "start test" << endl;
+                this_thread::sleep_for(3s);
                 Test test(company, false);
                 break;
             }
             case 2: {
+                cout << "start train tradition" << endl;
+                this_thread::sleep_for(3s);
                 Tradition trainTradition(company);
                 break;
             }
             case 3: {
+                cout << "start test tradition" << endl;
+                this_thread::sleep_for(3s);
                 Test testTradition(company, true);
                 break;
             }
@@ -2743,10 +2752,10 @@ int main(int argc, const char *argv[]) {
         if (_info.mode_ <= 10) {
             if (_info.mode_ == 0) {
                 cout << "this is train, will probably contaminate the existing train files" << endl;
-                cout << "y to continue, n to abort" << endl;
+                cout << "enter y to continue, enter any other key to abort" << endl;
                 char check;
                 cin >> check;
-                if (check == 'n')
+                if (check != 'y')
                     exit(0);
             }
             RunMode runMode(_info, companyPricePaths);
