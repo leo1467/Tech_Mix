@@ -319,7 +319,7 @@ void CompanyInfo::store_tech_to_vector() {
 
 void CompanyInfo::cal_SMA(vector<double> &tmp) {
     for (int period = 1; period < 257; period++) {
-        for (int dateRow = 0; dateRow < totalDays_; dateRow++) {
+        for (int dateRow = period - 1; dateRow < totalDays_; dateRow++) {
             double MARangePriceSum = 0;
             for (int i = dateRow, j = period; j > 0; i--, j--) {
                 MARangePriceSum += price_[i];
