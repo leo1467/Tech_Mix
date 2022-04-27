@@ -997,9 +997,8 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
 void Particle::instant_trade(string startDate, string endDate, bool hold) {
     vector<TechTable> tmp = {TechTable(company_, techIndex_)};
     tables_ = &tmp;
-    int startRow = -1, endRow = -1;
-    startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
-    endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
+    int startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
+    int endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
     string holdData;
     string *holdDataPtr = nullptr;
     push_holdData_column_Name(hold, holdData, holdDataPtr);
