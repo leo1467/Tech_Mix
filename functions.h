@@ -115,6 +115,7 @@ static void check_startRowSize_endRowSize(int startRowSize, int endRowSize) {
     }
     else if (startRowSize < endRowSize) {
         cout << "startRowSize < endRowSize" << endl;
+        exit(1);
     }
 }
 
