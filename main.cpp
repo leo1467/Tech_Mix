@@ -265,10 +265,10 @@ void CompanyInfo::create_folder(Path &paths) {
     create_directories(paths.testHoldFilePaths_[info_->techIndex_]);
     create_directories(paths.trainTraditionHoldFilePaths_[info_->techIndex_]);
     create_directories(paths.testTraditionHoldFilePaths_[info_->techIndex_]);
-    // create_directories(paths.trainBestHold_[info_->techIndex_]);
-    // create_directories(paths.testBestHold_[info_->techIndex_]);
-    // create_directories(paths.trainTraditionBestHold_[info_->techIndex_]);
-    // create_directories(paths.testTraditionBestHold_[info_->techIndex_]);
+    create_directories(paths.trainBestHold_[info_->techIndex_]);
+    create_directories(paths.testBestHold_[info_->techIndex_]);
+    create_directories(paths.trainTraditionBestHold_[info_->techIndex_]);
+    create_directories(paths.testTraditionBestHold_[info_->techIndex_]);
     for (auto i : info_->slidingWindows_) {
         create_directories(paths.trainFilePaths_[info_->techIndex_] + i);
         create_directories(paths.testFilePaths_[info_->techIndex_] + i);
@@ -2621,35 +2621,49 @@ public:
 
 class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名稱排序，或是以IRR排序(用第幾個col調整)
 public:
-    Info info_;
+    typedef vector<vector<vector<string>>::iterator> equalIterType;
+    Info *info_;
     string sortBy_;
-    int colToSort = 1;
+    int colToSort_;
 
-    SortIRRFileBy(string inpuFileName, string sortBy = "IRR") : sortBy_(sortBy) {
-        inpuFileName += ".csv";
-        vector<vector<string>> inputFile = read_data(info_.rootFolder_ + inpuFileName);
-        vector<vector<vector<string>>::iterator> equalSignIter;
+    void sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
+        for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
+            sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
+                return s1 < s2;
+            });
+        }
+    }
+
+    void sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
+        for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
+            sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
+                return stod(s1[colToSort_]) > stod(s2[colToSort_]);
+            });
+        }
+    }
+
+    equalIterType findEqualSign(vector<vector<string>> &inputFile) {
+        equalIterType equalSignIter;
         for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
             if ((*iter).front().front() == '=') {
                 equalSignIter.push_back(iter);
             }
         }
+        vector<vector<string>>::iterator rowIter = inputFile.begin();
         equalSignIter.push_back(inputFile.end());
-        if (sortBy_ == "name") {
-            for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
-                sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
-                    return s1.front() < s2.front();
-                });
-            }
-        }
-        else if (sortBy_ == "IRR") {
-            for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
-                sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
-                    return stod(s1[colToSort]) > stod(s2[colToSort]);
-                });
-            }
-        }
-        ofstream sortedFile(info_.rootFolder_ + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
+        return equalSignIter;
+    }
+
+    SortIRRFileBy(Info *info, string inpuFileName, int colToSort, string sortBy = "IRR") : info_(info), sortBy_(sortBy), colToSort_(colToSort) {
+        inpuFileName += ".csv";
+        vector<vector<string>> inputFile = read_data(info_->rootFolder_ + inpuFileName);
+        equalIterType equalSignIter = findEqualSign(inputFile);
+        if (colToSort_ == 0)
+            sortByName(inputFile, equalSignIter);
+        else
+            sortByIRR(inputFile, equalSignIter);
+
+        ofstream sortedFile(info_->rootFolder_ + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
         for (auto &row : inputFile) {
             for (auto &col : row) {
                 sortedFile << col << ",";
@@ -2658,21 +2672,74 @@ public:
         }
         sortedFile.close();
     }
+
+    SortIRRFileBy(vector<vector<string>> &inputFile, int colToSort) : colToSort_(colToSort) {
+        equalIterType equalSignIter = findEqualSign(inputFile);
+        sortByIRR(inputFile, equalSignIter);
+    }
 };
 
-static vector<path> set_company_price_paths(const Info &info) {
-    vector<path> companiesPricePath = get_path(info.priceFolder_);
-    if (info.setCompany_ != "all") {
-        vector<string> setCcompany = cut_string(info.setCompany_);
-        auto find_Index = [&](string &traget) {
-            return distance(companiesPricePath.begin(), find_if(companiesPricePath.begin(), companiesPricePath.end(), [&](path &pricePath) { return pricePath.stem() == traget; }));
-        };
-        size_t startIndex = find_Index(setCcompany.front());
-        size_t endIndex = find_Index(setCcompany.back()) + 1;
-        companiesPricePath = vector<path>(companiesPricePath.begin() + startIndex, companiesPricePath.begin() + endIndex);
+class FindBestHold {
+public:
+    Info *info_;
+    string trainOrTest_;
+    string techUse_;
+
+    void start_copy(string companyRootPath, string fromFolder, string toFolder, string trainOrTest, string company, string window) {
+        string from = companyRootPath + trainOrTest + fromFolder + company + "_" + window + ".csv";
+        string to = companyRootPath + trainOrTest + toFolder;
+        filesystem::copy(from, to, copy_options::overwrite_existing);
     }
-    return companiesPricePath;
-}
+
+    void copyBestHold(vector<vector<string>> &companyBestPeriod) {
+        for (auto &companyBest : companyBestPeriod) {
+            string companyRootPath = info_->rootFolder_ + "result_" + techUse_ + "/" + companyBest[0] + "/";
+            start_copy(companyRootPath, "Hold/", "BestHold/", trainOrTest_, companyBest[0], companyBest[1]);
+            start_copy(companyRootPath, "TraditionHold/", "TraditionBestHold/", trainOrTest_, companyBest[0], companyBest[2]);
+        }
+    }
+
+    vector<vector<string>> findBestWindow(vector<vector<string>> &IRRFile) {
+        vector<vector<string>> companyBestWindow;
+        for (auto rowIter = IRRFile.begin(); rowIter != IRRFile.end(); rowIter++) {
+            if ((*rowIter)[0].front() == '=') {
+                vector<string> toPush;
+                toPush.push_back((*rowIter)[0]);
+                toPush[0].erase(remove(toPush[0].begin(), toPush[0].end(), '='), toPush[0].end());
+                for (int addRow = 1; addRow < 5; addRow++) {
+                    if ((*(rowIter + addRow))[0] != "B&H") {
+                        toPush.push_back((*(rowIter + addRow))[0]);
+                        break;
+                    }
+                }
+                companyBestWindow.push_back(toPush);
+            }
+        }
+        return companyBestWindow;
+    }
+
+    FindBestHold(Info *info, string IRRFileName) : info_(info), trainOrTest_(cut_string(IRRFileName, '_')[0]) {
+        IRRFileName += ".csv";
+        techUse_ = [&]() {
+            size_t found = IRRFileName.find("sorted") + 7;
+            return cut_string(IRRFileName.substr(found, IRRFileName.length() - found), '.')[0];
+        }();
+        vector<vector<string>> IRRFile = read_data(info_->rootFolder_ + IRRFileName);
+        vector<vector<string>> companyBestWindow1 = findBestWindow(IRRFile);
+        SortIRRFileBy sortIRRFileBy(IRRFile, 2);
+        vector<vector<string>> companyBestWindow2 = findBestWindow(IRRFile);
+        auto [bestIter1, bestIter2] = tuple{companyBestWindow1.begin(), companyBestWindow2.begin()};
+        for (; bestIter1 != companyBestWindow1.end(); bestIter1++, bestIter2++) {
+            (*bestIter1).push_back((*bestIter2)[1]);
+        }
+        for (auto i : companyBestWindow1) {
+            for (auto j : i)
+                cout << j << ",";
+            cout << endl;
+        }
+        copyBestHold(companyBestWindow1);
+    }
+};
 
 class RunMode {
 private:
@@ -2686,25 +2753,21 @@ private:
         switch (company.info_->mode_) {
             case 0: {
                 cout << "start train" << endl;
-                this_thread::sleep_for(3s);
                 Train train(company);
                 break;
             }
             case 1: {
                 cout << "start test" << endl;
-                this_thread::sleep_for(3s);
                 Test test(company, false);
                 break;
             }
             case 2: {
                 cout << "start train tradition" << endl;
-                this_thread::sleep_for(3s);
                 Tradition trainTradition(company);
                 break;
             }
             case 3: {
                 cout << "start test tradition" << endl;
-                this_thread::sleep_for(3s);
                 Test testTradition(company, true);
                 break;
             }
@@ -2744,6 +2807,20 @@ public:
     }
 };
 
+static vector<path> set_company_price_paths(const Info &info) {
+    vector<path> companiesPricePath = get_path(info.priceFolder_);
+    if (info.setCompany_ != "all") {
+        vector<string> setCcompany = cut_string(info.setCompany_);
+        auto find_Index = [&](string &traget) {
+            return distance(companiesPricePath.begin(), find_if(companiesPricePath.begin(), companiesPricePath.end(), [&](path &pricePath) { return pricePath.stem() == traget; }));
+        };
+        size_t startIndex = find_Index(setCcompany.front());
+        size_t endIndex = find_Index(setCcompany.back()) + 1;
+        companiesPricePath = vector<path>(companiesPricePath.begin() + startIndex, companiesPricePath.begin() + endIndex);
+    }
+    return companiesPricePath;
+}
+
 int main(int argc, const char *argv[]) {
     time_point begin = steady_clock::now();
     vector<path> companyPricePaths = set_company_price_paths(_info);
@@ -2763,6 +2840,7 @@ int main(int argc, const char *argv[]) {
             // CalIRR calIRR(companyPricePaths, 0);  //0: train, 1: test
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR("train_IRR_name_sorted_RSI_2", "IRR");
+            // FindBestHold findBestHold(&_info, "test_IRR_IRR_sorted_SMA");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
