@@ -2800,6 +2800,7 @@ public:
         }
         for (auto &company : companiesInfo) {
             companyThread.push_back(thread(&RunMode::run_mode, this, ref(company)));
+            this_thread::sleep_for(0.5s);
         }
         for (auto &thread : companyThread) {
             thread.join();
