@@ -27,11 +27,11 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 11;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 0;
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {3};
     bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -49,7 +49,7 @@ public:
     double totalCapitalLV_ = 10000000;
 
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int windowThreadNum_ = 7;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
@@ -60,13 +60,13 @@ public:
     int compareMode_ = 0;
 
     string testStartYear_ = "2012-01";
-    string testEndYear_ = "2021-01";
+    string testEndYear_ = "2022-01";
     double testLength_;
 
-    path priceFolder_ = "price/";
-    string rootFolder_ = "result/";
+    path priceFolder_ = "price_2021/";
+    string rootFolder_ = "result_2021/";
 
-    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2" /* , "4D4" */, "4D3", "4D2" /* , "3D3" */, "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
+    vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     map<string, tuple<string, char, int, int>> slidingWindowPairs_;
 
@@ -74,7 +74,6 @@ public:
 
     void set_techIndex_and_techType() {
         sort(techIndexs_.begin(), techIndexs_.end());
-        vector<string> mixTech = cut_string(techType_, '_');
         for (auto &techIndex : techIndexs_) {
             techType_ += allTech_[techIndex] + "_";
         }
@@ -1512,7 +1511,7 @@ public:
 };
 
 TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int startRow, int endRow, string windowName, bool record) : company_(company), tables_(tables), startRow_(startRow), endRow_(endRow), actualDelta_(company.info_->delta_), debug_(company.info_->debug_), record_(record) {
-    cout << tables_[0].date_[startRow_] << "~" << tables_[0].date_[endRow] << endl;
+    // cout << tables_[0].date_[startRow_] << "~" << tables_[0].date_[endRow] << endl;
     create_particles();
     create_betaMatrix();
     globalP_[0].reset();
@@ -1925,6 +1924,7 @@ void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
         windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
+        this_thread::sleep_for(0.5s);
     }
     for (auto &thread : windowThreads) {
         thread.join();
@@ -1954,6 +1954,9 @@ void Train::train_a_window(string windowName) {
             srand(343);
             for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
                 TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+                cout << company_->companyName_ << "_" << windowName << "_";
+                cout << (*tables_)[0].date_[*intervalIter] << "~" << (*tables_)[0].date_[*(intervalIter + 1)] << "_";
+                cout << trainAPeriod.globalP_[0].RoR_ << "%" << endl;
                 output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
             }
         }
@@ -2334,8 +2337,7 @@ public:
         void rank_window(vector<WindowIRR> &windowsIRR);
         void sort_by_window_name(vector<WindowIRR> &windowsIRR);
         void sort_by_algo_IRR(vector<WindowIRR> &windowsIRR);
-        
-        
+
         CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex);
     };
 
@@ -2681,7 +2683,12 @@ public:
         return equalSignIter;
     }
 
-    SortIRRFileBy(Info *info, string inpuFileName, int colToSort, string sortBy = "IRR") : info_(info), sortBy_(sortBy), colToSort_(colToSort) {
+    SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : info_(info), colToSort_(colToSort) {
+        sortBy_ = [](int colToSort) {
+            if (colToSort == 0)
+                return "name";
+            return "IRR";
+        }(colToSort_);
         inpuFileName += ".csv";
         vector<vector<string>> inputFile = read_data(info_->rootFolder_ + inpuFileName);
         equalIterType equalSignIter = findEqualSign(inputFile);
@@ -2868,7 +2875,7 @@ int main(int argc, const char *argv[]) {
         else {
             // CalIRR calIRR(companyPricePaths, "train");
             // MergeIRRFile mergeFile;
-            // SortIRRFileBy IRR("train_IRR_name_sorted_RSI_2", "IRR");
+            // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
             // FindBestHold findBestHold(&_info, "test_IRR_IRR_sorted_SMA");
         }
     } catch (exception &e) {
