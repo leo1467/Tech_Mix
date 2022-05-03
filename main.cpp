@@ -63,8 +63,9 @@ public:
     string testEndYear_ = "2022-01";
     double testLength_;
 
-    path priceFolder_ = "price_2021/";
-    string rootFolder_ = "result_2021/";
+    string priceFolder_ = "price_2021/";
+    string expFolder_ = "exp_result/";
+    string rootFolder_ = "result";
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
@@ -128,11 +129,21 @@ public:
         }
     }
 
+    void set_folder() {
+        priceFolder_ = current_path().string() + "/" + priceFolder_;
+        expFolder_ = current_path().parent_path().string() + "/" + expFolder_;
+        if (!is_directory(expFolder_))
+            create_directories(expFolder_);
+        current_path(expFolder_);
+        rootFolder_ = rootFolder_ + "_" + (cut_string(priceFolder_, '_')).back();
+    }
+
     Info() {
         set_techIndex_and_techType();
         slidingWindows_ = set_certain_range_of_vec(setWindow_, slidingWindows_);
         windowNumber_ = (int)slidingWindows_.size();
         slidingWindowToEx();
+        set_folder();
     }
 } _info;
 
