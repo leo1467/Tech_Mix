@@ -63,9 +63,10 @@ public:
     string testEndYear_ = "2022-01";
     double testLength_;
 
-    string priceFolder_ = "price_2021/";
+    string priceFolder_ = "price_2021/"; //通常不會換price，只有在更新股價檔的時後才改
+    
     string expFolder_ = "exp_result/";
-    string rootFolder_ = "result";
+    string rootFolder_ = "result_";
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
@@ -135,7 +136,7 @@ public:
         if (!is_directory(expFolder_))
             create_directories(expFolder_);
         current_path(expFolder_);
-        rootFolder_ = rootFolder_ + "_" + (cut_string(priceFolder_, '_')).back();
+        rootFolder_ = rootFolder_ + to_string(stoi(testEndYear_) - 1) + "/";
     }
 
     Info() {
