@@ -215,7 +215,7 @@ CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.st
 
 void CompanyInfo::set_paths(Path &paths) {
     for (auto tech : info_->allTech_) {
-        paths.techOuputPaths_.push_back("tech/" + tech + "/" + companyName_ + "/");
+        paths.techOuputPaths_.push_back(info_->rootFolder_ + "/tech/" + tech + "/" + companyName_ + "/");
 
         paths.resultOutputPaths_.push_back(info_->rootFolder_ + "result_" + tech + "/");
 
