@@ -209,7 +209,7 @@ public:
 CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.stem().string()), info_(&info) {
     set_paths(paths_);
     store_date_price(pricePath);
-    create_folder(paths_);
+    // create_folder(paths_);
     find_table_start_row();
     cout << companyName_ << endl;
 }
@@ -422,6 +422,11 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
 }
 
 void CompanyInfo::output_Tech() {
+    if (info_->mixedTech_) {
+        cout << "mixed tech no need to ouput tech" << endl;
+        exit(1);
+    }
+    create_directories(paths_.techOuputPaths_[info_->techIndex_]);
     store_tech_to_vector();
     cout << "saving " << info_->techType_ << " file" << endl;
     for (int techPeriod = 1; techPeriod < 257; techPeriod++) {
@@ -1935,6 +1940,7 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
 void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
+        create_directories(company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName);
         windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
         this_thread::sleep_for(0.5s);
     }
@@ -2041,6 +2047,10 @@ Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : co
     set_train_test_file_path();
     for (auto windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
+            if (tradition_)
+                create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
+            else
+                create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
             TrainWindow window(company_, windowName);
             cout << window.windowName_ << endl;
             test_a_window(window);
@@ -2180,6 +2190,7 @@ Tradition::Tradition(CompanyInfo &company) : company_(company) {
     for (auto windowName : company_.info_->slidingWindows_) {
         TrainWindow window(company_, windowName);
         if (window.interval_[0] >= 0) {
+            create_directories(company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + windowName);
             cout << window.windowName_ << endl;
             train_a_tradition_window(window);
         }
@@ -2236,6 +2247,7 @@ class HoldFile : public Test {
 private:
     CompanyInfo *company_;
     bool isTrain_;
+    bool isTradition_;
     string targetWindowPaths_;
     string holdFileOuputPath_;
 
@@ -2264,7 +2276,31 @@ public:
         out_.close();
     }
 
-    HoldFile(CompanyInfo *company, bool isTrain, string targetWindowPaths, string holdFileOuputPath) : Test(*company), company_(company), isTrain_(isTrain), targetWindowPaths_(targetWindowPaths), holdFileOuputPath_(holdFileOuputPath) {
+    void set_paths_create_Folder() {
+        if (isTrain_ && !isTradition_) {  //train
+            create_directories(company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_]);
+            targetWindowPaths_ = company_->paths_.trainFilePaths_[company_->info_->techIndex_];
+            holdFileOuputPath_ = company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_];
+        }
+        else if (!isTrain_ && !isTradition_){  //test
+            create_directories(company_->paths_.testHoldFilePaths_[company_->info_->techIndex_]);
+            targetWindowPaths_ = company_->paths_.testFilePaths_[company_->info_->techIndex_];
+            holdFileOuputPath_ = company_->paths_.testHoldFilePaths_[company_->info_->techIndex_];
+        }
+        else if (isTrain_ && isTradition_) {  //train tradition
+            create_directories(company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_]);
+            targetWindowPaths_ = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_];
+            holdFileOuputPath_ = company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_];
+        }
+        else if (!isTrain_ && !isTradition_) {  //test tradition
+            create_directories(company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_]);
+            targetWindowPaths_ = company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_];
+            holdFileOuputPath_ = company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_];
+        }
+    }
+    
+    HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(*company), company_(company), isTrain_(isTrain), isTradition_(isTradition) {
+        set_paths_create_Folder();
         add_tables();
         set_particle();
         vector<vector<string>> thisTargetFile;
@@ -2830,8 +2866,7 @@ private:
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
                 // company.output_Tech();
-                // HoldFile holdFile(&company, true, company.paths_.trainFilePaths_[company.info_->techIndex_], company.paths_.trainHoldFilePaths_[company.info_->techIndex_]);
-                // HoldFile holdFile(&company, false, company.paths_.testFilePaths_[company.info_->techIndex_], company.paths_.testHoldFilePaths_[company.info_->techIndex_]);
+                // HoldFile holdFile(&company, false, false);
                 break;
             }
         }
