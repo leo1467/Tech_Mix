@@ -49,7 +49,7 @@ public:
     double totalCapitalLV_ = 10000000;
 
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 7;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
@@ -133,8 +133,7 @@ public:
     void set_folder() {
         priceFolder_ = current_path().string() + "/" + priceFolder_;
         expFolder_ = current_path().parent_path().string() + "/" + expFolder_;
-        if (!is_directory(expFolder_))
-            create_directories(expFolder_);
+        create_directories(expFolder_);
         current_path(expFolder_);
         rootFolder_ = rootFolder_ + to_string(stoi(testEndYear_) - 1) + "/";
     }
@@ -462,6 +461,7 @@ void CompanyInfo::output_Tech() {
         out.close();
     }
     cout << endl;
+    techTable_.clear();
 }
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
@@ -497,6 +497,7 @@ public:
 };
 
 TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_->allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_) {
+    create_directories(company_->paths_.techOuputPaths_[techIndex_]);
     create_techTable();
 }
 
@@ -583,11 +584,6 @@ void TechTable::output_techTable() {
     }
     out.close();
 }
-
-class TechTables {
-    vector<TechTable> tables_;
-    int tableSize_;
-};
 
 class TestWindow {
 protected:
@@ -2047,10 +2043,12 @@ Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : co
     set_train_test_file_path();
     for (auto windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
-            if (tradition_)
+            if (tradition_) {
                 create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
-            else
+            }
+            else {
                 create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
+            }
             TrainWindow window(company_, windowName);
             cout << window.windowName_ << endl;
             test_a_window(window);
@@ -2277,25 +2275,21 @@ public:
     }
 
     void set_paths_create_Folder() {
+        auto set_path = [](string targetWindowPaths, string holdFileOuputPath) {
+            create_directories(holdFileOuputPath);
+            return tuple{targetWindowPaths, holdFileOuputPath};
+        };
         if (isTrain_ && !isTradition_) {  //train
-            create_directories(company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_]);
-            targetWindowPaths_ = company_->paths_.trainFilePaths_[company_->info_->techIndex_];
-            holdFileOuputPath_ = company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_];
+            tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.trainFilePaths_[company_->info_->techIndex_], company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_]);
         }
-        else if (!isTrain_ && !isTradition_){  //test
-            create_directories(company_->paths_.testHoldFilePaths_[company_->info_->techIndex_]);
-            targetWindowPaths_ = company_->paths_.testFilePaths_[company_->info_->techIndex_];
-            holdFileOuputPath_ = company_->paths_.testHoldFilePaths_[company_->info_->techIndex_];
+        else if (!isTrain_ && !isTradition_) {  //test
+            tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.testFilePaths_[company_->info_->techIndex_], company_->paths_.testHoldFilePaths_[company_->info_->techIndex_]);
         }
         else if (isTrain_ && isTradition_) {  //train tradition
-            create_directories(company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_]);
-            targetWindowPaths_ = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_];
-            holdFileOuputPath_ = company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_];
+            tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_], company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_]);
         }
-        else if (!isTrain_ && !isTradition_) {  //test tradition
-            create_directories(company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_]);
-            targetWindowPaths_ = company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_];
-            holdFileOuputPath_ = company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_];
+        else if (!isTrain_ && isTradition_) {  //test tradition
+            tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_], company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_]);
         }
     }
     
@@ -2866,7 +2860,7 @@ private:
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
                 // company.output_Tech();
-                // HoldFile holdFile(&company, false, false);
+                // HoldFile holdFile(&company, false, true);
                 break;
             }
         }
