@@ -1039,11 +1039,11 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
                 case 0:
                 case 1:
                 case 2: {
-                    holdData += "buy 1,buy 2,sell 1,sell 2\n";
+                    holdData += "buy 1,buy 2,sell 1,sell 2,\n";
                     break;
                 }
                 case 3: {
-                    holdData += "RSI,overSold,overbought\n";
+                    holdData += "RSI,overSold,overbought,\n";
                     break;
                 }
             }
