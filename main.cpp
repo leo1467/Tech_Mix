@@ -957,6 +957,8 @@ public:
 
     string trainOrTestData_;
 
+    int hold1OrHold2 = 1;
+
     typedef vector<bool (*)(vector<TechTable> *, vector<int> &, int)> buy_sell;
     buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
     buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
@@ -1033,7 +1035,7 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
 void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&holdDataPtr) {
     if (hold) {
         holdData.clear();
-        holdData += "Date,Price,Hold,buy,sell date,sell " + techType_ + ",";
+        holdData += "Date,Price,hold 1,hold 2,buy,sell date,sell " + techType_ + ",";
         if (!company_->info_->mixedTech_) {
             switch (techIndex_) {
                 case 0:
@@ -1131,6 +1133,10 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
             sellNum_++;
             push_tradeData_sell(stockHold, i);
             push_holdData_sell(endRow, holdDataPtr, i);
+            if (hold1OrHold2 == 1)
+                hold1OrHold2 = 2;
+            else
+                hold1OrHold2 = 1;
         }
         else if (holdDataPtr != nullptr && stockHold != 0) {
             push_holdData_holding(holdDataPtr, i);
@@ -1279,7 +1285,11 @@ void Particle::push_extra_techData(int i, string *holdDataPtr) {
 
 void Particle::push_holdData_buy(string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
+        if (hold1OrHold2 == 2) 
+            (*holdDataPtr) += ",";
         (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+        if (hold1OrHold2 == 1) 
+            (*holdDataPtr) += ",";
         (*holdDataPtr) += ",";
         (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
         (*holdDataPtr) += ",,,";
@@ -1316,7 +1326,11 @@ void Particle::push_tradeData_sell(int stockHold, int i) {
 
 void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
+        if (hold1OrHold2 == 2) 
+            (*holdDataPtr) += ",";
         (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+        if (hold1OrHold2 == 1)
+            (*holdDataPtr) += ",";
         if (i == endRow) {
             (*holdDataPtr) += ",,";
             (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
@@ -1333,14 +1347,18 @@ void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
 }
 
 void Particle::push_holdData_holding(string *holdDataPtr, int i) {
+    if (hold1OrHold2 == 2)
+        (*holdDataPtr) += ",";
     (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+    if (hold1OrHold2 == 1)
+        (*holdDataPtr) += ",";
     (*holdDataPtr) += ",,,,";
     push_extra_techData(i, holdDataPtr);
     (*holdDataPtr) += "\n";
 }
 
 void Particle::push_holdData_not_holding(string *holdDataPtr, int i) {
-    (*holdDataPtr) += ",,,,";
+    (*holdDataPtr) += ",,,,,";
     push_extra_techData(i, holdDataPtr);
     (*holdDataPtr) += "\n";
 }
@@ -2860,7 +2878,7 @@ private:
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
                 // company.output_Tech();
-                // HoldFile holdFile(&company, false, true);
+                // HoldFile holdFile(&company, true, false);
                 break;
             }
         }
