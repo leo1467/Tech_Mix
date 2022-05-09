@@ -2719,7 +2719,7 @@ public:
     void sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
         for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
             sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
-                return s1 < s2;
+                return s1[0] < s2[0];
             });
         }
     }
