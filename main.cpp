@@ -676,7 +676,7 @@ void TestWindow::find_W_test() {
     for (int dateRow = company_.testStartRow_, monthCnt = testLength_ - 1; dateRow < company_.testEndRow_; dateRow++) {
         smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
         bigWeekDay = cal_weekday(company_.date_[dateRow]);
-        if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
+        if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow - 1], company_.date_[dateRow])) {
             monthCnt++;
             if (monthCnt == testLength_) {
                 startRow.push_back(dateRow);
@@ -687,7 +687,7 @@ void TestWindow::find_W_test() {
     for (int dateRow = company_.testStartRow_, monthCnt = 0; dateRow <= company_.testEndRow_; dateRow++) {
         smallWeekDay = cal_weekday(company_.date_[dateRow]);
         bigWeekDay = cal_weekday(company_.date_[dateRow + 1]);
-        if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow + 1, dateRow)) {
+        if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow], company_.date_[dateRow + 1])) {
             monthCnt++;
             if (monthCnt == testLength_ || dateRow == company_.testEndRow_) {
                 endRow.push_back(dateRow);
@@ -831,7 +831,7 @@ void TrainWindow::find_W_train() {
         for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + tableStartRow_, weekCnt = 0; dateRow > 0; dateRow--) {
             smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
             bigWeekDay = cal_weekday(company_.date_[dateRow]);
-            if (is_week_changed(company_.date_, bigWeekDay, smallWeekDay, dateRow, dateRow - 1)) {
+            if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow - 1], company_.date_[dateRow])) {
                 weekCnt++;
                 if (weekCnt == trainLength_) {
                     startRow.push_back(dateRow);
@@ -2879,11 +2879,6 @@ private:
                 // TrainLoop loop(company);
                 // company.output_Tech();
                 // HoldFile holdFile(&company, true, false);
-                TrainWindow w(company, "4W4");
-                ofstream out("a.csv");
-                for (auto intervalIter = w.TestWindow::interval_.begin(); intervalIter != w.TestWindow::interval_.end(); intervalIter++) {
-                    out << company.date_[*intervalIter + company.tableStartRow_] << "," << company.date_[*(++intervalIter) + company.tableStartRow_] << endl;
-                }
                 break;
             }
         }

@@ -138,13 +138,24 @@ static int cal_weekday(string date) {
     return time_out->tm_wday;
 }
 
-static bool is_week_changed(vector<string> &date, int bigWeekDay, int smallWeekDay, int big_i, int small_i) {
-    int bigDate = stoi(date[big_i].substr(8, 2));
-    int smallDate = stoi(date[small_i].substr(8, 2));
-    return (bigWeekDay <= smallWeekDay ||
-            bigDate - smallDate >= 7 ||
-            ((bigDate < smallDate) && (bigDate + 30 - smallDate) >= 7));
+static bool is_over_7_days(string date1, string date2) {
+    tm d1 = {0, 0, 0, stoi(date1.substr(8, 2)), stoi(date1.substr(5, 2)) - 1, stoi(date1.substr(0, 4)) - 1990};
+    tm d2 = {0, 0, 0, stoi(date2.substr(8, 2)), stoi(date2.substr(5, 2)) - 1, stoi(date2.substr(0, 4)) - 1990};
+    
+    time_t t1 = mktime(&d1);
+    time_t t2 = mktime(&d2);
+    double daysApart = abs(difftime(t1, t2) / (60 * 60 * 24));
+
+    return daysApart >= 7;
 }
+
+//static bool is_week_changed(vector<string> &date, int bigWeekDay, int smallWeekDay, int big_i, int small_i) {
+//    int bigDate = stoi(date[big_i].substr(8, 2));
+//    int smallDate = stoi(date[small_i].substr(8, 2));
+//    return (bigWeekDay <= smallWeekDay ||
+//            bigDate - smallDate >= 7 ||
+//            ((bigDate < smallDate) && (bigDate + 30 - smallDate) >= 7));
+//}
 
 static int find_index_of_string_in_vec(const vector<string> &stringVector, const string targetString) {
     auto iter = find(stringVector.begin(), stringVector.end(), targetString);
