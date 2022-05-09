@@ -138,10 +138,12 @@ static int cal_weekday(string date) {
     return time_out->tm_wday;
 }
 
-static bool is_week_changed(vector<string> date, int bigWeekDay, int smallWeekDay, int big_i, int small_i) {
-    return (bigWeekDay < smallWeekDay ||
-            stoi(date[big_i].substr(8, 2)) - stoi(date[small_i].substr(8, 2)) >= 7 ||
-            (stoi(date[big_i].substr(8, 2)) < stoi(date[small_i].substr(8, 2)) && stoi(date[big_i].substr(8, 2)) + 30 - stoi(date[small_i].substr(8, 2)) >= 7));
+static bool is_week_changed(vector<string> &date, int bigWeekDay, int smallWeekDay, int big_i, int small_i) {
+    int bigDate = stoi(date[big_i].substr(8, 2));
+    int smallDate = stoi(date[small_i].substr(8, 2));
+    return (bigWeekDay <= smallWeekDay ||
+            bigDate - smallDate >= 7 ||
+            ((bigDate < smallDate) && (bigDate + 30 - smallDate) >= 7));
 }
 
 static int find_index_of_string_in_vec(const vector<string> &stringVector, const string targetString) {

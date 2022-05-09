@@ -27,8 +27,8 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 10;
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {3};
@@ -2879,6 +2879,11 @@ private:
                 // TrainLoop loop(company);
                 // company.output_Tech();
                 // HoldFile holdFile(&company, true, false);
+                TrainWindow w(company, "4W4");
+                ofstream out("a.csv");
+                for (auto intervalIter = w.TestWindow::interval_.begin(); intervalIter != w.TestWindow::interval_.end(); intervalIter++) {
+                    out << company.date_[*intervalIter + company.tableStartRow_] << "," << company.date_[*(++intervalIter) + company.tableStartRow_] << endl;
+                }
                 break;
             }
         }
