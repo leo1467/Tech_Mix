@@ -28,10 +28,10 @@ using namespace filesystem;
 class Info {
 public:
     int mode_ = 10;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {3};
+    vector<int> techIndexs_ = {0};
     bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -488,16 +488,20 @@ public:
     vector<double> price_;
     vector<vector<double>> techTable_;
 
+    bool checkStartRow_;
+
     void create_techTable();
     void ask_generate_tech_file();
     void read_techFile(vector<path> &techFilePath, int techFilePathSize);
     void output_techTable();
 
-    TechTable(CompanyInfo *company, int techIndex);
+    TechTable(CompanyInfo *company, int techIndex, bool checkStartRow = false);
 };
 
-TechTable::TechTable(CompanyInfo *company, int techIndex) : company_(company), techIndex_(techIndex), techType_(company->info_->allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_) {
-    create_directories(company_->paths_.techOuputPaths_[techIndex_]);
+TechTable::TechTable(CompanyInfo *company, int techIndex, bool checkStartRow) : company_(company), techIndex_(techIndex), techType_(company->info_->allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_), checkStartRow_(checkStartRow) {
+    if (!company_->info_->mixedTech_) {
+        create_directories(company_->paths_.techOuputPaths_[techIndex_]);
+    }
     create_techTable();
 }
 
@@ -510,22 +514,24 @@ void TechTable::create_techTable() {
         techFilePath = get_path(company_->paths_.techOuputPaths_[techIndex_]);
         techFilePathSize = (int)techFilePath.size();
     }
-    if ((int)read_data(techFilePath.back()).size() - days_ < 0) {
-        company_->tableStartRow_ = find_index_of_string_in_vec(company_->date_, read_data(techFilePath.back())[0][0]);
+    if (vector<vector<string>> lastTechFile = read_data(techFilePath.back()); (int)lastTechFile.size() - days_ < 0) {
+        company_->tableStartRow_ = find_index_of_string_in_vec(company_->date_, lastTechFile[0][0]);
         days_ = company_->totalDays_ - company_->tableStartRow_;
     }
-    date_.resize(days_);
-    price_.resize(days_);
-    for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
-        date_[j] = company_->date_[i];
-        price_[j] = company_->price_[i];
+    if (!checkStartRow_) {
+        date_.resize(days_);
+        price_.resize(days_);
+        for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
+            date_[j] = company_->date_[i];
+            price_[j] = company_->price_[i];
+        }
+        techTable_.resize(days_);
+        for (int i = 0; i < days_; i++) {
+            techTable_[i].resize(257);
     }
-    techTable_.resize(days_);
-    for (int i = 0; i < days_; i++) {
-        techTable_[i].resize(257);
+        read_techFile(techFilePath, techFilePathSize);
+        cout << endl;
     }
-    read_techFile(techFilePath, techFilePathSize);
-    cout << endl;
 }
 
 void TechTable::ask_generate_tech_file() {
@@ -2061,15 +2067,21 @@ Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : co
     set_train_test_file_path();
     for (auto windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
-            if (tradition_) {
-                create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
-            }
-            else {
-                create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
-            }
             TrainWindow window(company_, windowName);
             cout << window.windowName_ << endl;
-            test_a_window(window);
+            if (window.interval_[0] >= 0) {
+                if (tradition_) {
+                    create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
+                }
+                else {
+                    create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
+                }
+                test_a_window(window);
+            }
+            else {
+                cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
+                cout << ", skip this window" << endl;
+            }
         }
     }
 }
@@ -2114,21 +2126,15 @@ void Test::set_train_test_file_path() {
 
 void Test::test_a_window(TrainWindow &window) {
     vector<path> trainFilePaths = get_path(paths_.trainFilePaths_ + window.windowName_);
-    if (window.interval_[0] >= 0) {
-        vector<vector<string>> thisTrainFiles;
-        check_exception(trainFilePaths, window);
-        auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
-        for (; intervalIter != window.TestWindow::interval_.end(); intervalIter += 2, filePathIndex++) {
-            thisTrainFiles = read_data(trainFilePaths[filePathIndex]);
-            p_.reset();
-            set_variables(thisTrainFiles);
-            p_.record_train_test_data(*intervalIter, *(intervalIter + 1), nullptr, &thisTrainFiles);
-            output_test_file(window, *intervalIter, *(intervalIter + 1));
-        }
-    }
-    else {
-        cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
-        cout << ", skip this window" << endl;
+    vector<vector<string>> thisTrainFiles;
+    check_exception(trainFilePaths, window);
+    auto [intervalIter, filePathIndex] = tuple{window.TestWindow::interval_.begin(), 0};
+    for (; intervalIter != window.TestWindow::interval_.end(); intervalIter += 2, filePathIndex++) {
+        thisTrainFiles = read_data(trainFilePaths[filePathIndex]);
+        p_.reset();
+        set_variables(thisTrainFiles);
+        p_.record_train_test_data(*intervalIter, *(intervalIter + 1), nullptr, &thisTrainFiles);
+        output_test_file(window, *intervalIter, *(intervalIter + 1));
     }
 }
 
@@ -2388,7 +2394,7 @@ public:
         vector<string> trainOrTestPaths_;
 
         void set_filePath();
-        void cal_window_IRRs(string windowName);
+        void cal_window_IRRs(TrainWindow &window);
         double cal_one_IRR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition, vector<int>::iterator &intervalIter);
         WindowIRR cal_BH_IRR();
@@ -2422,6 +2428,7 @@ CalIRR::CalIRR(vector<path> &companyPricePaths, string trainOrTest) : companyPri
     trainOrTestIndex_ = find_index_of_string_in_vec(trainOrTestVec_, trainOrTest_);
     for (auto &companyPricePath : companyPricePaths_) {
         CompanyInfo company(companyPricePath, info_);
+        TechTable checkStartRow(&company, company.info_->techIndex_ > 3 ? 0 : company.info_->techIndex_, true);
         CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_, trainOrTestIndex_);
         auto output_company_all_window_IRR = [](ofstream &out, const string &outputData) {
             out << outputData;
@@ -2535,7 +2542,14 @@ CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyW
     for (auto &windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
             cout << windowName << endl;
-            cal_window_IRRs(windowName);
+            TrainWindow window(company_, windowName);
+            if (window.interval_[0] >= 0) {
+                cal_window_IRRs(window);
+            }
+            else {
+                cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
+                cout << ", skip this window" << endl;
+            }
         }
     }
     thisCompanyWindowIRR_.windowsIRR_.push_back(cal_BH_IRR());
@@ -2552,8 +2566,7 @@ void CalIRR::CalOneCompanyIRR::set_filePath() {
     }
 }
 
-void CalIRR::CalOneCompanyIRR::cal_window_IRRs(string windowName) {
-    TrainWindow window(company_, windowName);
+void CalIRR::CalOneCompanyIRR::cal_window_IRRs(TrainWindow &window) {
     tmpWinodwIRR_.algoIRR_ = cal_one_IRR(allRoRData_.algoRoRoutData_, window, trainOrTestPaths_.front(), false);
     tmpWinodwIRR_.traditionIRR_ = cal_one_IRR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);  //若還沒有傳統的test這行可以註解
     if (trainOrTestIndex_ == 0) {
@@ -2562,7 +2575,7 @@ void CalIRR::CalOneCompanyIRR::cal_window_IRRs(string windowName) {
         BH bh(company_, trainStartDate, trainEndDate);
         tmpWinodwIRR_.BHIRR_ = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front()) * company_.oneYearDays_) - 1.0;
     }
-    tmpWinodwIRR_.windowName_ = windowName;
+    tmpWinodwIRR_.windowName_ = window.windowName_;
     thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
     tmpWinodwIRR_.fill_zero();
 }
@@ -2826,11 +2839,6 @@ public:
         auto [bestIter1, bestIter2] = tuple{companyBestWindow1.begin(), companyBestWindow2.begin()};
         for (; bestIter1 != companyBestWindow1.end(); bestIter1++, bestIter2++) {
             (*bestIter1).push_back((*bestIter2)[1]);
-        }
-        for (auto i : companyBestWindow1) {
-            for (auto j : i)
-                cout << j << ",";
-            cout << endl;
         }
         copyBestHold(companyBestWindow1);
     }
