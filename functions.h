@@ -41,6 +41,10 @@ static vector<vector<string>> read_data(path filePath) {
 }
 
 static vector<path> get_path(path targetPath) {
+    if (!exists(targetPath)) {
+        cout << targetPath << " does not exist" << endl;
+        exit(1);
+    }
     vector<path> filePath;
     copy(directory_iterator(targetPath), directory_iterator(), back_inserter(filePath));
     sort(filePath.begin(), filePath.end());
@@ -144,7 +148,7 @@ static bool is_over_7_days(string date1, string date2) {
     
     time_t t1 = mktime(&d1);
     time_t t2 = mktime(&d2);
-    double daysApart = abs(difftime(t1, t2) / (60 * 60 * 24));
+    double daysApart = abs(difftime(t1, t2) / (60.0 * 60.0 * 24.0));
 
     return daysApart >= 7;
 }

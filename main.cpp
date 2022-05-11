@@ -27,7 +27,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 10;
+    int mode_ = 11;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -490,7 +490,8 @@ public:
 
     bool checkStartRow_;
 
-    void create_techTable();
+    tuple<vector<path>, int> get_file_path_and_check();
+    void create_techTable(vector<path> &techFilePath, int techFilePathSize);
     void ask_generate_tech_file();
     void read_techFile(vector<path> &techFilePath, int techFilePathSize);
     void output_techTable();
@@ -502,10 +503,13 @@ TechTable::TechTable(CompanyInfo *company, int techIndex, bool checkStartRow) : 
     if (!company_->info_->mixedTech_) {
         create_directories(company_->paths_.techOuputPaths_[techIndex_]);
     }
-    create_techTable();
+    auto [techFilePath, techFilePathSize] = get_file_path_and_check();
+    if (!checkStartRow) {
+        create_techTable(techFilePath, techFilePathSize);
+    }
 }
 
-void TechTable::create_techTable() {
+tuple<vector<path>, int> TechTable::get_file_path_and_check() {
     vector<path> techFilePath = get_path(company_->paths_.techOuputPaths_[techIndex_]);
     int techFilePathSize = (int)techFilePath.size();
     while (techFilePathSize == 0) {
@@ -518,20 +522,7 @@ void TechTable::create_techTable() {
         company_->tableStartRow_ = find_index_of_string_in_vec(company_->date_, lastTechFile[0][0]);
         days_ = company_->totalDays_ - company_->tableStartRow_;
     }
-    if (!checkStartRow_) {
-        date_.resize(days_);
-        price_.resize(days_);
-        for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
-            date_[j] = company_->date_[i];
-            price_[j] = company_->price_[i];
-        }
-        techTable_.resize(days_);
-        for (int i = 0; i < days_; i++) {
-            techTable_[i].resize(257);
-    }
-        read_techFile(techFilePath, techFilePathSize);
-        cout << endl;
-    }
+    return tuple{techFilePath, techFilePathSize};
 }
 
 void TechTable::ask_generate_tech_file() {
@@ -552,6 +543,21 @@ void TechTable::ask_generate_tech_file() {
             cout << "wrong choise" << endl;
         }
     }
+}
+
+void TechTable::create_techTable(vector<path> &techFilePath, int techFilePathSize) {
+    date_.resize(days_);
+    price_.resize(days_);
+    for (int i = company_->tableStartRow_, j = 0; i < company_->totalDays_; i++, j++) {
+        date_[j] = company_->date_[i];
+        price_[j] = company_->price_[i];
+    }
+    techTable_.resize(days_);
+    for (int i = 0; i < days_; i++) {
+        techTable_[i].resize(257);
+    }
+    read_techFile(techFilePath, techFilePathSize);
+    cout << endl;
 }
 
 void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) {
