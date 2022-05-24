@@ -31,7 +31,7 @@ public:
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0};
+    vector<int> techIndexs_ = {0, 3};
     bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -63,8 +63,8 @@ public:
     string testEndYear_ = "2022-01";
     double testLength_;
 
-    string priceFolder_ = "price_2021/"; //通常不會換price，只有在更新股價檔的時後才改
-    
+    string priceFolder_ = "price_2021/";  //通常不會換price，只有在更新股價檔的時後才改
+
     string expFolder_ = "exp_result/";
     string rootFolder_ = "result_";
 
@@ -880,19 +880,19 @@ public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 120, 20, 120}, {20, 240, 20, 240}, {60, 120, 60, 120}, {60, 240, 60, 240}};
 
-    static bool buy_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
-        double MAbuy1PreDay = (*tables)[0].techTable_[i - 1][decimal[0]];
-        double MAbuy2PreDay = (*tables)[0].techTable_[i - 1][decimal[1]];
-        double MAbuy1Today = (*tables)[0].techTable_[i][decimal[0]];
-        double MAbuy2Today = (*tables)[0].techTable_[i][decimal[1]];
+    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+        double MAbuy1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[0]];
+        double MAbuy2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[1]];
+        double MAbuy1Today = (*tables)[tableIndex].techTable_[i][decimal[0]];
+        double MAbuy2Today = (*tables)[tableIndex].techTable_[i][decimal[1]];
         return MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today;
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
-        double MAsell1PreDay = (*tables)[0].techTable_[i - 1][decimal[2]];
-        double MAsell2PreDay = (*tables)[0].techTable_[i - 1][decimal[3]];
-        double MAsell1Today = (*tables)[0].techTable_[i][decimal[2]];
-        double MAsell2Today = (*tables)[0].techTable_[i][decimal[3]];
+    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+        double MAsell1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[2]];
+        double MAsell2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[3]];
+        double MAsell1Today = (*tables)[tableIndex].techTable_[i][decimal[2]];
+        double MAsell2Today = (*tables)[tableIndex].techTable_[i][decimal[3]];
         return MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today;
     }
 };
@@ -902,13 +902,13 @@ public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
 
-    static bool buy_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
-        double RSI = (*tables)[0].techTable_[i][decimal[0]];
+    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+        double RSI = (*tables)[tableIndex].techTable_[i][decimal[0]];
         return RSI <= decimal[1];
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, vector<int> &decimal, int i) {
-        double RSI = (*tables)[0].techTable_[i][decimal[0]];
+    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+        double RSI = (*tables)[tableIndex].techTable_[i][decimal[0]];
         return RSI >= decimal[2];
     }
 };
@@ -954,6 +954,7 @@ public:
     vector<int> decimal_;
 
     vector<TechTable> *tables_ = nullptr;
+    int tableIndex_ = 0;
 
     double remain_ = 0;
     double RoR_ = 0;
@@ -971,9 +972,9 @@ public:
 
     int hold1OrHold2 = 1;
 
-    typedef vector<bool (*)(vector<TechTable> *, vector<int> &, int)> buy_sell;
-    buy_sell buy{&MA::buy_condition0, &MA::buy_condition0, &MA::buy_condition0, &RSI::buy_condition0};
-    buy_sell sell{&MA::sell_condition0, &MA::sell_condition0, &MA::sell_condition0, &RSI::sell_condition0};
+    typedef vector<bool (*)(vector<TechTable> *, int, vector<int> &, int)> buy_sell;
+    buy_sell buy{MA::buy_condition0, MA::buy_condition0, MA::buy_condition0, RSI::buy_condition0};
+    buy_sell sell{MA::sell_condition0, MA::sell_condition0, MA::sell_condition0, RSI::sell_condition0};
 
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
@@ -986,6 +987,7 @@ public:
     void set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false, string *holdDataPtr = nullptr);
+    int set_tableIndex();
     bool set_buy_sell_condition(bool &condition, int stockHold, int i, int endRow, bool isBuy);
     void push_holdData_date_price(string *holdDataPtr, int i);
     void push_tradeData_column_name();
@@ -1063,7 +1065,7 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
             }
         }
         else {
-            holdData += "\n";
+            holdData += ",,,,\n";
         }
         holdDataPtr = &holdData;
     }
@@ -1124,6 +1126,7 @@ void Particle::ini_buyNum_sellNum() {
 }
 
 void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdDataPtr) {
+    tableIndex_ = set_tableIndex();
     int stockHold = 0;
     push_tradeData_column_name();
     ini_buyNum_sellNum();
@@ -1133,14 +1136,14 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     for (int i = startRow; i <= endRow; i++) {
         push_holdData_date_price(holdDataPtr, i);
         if (set_buy_sell_condition(buyCondition, stockHold, i, endRow, true) && techNotAllZeros) {
-            stockHold = floor(remain_ / (*tables_)[0].price_[i]);
-            remain_ = remain_ - stockHold * (*tables_)[0].price_[i];
+            stockHold = floor(remain_ / (*tables_)[tableIndex_].price_[i]);
+            remain_ = remain_ - stockHold * (*tables_)[tableIndex_].price_[i];
             buyNum_++;
             push_tradeData_buy(stockHold, i);
             push_holdData_buy(holdDataPtr, i);
         }
         else if (set_buy_sell_condition(sellCondition, stockHold, i, endRow, false) && techNotAllZeros) {
-            remain_ = remain_ + (double)stockHold * (*tables_)[0].price_[i];
+            remain_ = remain_ + (double)stockHold * (*tables_)[tableIndex_].price_[i];
             stockHold = 0;
             sellNum_++;
             push_tradeData_sell(stockHold, i);
@@ -1162,6 +1165,18 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     push_tradeData_last(lastRecord);
 }
 
+int Particle::set_tableIndex() {
+    if (company_->info_->mixedTech_) {
+        auto [tableIter, tableIndex] = tuple{(*tables_).begin(), 0};
+        for (; tableIter != (*tables_).end(); tableIter++, tableIndex++) {
+            if ((*tableIter).techIndex_ == techIndex_) {
+                return tableIndex;
+            }
+        }
+    }
+    return 0;
+}
+
 // bool RSIhold = true;
 // bool MAhold = false;
 // int buy1 = 10;
@@ -1170,10 +1185,10 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
 // int sell2 = 20;
 bool Particle::set_buy_sell_condition(bool &condition, int stockHold, int i, int endRow, bool isBuy) {
     if (isBuy) {
-        condition = !stockHold && (*buy[techIndex_])(tables_, decimal_, i) && i != endRow;
+        condition = !stockHold && (*buy[techIndex_])(tables_, tableIndex_, decimal_, i) && i != endRow;
         return condition;
     }
-    condition = stockHold && ((*sell[techIndex_])(tables_, decimal_, i) || i == endRow);
+    condition = stockHold && ((*sell[techIndex_])(tables_, tableIndex_, decimal_, i) || i == endRow);
     return condition;
 
     // 以RSI訓練期的資料為底，測試期的時候再加上MA的條件
@@ -1214,9 +1229,9 @@ bool Particle::set_buy_sell_condition(bool &condition, int stockHold, int i, int
 
 void Particle::push_holdData_date_price(string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        (*holdDataPtr) += (*tables_)[0].date_[i];
+        (*holdDataPtr) += (*tables_)[tableIndex_].date_[i];
         (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
         (*holdDataPtr) += ",";
     }
 }
@@ -1242,26 +1257,26 @@ void Particle::push_tradeData_column_name() {
 void Particle::push_tradeData_buy(int stockHold, int i) {
     if (isRecordOn_) {
         tradeRecord_ += "buy,";
-        tradeRecord_ += (*tables_)[0].date_[i] + ",";
-        tradeRecord_ += set_precision((*tables_)[0].price_[i]) + ",";
+        tradeRecord_ += (*tables_)[tableIndex_].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[tableIndex_].price_[i]) + ",";
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[0]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[1]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[1]]) + ",";
                 break;
             }
             case 3: {
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
                 break;
             }
         }
         tradeRecord_ += to_string(stockHold) + ",";
         tradeRecord_ += set_precision(remain_) + ",";
-        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[tableIndex_].price_[i]) + "\n";
     }
 }
 
@@ -1271,18 +1286,21 @@ void Particle::push_extra_techData(int i, string *holdDataPtr) {
         case 1:
         case 2: {
             for (auto variable : decimal_) {
-                (*holdDataPtr) += set_precision((*tables_)[0].techTable_[i][variable]);
+                (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][variable]);
                 (*holdDataPtr) += ",";
             }
             break;
         }
         case 3: {
-            (*holdDataPtr) += set_precision((*tables_)[0].techTable_[i][decimal_[0]]);
+            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]);
             (*holdDataPtr) += ",";
             (*holdDataPtr) += to_string(decimal_[1]);
             (*holdDataPtr) += ",";
             (*holdDataPtr) += to_string(decimal_[2]);
             (*holdDataPtr) += ",";
+            if (company_->info_->mixedTech_) {
+                (*holdDataPtr) += ",";
+            }
             // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy1]);
             // (*holdDataPtr) += ",";
             // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy2]);
@@ -1297,13 +1315,13 @@ void Particle::push_extra_techData(int i, string *holdDataPtr) {
 
 void Particle::push_holdData_buy(string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        if (hold1OrHold2 == 2) 
+        if (hold1OrHold2 == 2)
             (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
-        if (hold1OrHold2 == 1) 
+        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+        if (hold1OrHold2 == 1)
             (*holdDataPtr) += ",";
         (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
         (*holdDataPtr) += ",,,";
         push_extra_techData(i, holdDataPtr);
         (*holdDataPtr) += "\n";
@@ -1313,44 +1331,44 @@ void Particle::push_holdData_buy(string *holdDataPtr, int i) {
 void Particle::push_tradeData_sell(int stockHold, int i) {
     if (isRecordOn_) {
         tradeRecord_ += "sell,";
-        tradeRecord_ += (*tables_)[0].date_[i] + ",";
-        tradeRecord_ += set_precision((*tables_)[0].price_[i]) + ",";
+        tradeRecord_ += (*tables_)[tableIndex_].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[tableIndex_].price_[i]) + ",";
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i - 1][decimal_[3]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[3]]) + ",";
                 break;
             }
             case 3: {
-                tradeRecord_ += set_precision((*tables_)[0].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
                 break;
             }
         }
         tradeRecord_ += to_string(stockHold) + ",";
         tradeRecord_ += set_precision(remain_) + ",";
-        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[0].price_[i]) + "\n\n";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[tableIndex_].price_[i]) + "\n\n";
     }
 }
 
 void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        if (hold1OrHold2 == 2) 
+        if (hold1OrHold2 == 2)
             (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
         if (hold1OrHold2 == 1)
             (*holdDataPtr) += ",";
         if (i == endRow) {
             (*holdDataPtr) += ",,";
-            (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
             (*holdDataPtr) += ",,";
         }
         else {
             (*holdDataPtr) += ",,,";
-            (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
             (*holdDataPtr) += ",";
         }
         push_extra_techData(i, holdDataPtr);
@@ -1361,7 +1379,7 @@ void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
 void Particle::push_holdData_holding(string *holdDataPtr, int i) {
     if (hold1OrHold2 == 2)
         (*holdDataPtr) += ",";
-    (*holdDataPtr) += set_precision((*tables_)[0].price_[i]);
+    (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
     if (hold1OrHold2 == 1)
         (*holdDataPtr) += ",";
     (*holdDataPtr) += ",,,,";
@@ -1960,6 +1978,9 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
         tables = {TechTable(&company, company.info_->techIndex_)};
         tables_ = &tables;
     }
+    else {
+        TechTable checkStartRow(company_, 0, true);
+    }
     train_a_company();
 }
 
@@ -2214,6 +2235,9 @@ Tradition::Tradition(CompanyInfo &company) : company_(company) {
         set_strategy();
         create_particles();
     }
+    else {
+        TechTable checkStartRow(&company_, 0, true);
+    }
     cout << "train " << company_.companyName_ << " tradition" << endl;
     for (auto windowName : company_.info_->slidingWindows_) {
         TrainWindow window(company_, windowName);
@@ -2245,7 +2269,8 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
     if (company_.info_->mixedTech_) {
         MixedTechChooseTrainFile mixedTechChooseTrainFile(&company_, &window, company_.paths_.trainTraditionFilePaths_);
         for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
-            filesystem::copy(from, company_.paths_.trainFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/", copy_options::overwrite_existing);
+            string to = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/";
+            filesystem::copy(from, to, copy_options::overwrite_existing);
         }
     }
     else {
@@ -2322,7 +2347,7 @@ public:
             tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_], company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_]);
         }
     }
-    
+
     HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(*company), company_(company), isTrain_(isTrain), isTradition_(isTradition) {
         set_paths_create_Folder();
         add_tables();
@@ -2796,19 +2821,25 @@ class FindBestHold {
 public:
     Info *info_;
     string trainOrTest_;
+    string algoOrTrad_;
     string techUse_;
 
     void start_copy(string companyRootPath, string fromFolder, string toFolder, string trainOrTest, string company, string window) {
-        string from = companyRootPath + trainOrTest + fromFolder + company + "_" + window + ".csv";
+        string from = companyRootPath + trainOrTest + fromFolder + company + "_" + window + "_hold.csv";
         string to = companyRootPath + trainOrTest + toFolder;
+        create_directories(to);
         filesystem::copy(from, to, copy_options::overwrite_existing);
     }
 
     void copyBestHold(vector<vector<string>> &companyBestPeriod) {
         for (auto &companyBest : companyBestPeriod) {
             string companyRootPath = info_->rootFolder_ + "result_" + techUse_ + "/" + companyBest[0] + "/";
-            start_copy(companyRootPath, "Hold/", "BestHold/", trainOrTest_, companyBest[0], companyBest[1]);
-            start_copy(companyRootPath, "TraditionHold/", "TraditionBestHold/", trainOrTest_, companyBest[0], companyBest[2]);
+            if (algoOrTrad_ == "algo") {
+                start_copy(companyRootPath, "Hold/", "BestHold/", trainOrTest_, companyBest[0], companyBest[1]);
+            }
+            else if (algoOrTrad_ == "tradition") {
+                start_copy(companyRootPath, "TraditionHold/", "TraditionBestHold/", trainOrTest_, companyBest[0], companyBest[2]);
+            }
         }
     }
 
@@ -2831,10 +2862,10 @@ public:
         return companyBestWindow;
     }
 
-    FindBestHold(Info *info, string IRRFileName) : info_(info), trainOrTest_(cut_string(IRRFileName, '_')[0]) {
+    FindBestHold(Info *info, string IRRFileName, string algoOrTrad) : info_(info), trainOrTest_(cut_string(IRRFileName, '_')[0]), algoOrTrad_(algoOrTrad) {
         IRRFileName += ".csv";
         techUse_ = [&]() {
-            string sorted = "sorted";
+            string sorted = "sorted_";
             size_t found = IRRFileName.find(sorted) + sorted.length();
             return cut_string(IRRFileName.substr(found, IRRFileName.length() - found), '.')[0];
         }();
@@ -2949,7 +2980,7 @@ int main(int argc, const char *argv[]) {
             // CalIRR calIRR(companyPricePaths, "train");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "test_IRR_IRR_sorted_SMA");
+            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_SMA", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
