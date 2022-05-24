@@ -85,8 +85,7 @@ public:
         if (techIndexs_.size() == 1) {
             techIndex_ = techIndexs_[0];
             mixedTech_ = false;
-        }
-        else {
+        } else {
             techIndex_ = (int)allTech_.size();
             allTech_.push_back(techType_);
             mixedTech_ = true;
@@ -114,13 +113,11 @@ public:
                     });
                     slidingWindowEx.pop_back();
                     tmp = {slidingWindowEx, 'M', trainTest[0], trainTest[1]};
-                }
-                else if (trainTestPair.size() == 1) {  //做*滑動視窗
+                } else if (trainTestPair.size() == 1) {  //做*滑動視窗
                     slidingWindowEx += to_string(componentLength.at(trainTestPair[0][0])) + "M";
                     tmp = {slidingWindowEx, 'S', componentLength.at(trainTestPair[0][0]), componentLength.at(trainTestPair[0][0])};
                 }
-            }
-            else {  //做A2A及其餘自訂滑動視窗
+            } else {  //做A2A及其餘自訂滑動視窗
                 trainTest = find_train_and_test_len(windowName, delimiter);
                 tmp = {windowName, delimiter, trainTest[0], trainTest[1]};
             }
@@ -254,15 +251,13 @@ void CompanyInfo::store_date_price(path priceFilePath) {
         date_[i - 1] = priceFile[i][0];
         if (!is_double(priceFile[i][4])) {
             price_[i - 1] = price_[i - 2];
-        }
-        else {
+        } else {
             price_[i - 1] = stod(priceFile[i][4]);
         }
         if (j == 0 && date_[i - 1].substr(0, 7) == info_->testStartYear_) {
             testStartRow_ = i - 1;
             j++;
-        }
-        else if (j == 1 && date_[i - 1].substr(0, 7) == info_->testEndYear_) {
+        } else if (j == 1 && date_[i - 1].substr(0, 7) == info_->testEndYear_) {
             testEndRow_ = i - 2;
             j++;
         }
@@ -297,8 +292,7 @@ void CompanyInfo::find_table_start_row() {
         int trainMonth;
         if (get<1>(windowComponent.second) == 'M') {
             trainMonth = get<2>(windowComponent.second);
-        }
-        else {
+        } else {
             trainMonth = 12;
         }
         if (get<1>(windowComponent.second) == 'M' && trainMonth > longestTrainMonth) {
@@ -368,8 +362,7 @@ void CompanyInfo::cal_EMA(vector<double> &tmp) {
         for (int dateRow = 0; dateRow < totalDays_; dateRow++) {
             if (dateRow == 0) {
                 EMA = price_[dateRow];
-            }
-            else {
+            } else {
                 EMA = price_[dateRow] * alpha + (1.0 - alpha) * tmp[dateRow - 1];
             }
             tmp.push_back(EMA);
@@ -389,8 +382,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
         for (int row = 0; row < RSIPeriod; row++) {
             if (priceGainLoss[row] >= 0) {
                 gain += priceGainLoss[row];
-            }
-            else {
+            } else {
                 loss += -priceGainLoss[row];
             }
         }
@@ -404,8 +396,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
                 RSI = 100.0 - (100.0 / (1 + (((preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / (preAvgLoss * (RSIPeriod - 1))))));
                 preAvgGain = (preAvgGain * (RSIPeriod - 1) + priceGainLoss[i]) / RSIPeriod;
                 preAvgLoss = (preAvgLoss * (RSIPeriod - 1)) / RSIPeriod;
-            }
-            else {
+            } else {
                 RSI = 100.0 - (100.0 / (1 + ((preAvgGain * (RSIPeriod - 1)) / (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]))));
                 preAvgGain = (preAvgGain * (RSIPeriod - 1)) / RSIPeriod;
                 preAvgLoss = (preAvgLoss * (RSIPeriod - 1) - priceGainLoss[i]) / RSIPeriod;
@@ -467,11 +458,9 @@ void CompanyInfo::output_Tech() {
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
     if (techPerid < 10) {
         out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_00" + to_string(techPerid) + ".csv");
-    }
-    else if (techPerid >= 10 && techPerid < 100) {
+    } else if (techPerid >= 10 && techPerid < 100) {
         out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_0" + to_string(techPerid) + ".csv");
-    }
-    else if (techPerid >= 100) {
+    } else if (techPerid >= 100) {
         out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_" + to_string(techPerid) + ".csv");
     }
 }
@@ -623,8 +612,7 @@ public:
 TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company), windowName_(window), windowComponent_(company.info_->slidingWindowPairs_.at(window)), tableStartRow_(company.tableStartRow_) {
     if (windowName_ != "A2A") {
         find_test_interval();
-    }
-    else {
+    } else {
         interval_.push_back(company_.testStartRow_);
         interval_.push_back(company_.testEndRow_);
     }
@@ -756,8 +744,7 @@ TrainWindow::TrainWindow(CompanyInfo &company, string window) : TestWindow(compa
         for (auto &i : interval_) {
             i -= tableStartRow_;
         }
-    }
-    else {
+    } else {
         interval_ = TestWindow::interval_;
     }
     for (auto intervalIter = interval_.begin(); intervalIter != interval_.end(); intervalIter += 2) {
@@ -826,8 +813,7 @@ void TrainWindow::find_star_train(vector<int> &endRow, vector<int> &startRow) {
                 if (monthCnt == 12 && intervalIndex % 2 == 0) {
                     startRow.push_back(dateRow);
                     break;
-                }
-                else if (monthCnt == 12 && intervalIndex % 2 == 1) {
+                } else if (monthCnt == 12 && intervalIndex % 2 == 1) {
                     endRow.push_back(dateRow - 1);
                     break;
                 }
@@ -1063,8 +1049,7 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
                     break;
                 }
             }
-        }
-        else {
+        } else {
             holdData += ",,,,\n";
         }
         holdDataPtr = &holdData;
@@ -1141,22 +1126,20 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
             buyNum_++;
             push_tradeData_buy(stockHold, i);
             push_holdData_buy(holdDataPtr, i);
-        }
-        else if (set_buy_sell_condition(sellCondition, stockHold, i, endRow, false) && techNotAllZeros) {
+        } else if (set_buy_sell_condition(sellCondition, stockHold, i, endRow, false) && techNotAllZeros) {
             remain_ = remain_ + (double)stockHold * (*tables_)[tableIndex_].price_[i];
             stockHold = 0;
             sellNum_++;
             push_tradeData_sell(stockHold, i);
             push_holdData_sell(endRow, holdDataPtr, i);
-            if (hold1OrHold2 == 1)
+            if (hold1OrHold2 == 1) {
                 hold1OrHold2 = 2;
-            else
+            } else {
                 hold1OrHold2 = 1;
-        }
-        else if (holdDataPtr != nullptr && stockHold != 0) {
+            }
+        } else if (holdDataPtr != nullptr && stockHold != 0) {
             push_holdData_holding(holdDataPtr, i);
-        }
-        else if (holdDataPtr != nullptr && stockHold == 0) {
+        } else if (holdDataPtr != nullptr && stockHold == 0) {
             push_holdData_not_holding(holdDataPtr, i);
         }
     }
@@ -1315,11 +1298,13 @@ void Particle::push_extra_techData(int i, string *holdDataPtr) {
 
 void Particle::push_holdData_buy(string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        if (hold1OrHold2 == 2)
+        if (hold1OrHold2 == 2) {
             (*holdDataPtr) += ",";
+        }
         (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
-        if (hold1OrHold2 == 1)
+        if (hold1OrHold2 == 1) {
             (*holdDataPtr) += ",";
+        }
         (*holdDataPtr) += ",";
         (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
         (*holdDataPtr) += ",,,";
@@ -1356,17 +1341,18 @@ void Particle::push_tradeData_sell(int stockHold, int i) {
 
 void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        if (hold1OrHold2 == 2)
+        if (hold1OrHold2 == 2) {
             (*holdDataPtr) += ",";
+        }
         (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
-        if (hold1OrHold2 == 1)
+        if (hold1OrHold2 == 1) {
             (*holdDataPtr) += ",";
+        }
         if (i == endRow) {
             (*holdDataPtr) += ",,";
             (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
             (*holdDataPtr) += ",,";
-        }
-        else {
+        } else {
             (*holdDataPtr) += ",,,";
             (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
             (*holdDataPtr) += ",";
@@ -1377,11 +1363,13 @@ void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
 }
 
 void Particle::push_holdData_holding(string *holdDataPtr, int i) {
-    if (hold1OrHold2 == 2)
+    if (hold1OrHold2 == 2) {
         (*holdDataPtr) += ",";
+    }
     (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
-    if (hold1OrHold2 == 1)
+    if (hold1OrHold2 == 1) {
         (*holdDataPtr) += ",";
+    }
     (*holdDataPtr) += ",,,,";
     push_extra_techData(i, holdDataPtr);
     (*holdDataPtr) += "\n";
@@ -1431,8 +1419,7 @@ void Particle::measure(BetaMatrix &betaMatrix) {
         r = (double)rand() / (double)RAND_MAX;
         if (r < betaMatrix.matrix_[i]) {
             binary_[i] = 1;
-        }
-        else {
+        } else {
             binary_[i] = 0;
         }
     }
@@ -1482,8 +1469,7 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
                 trainOrTestData_ += "\n";
             }
             trainOrTestData_ += "\n";
-        }
-        else {
+        } else {
             trainOrTestData_ += "tech type," + techType_ + "\n";
             trainOrTestData_ += "algo," + company_->info_->algoType_ + "\n";
             trainOrTestData_ += "delta," + set_precision(company_->info_->delta_) + "\n";
@@ -1641,8 +1627,9 @@ void TrainAPeriod::initialize_KNQTS() {
 }
 
 void TrainAPeriod::output_debug_exp(int expCnt) {
-    if (debug_)
+    if (debug_) {
         debugOut_ << "exp:" << expCnt << ",==========,==========" << endl;
+    }
 }
 
 void TrainAPeriod::start_gen(int expCnt, int genCnt) {
@@ -1660,8 +1647,9 @@ void TrainAPeriod::start_gen(int expCnt, int genCnt) {
 }
 
 void TrainAPeriod::output_debug_gen(int genCnt) {
-    if (debug_)
+    if (debug_) {
         debugOut_ << "gen:" << genCnt << ",=====" << endl;
+    }
 }
 
 void TrainAPeriod::evolve_particles(int i) {
@@ -1673,8 +1661,9 @@ void TrainAPeriod::evolve_particles(int i) {
 }
 
 void TrainAPeriod::output_debug_particle(int i) {
-    if (debug_)
+    if (debug_) {
         particles_[i].print(debugOut_);
+    }
 }
 
 void TrainAPeriod::store_exp_gen(int expCnt, int genCnt) {
@@ -1798,8 +1787,7 @@ void TrainAPeriod::KNQTScompare() {
 void TrainAPeriod::KNQTSmultiply() {
     if (compareNew_ > compareOld_) {
         actualDelta_ *= company_.info_->multiplyUp_;
-    }
-    else {
+    } else {
         actualDelta_ *= company_.info_->multiplyDown_;
     }
     compareOld_ = compareNew_;
@@ -1883,8 +1871,9 @@ public:
     }
 
     Semaphore(int count = 1) : count_(count) {
-        if (count_ == 0)
+        if (count_ == 0) {
             count_ = 1;
+        }
     }
 };
 
@@ -1977,8 +1966,7 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
     if (!company_->info_->mixedTech_) {
         tables = {TechTable(&company, company.info_->techIndex_)};
         tables_ = &tables;
-    }
-    else {
+    } else {
         TechTable checkStartRow(company_, 0, true);
     }
     train_a_company();
@@ -2013,8 +2001,7 @@ void Train::train_a_window(string windowName) {
             for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
                 filesystem::copy(from, outputPath, copy_options::overwrite_existing);
             }
-        }
-        else {
+        } else {
             window.print_train();
             srand(343);
             for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
@@ -2025,8 +2012,7 @@ void Train::train_a_window(string windowName) {
                 output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
             }
         }
-    }
-    else {
+    } else {
         cout << window.windowName_ << " train window is too old, skip this window" << endl;
     }
     sem_.notify();
@@ -2099,13 +2085,11 @@ Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : co
             if (window.interval_[0] >= 0) {
                 if (tradition_) {
                     create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
-                }
-                else {
+                } else {
                     create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
                 }
                 test_a_window(window);
-            }
-            else {
+            } else {
                 cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
                 cout << ", skip this window" << endl;
             }
@@ -2116,8 +2100,7 @@ Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : co
 void Test::add_tables(vector<int> additionTable) {
     if (!company_.info_->mixedTech_) {
         tables_.push_back(TechTable(&company_, company_.info_->techIndex_));
-    }
-    else {
+    } else {
         for (auto &techIndex : company_.info_->techIndexs_) {
             tables_.push_back(TechTable(&company_, techIndex));
         }
@@ -2132,8 +2115,7 @@ void Test::add_tables(vector<int> additionTable) {
 void Test::set_particle() {
     if (!company_.info_->mixedTech_) {
         p_.init(&company_, company_.info_->techIndex_);
-    }
-    else {
+    } else {
         p_.init(&company_, 0);
     }
     p_.tables_ = &tables_;
@@ -2143,8 +2125,7 @@ void Test::set_train_test_file_path() {
     if (tradition_) {
         paths_.trainFilePaths_ = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_];
         paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
-    }
-    else {
+    } else {
         paths_.trainFilePaths_ = company_.paths_.trainFilePaths_[company_.info_->techIndex_];
         paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
     }
@@ -2187,8 +2168,7 @@ void Test::output_test_file(TestWindow &window, int startRow, int endRow) {
     ofstream out;
     if (!tradition_) {
         out.open(company_.paths_.testFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
-    }
-    else {
+    } else {
         out.open(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
     }
     out << p_.trainOrTestData_;
@@ -2234,8 +2214,7 @@ Tradition::Tradition(CompanyInfo &company) : company_(company) {
         tables_ = tables;
         set_strategy();
         create_particles();
-    }
-    else {
+    } else {
         TechTable checkStartRow(&company_, 0, true);
     }
     cout << "train " << company_.companyName_ << " tradition" << endl;
@@ -2245,8 +2224,7 @@ Tradition::Tradition(CompanyInfo &company) : company_(company) {
             create_directories(company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + windowName);
             cout << window.windowName_ << endl;
             train_a_tradition_window(window);
-        }
-        else {
+        } else {
             cout << window.windowName_ << " train window is too old, skip this window" << endl;
         }
     }
@@ -2272,8 +2250,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
             string to = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/";
             filesystem::copy(from, to, copy_options::overwrite_existing);
         }
-    }
-    else {
+    } else {
         string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_;
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
             for (int i = 0; i < traditionStrategyNum_; i++) {
@@ -2313,10 +2290,11 @@ public:
     void cal_hold(vector<path> &filePaths, vector<vector<string>> &thisTargetFile, TrainWindow &window) {
         cout << "output " << window.windowName_ << " hold" << endl;
         vector<int> interval;
-        if (isTrain_)
+        if (isTrain_) {
             interval = window.interval_;
-        else
+        } else {
             interval = window.TestWindow::interval_;
+        }
         auto [filePathIter, intervalIter] = tuple{filePaths.begin(), interval.begin()};
         for (int periodIndex = 0; periodIndex < window.intervalSize_ / 2; periodIndex++, filePathIter++, intervalIter += 2) {
             thisTargetFile = read_data(*filePathIter);
@@ -2336,14 +2314,11 @@ public:
         };
         if (isTrain_ && !isTradition_) {  //train
             tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.trainFilePaths_[company_->info_->techIndex_], company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_]);
-        }
-        else if (!isTrain_ && !isTradition_) {  //test
+        } else if (!isTrain_ && !isTradition_) {  //test
             tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.testFilePaths_[company_->info_->techIndex_], company_->paths_.testHoldFilePaths_[company_->info_->techIndex_]);
-        }
-        else if (isTrain_ && isTradition_) {  //train tradition
+        } else if (isTrain_ && isTradition_) {  //train tradition
             tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_], company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_]);
-        }
-        else if (!isTrain_ && isTradition_) {  //test tradition
+        } else if (!isTrain_ && isTradition_) {  //test tradition
             tie(targetWindowPaths_, holdFileOuputPath_) = set_path(company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_], company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_]);
         }
     }
@@ -2354,8 +2329,9 @@ public:
         set_particle();
         vector<vector<string>> thisTargetFile;
         for (auto windowName : company_->info_->slidingWindows_) {
-            if (windowName == "A2A" && isTrain_ == false)
+            if (windowName == "A2A" && isTrain_ == false) {
                 continue;
+            }
             vector<path> filePaths = get_path(targetWindowPaths_ + windowName);
             p_.push_holdData_column_Name(true, holdData_, holdDataPtr_);
             TrainWindow window(*company_, windowName);
@@ -2576,8 +2552,7 @@ CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyW
             TrainWindow window(company_, windowName);
             if (window.interval_[0] >= 0) {
                 cal_window_IRRs(window);
-            }
-            else {
+            } else {
                 cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
                 cout << ", skip this window" << endl;
             }
@@ -2591,8 +2566,7 @@ CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyW
 void CalIRR::CalOneCompanyIRR::set_filePath() {
     if (trainOrTestIndex_ == 0) {
         trainOrTestPaths_ = {company_.paths_.trainFilePaths_[company_.info_->techIndex_], company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_]};
-    }
-    else {
+    } else {
         trainOrTestPaths_ = {company_.paths_.testFilePaths_[company_.info_->techIndex_], company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_]};
     }
 }
@@ -2623,8 +2597,7 @@ double CalIRR::CalOneCompanyIRR::cal_one_IRR(string &RoRoutData, TrainWindow &wi
     if (trainOrTestIndex_ == 0) {
         totalRoR = totalRoR / (window.intervalSize_ / 2);
         windowIRR = pow(totalRoR--, company_.oneYearDays_) - 1.0;
-    }
-    else {
+    } else {
         windowIRR = pow(totalRoR--, 1.0 / company_.info_->testLength_) - 1.0;
     }
     RoRoutData += ",,,,,,," + window.windowName_ + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
@@ -2639,24 +2612,24 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         return pow(RoR / 100.0 + 1.0, 1.0 / periodDays);
     };
     if (filePathIter == strategyPaths.begin()) {
-        if (trainOrTestIndex_ == 0)
+        if (trainOrTestIndex_ == 0) {
             totalRoR = cal_IRR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
-        else
+        } else {
             totalRoR = RoR / 100.0 + 1.0;
+        }
         push += filePathIter->stem().string() + ",";
-    }
-    else {
-        if (trainOrTestIndex_ == 0)
+    } else {
+        if (trainOrTestIndex_ == 0) {
             totalRoR += cal_IRR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
-        else
+        } else {
             totalRoR = totalRoR * (RoR / 100.0 + 1.0);
+        }
         push += "," + filePathIter->stem().string() + ",";
     }
     int techIndex = -1;
     if (!company_.info_->mixedTech_) {
         techIndex = company_.info_->techIndex_;
-    }
-    else {
+    } else {
         techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
     }
     for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
@@ -2669,8 +2642,7 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     if (company_.info_->mixedTech_) {
         if (!tradition) {
             tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
-        }
-        else {
+        } else {
             tmpWinodwIRR_.techChooseTimes_[1][techIndex]++;
         }
     }
@@ -2836,8 +2808,7 @@ public:
             string companyRootPath = info_->rootFolder_ + "result_" + techUse_ + "/" + companyBest[0] + "/";
             if (algoOrTrad_ == "algo") {
                 start_copy(companyRootPath, "Hold/", "BestHold/", trainOrTest_, companyBest[0], companyBest[1]);
-            }
-            else if (algoOrTrad_ == "tradition") {
+            } else if (algoOrTrad_ == "tradition") {
                 start_copy(companyRootPath, "TraditionHold/", "TraditionBestHold/", trainOrTest_, companyBest[0], companyBest[2]);
             }
         }
@@ -2975,8 +2946,7 @@ int main(int argc, const char *argv[]) {
                     exit(0);
             }
             RunMode runMode(_info, companyPricePaths);
-        }
-        else {
+        } else {
             // CalIRR calIRR(companyPricePaths, "train");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
