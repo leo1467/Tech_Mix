@@ -1975,7 +1975,9 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
 void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
-        create_directories(company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName);
+        if (company_->info_->delta_ == 0) {
+            create_directories(company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName);
+        }
         windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
         this_thread::sleep_for(0.5s);
     }
@@ -2861,28 +2863,30 @@ private:
 
     void run_mode(CompanyInfo &company) {
         sem_.wait();
+        cout << company.companyName_;
         switch (company.info_->mode_) {
             case 0: {
-                cout << "start train" << endl;
+                cout << " train" << endl;
                 Train train(company);
                 break;
             }
             case 1: {
-                cout << "start test" << endl;
+                cout << " test" << endl;
                 Test test(company, false);
                 break;
             }
             case 2: {
-                cout << "start train tradition" << endl;
+                cout << " train tradition" << endl;
                 Tradition trainTradition(company);
                 break;
             }
             case 3: {
-                cout << "start test tradition" << endl;
+                cout << " test tradition" << endl;
                 Test testTradition(company, true);
                 break;
             }
             case 10: {
+                cout << " mode 10" << endl;
                 // Test(company, company.info_->setWindow_, false, true, vector<int>{0});
                 // Tradition tradition(company);
                 // Train train(company, "2011-12-01", "2011-12-30");
