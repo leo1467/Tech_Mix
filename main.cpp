@@ -27,11 +27,12 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 11;
+    int mode_ = 0;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};
+    vector<int> techIndexs_ = {3};
+    int mixType = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
     bool mixedTech_;
     int techIndex_;
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
@@ -49,7 +50,7 @@ public:
     double totalCapitalLV_ = 10000000;
 
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int windowThreadNum_ = 6;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
@@ -66,7 +67,7 @@ public:
     string priceFolder_ = "price_2021/";  //通常不會換price，只有在更新股價檔的時後才改
 
     string expFolder_ = "exp_result/";
-    string rootFolder_ = "result_";
+    string rootFolder_ = "result_newRSI_";
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
@@ -1117,7 +1118,7 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     ini_buyNum_sellNum();
     bool buyCondition = false;
     bool sellCondition = false;
-    bool techNotAllZeros = all_of(decimal_.begin(), decimal_.end(), [](int i) { return i; });
+    bool techNotAllZeros = !all_of(decimal_.begin(), decimal_.end(), [](int i) { return i == 0; });
     for (int i = startRow; i <= endRow; i++) {
         push_holdData_date_price(holdDataPtr, i);
         if (set_buy_sell_condition(buyCondition, stockHold, i, endRow, true) && techNotAllZeros) {
@@ -1975,9 +1976,6 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
 void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
-        if (company_->info_->delta_ == 0) {
-            create_directories(company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName);
-        }
         windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
         this_thread::sleep_for(0.5s);
     }
@@ -1991,12 +1989,14 @@ void Train::train_a_window(string windowName) {
     TrainWindow window(*company_, windowName);
     if (window.interval_[0] >= 0) {
         string outputPath = [&company_ = this->company_, windowName]() {
+            string dir;
             if (company_->info_->testDeltaLoop_) {
-                string dir = windowName + "_" + to_string(company_->info_->delta_) + "/";
-                create_directories(dir);
-                return dir;
+                dir = windowName + "_" + to_string(company_->info_->delta_) + "/";
+            } else {
+                dir = company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName + "/";
             }
-            return company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName + "/";
+            create_directories(dir);
+            return dir;
         }();
         if (company_->info_->mixedTech_) {
             MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
@@ -2334,10 +2334,10 @@ public:
             if (windowName == "A2A" && isTrain_ == false) {
                 continue;
             }
-            vector<path> filePaths = get_path(targetWindowPaths_ + windowName);
-            p_.push_holdData_column_Name(true, holdData_, holdDataPtr_);
             TrainWindow window(*company_, windowName);
             if (window.interval_[0] > 0) {
+                vector<path> filePaths = get_path(targetWindowPaths_ + windowName);
+                p_.push_holdData_column_Name(true, holdData_, holdDataPtr_);
                 cal_hold(filePaths, thisTargetFile, window);
             }
         }
@@ -2899,6 +2899,7 @@ private:
                 // TrainLoop loop(company);
                 // company.output_Tech();
                 // HoldFile holdFile(&company, true, false);
+                // HoldFile holFile(&company, false, false);
                 break;
             }
         }
@@ -2951,10 +2952,10 @@ int main(int argc, const char *argv[]) {
             }
             RunMode runMode(_info, companyPricePaths);
         } else {
-            // CalIRR calIRR(companyPricePaths, "train");
+            // CalIRR calIRR(companyPricePaths, "test");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_SMA", "algo");
+            // FindBestHold findBestHold(&_info, "test_IRR_IRR_sorted_SMA_RSI", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
