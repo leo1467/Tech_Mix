@@ -1919,7 +1919,7 @@ private:
 
     Semaphore sem_;
 
-    void train_a_window(string windowName);
+    void train_a_window(TrainWindow window);
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
@@ -1976,7 +1976,12 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
 void Train::train_a_company() {
     vector<thread> windowThreads;
     for (auto windowName : company_->info_->slidingWindows_) {
-        windowThreads.push_back(thread(&Train::train_a_window, this, windowName));
+        TrainWindow window(*company_, windowName);
+        if (window.interval_[0] >= 0) {
+            windowThreads.push_back(thread(&Train::train_a_window, this, window));
+        } else {
+            cout << window.windowName_ << " train window is too old, skip this window" << endl;
+        }
         this_thread::sleep_for(0.5s);
     }
     for (auto &thread : windowThreads) {
@@ -1984,38 +1989,33 @@ void Train::train_a_company() {
     }
 }
 
-void Train::train_a_window(string windowName) {
+void Train::train_a_window(TrainWindow window) {
     sem_.wait();
-    TrainWindow window(*company_, windowName);
-    if (window.interval_[0] >= 0) {
-        string outputPath = [&company_ = this->company_, windowName]() {
-            string dir;
-            if (company_->info_->testDeltaLoop_) {
-                dir = windowName + "_" + to_string(company_->info_->delta_) + "/";
-            } else {
-                dir = company_->paths_.trainFilePaths_[company_->info_->techIndex_] + windowName + "/";
-            }
-            create_directories(dir);
-            return dir;
-        }();
-        if (company_->info_->mixedTech_) {
-            MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
-            for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
-                filesystem::copy(from, outputPath, copy_options::overwrite_existing);
-            }
+    string outputPath = [&]() {
+        string dir;
+        if (company_->info_->testDeltaLoop_) {
+            dir = window.windowName_ + "_" + to_string(company_->info_->delta_) + "/";
         } else {
-            window.print_train();
-            srand(343);
-            for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-                TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
-                cout << company_->companyName_ << "_" << windowName << "_";
-                cout << (*tables_)[0].date_[*intervalIter] << "~" << (*tables_)[0].date_[*(intervalIter + 1)] << "_";
-                cout << trainAPeriod.globalP_[0].RoR_ << "%" << endl;
-                output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
-            }
+            dir = company_->paths_.trainFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
+        }
+        create_directories(dir);
+        return dir;
+    }();
+    if (company_->info_->mixedTech_) {
+        MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
+        for (auto from : mixedTechChooseTrainFile.goodTrainFile) {
+            filesystem::copy(from, outputPath, copy_options::overwrite_existing);
         }
     } else {
-        cout << window.windowName_ << " train window is too old, skip this window" << endl;
+        window.print_train();
+        srand(343);
+        for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
+            TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+            cout << company_->companyName_ << "_" << window.windowName_ << "_";
+            cout << (*tables_)[0].date_[*intervalIter] << "~" << (*tables_)[0].date_[*(intervalIter + 1)] << "_";
+            cout << trainAPeriod.globalP_[0].RoR_ << "%" << endl;
+            output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
+        }
     }
     sem_.notify();
 }
