@@ -1937,93 +1937,98 @@ public:
     vector<path> goodTrainFiles;
     vector<vector<MixedStrategy>> mixedStrategies_;
     
-    void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {
-        goodTrainFiles.resize(window_->intervalSize_ / 2);
-        size_t bestRoRIndex = 0;
-        vector<double> everyRoR;
-        for (auto &trainFile : aPeriodTrainFiles) {
-            everyRoR.push_back(stod(trainFile[10][1]));
-        }
-        bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
-        goodTrainFiles[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
-    }
-
-    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {
-        vector<MixedStrategy> strategies;
-        for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
-            MixedStrategy tmp;
-            string tech = (*iter)[0][1];
-            if (tech.back() == '\r') {
-                tech.erase(tech.length() - 1);
-            }
-            tmp.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
-            int decimalNum = 0;
-            switch (tmp.buy_.techIndex_) {
-                case 0:
-                case 1:
-                case 2: {
-                    decimalNum = 4;
-                    break;
-                }
-                case 3: {
-                    decimalNum = 3;
-                    break;
-                }
-                default: {
-                    cout << "can't find tmp.buy_.techIndex_" << endl;
-                    exit(0);
-                }
-            }
-            for (int i = 0; i < decimalNum; i++) {
-                tmp.buy_.decimal_.push_back(stoi((*iter)[i + 12][1]));
-            }
-            tmp.sell_ = tmp.buy_;
-            strategies.push_back(tmp);
-        }
-        vector<MixedStrategy> tmps;
-        for (auto iIter = strategies.begin(); iIter != strategies.end(); iIter++) {
-            for (auto jIter = strategies.begin(); jIter != strategies.end(); jIter++) {
-                MixedStrategy tmp;
-                tmp.buy_ = (*iIter).buy_;
-                tmp.sell_ = (*jIter).sell_;
-                tmps.push_back(tmp);
-            }
-        }
-        tmps.insert(tmps.begin() + 1, *(tmps.end() - 1));
-        tmps.pop_back();
-        mixedStrategies_.push_back(tmps);
-    }
+    void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex);
+    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles);
     
-    MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window) {
-        vector<string> trainFilePaths;
-        for (auto &techIndex : company_->info_->techIndexs_) {
-            trainFilePaths.push_back(techTrainFilePath[techIndex]);
-        }
-        vector<vector<path>> diffTechTrainFilePath;
-        for (auto trainPath : trainFilePaths) {
-            diffTechTrainFilePath.push_back(get_path(trainPath + window->windowName_));
-        }
-        vector<vector<vector<string>>> aPeriodTrainFiles(company_->info_->mixedTechNum_);
-        for (int colIndex = 0; colIndex < window_->intervalSize_ / 2; colIndex++) {
-            for (int rowIndex = 0; rowIndex < company_->info_->mixedTechNum_; rowIndex++) {
-                aPeriodTrainFiles[rowIndex] = read_data(diffTechTrainFilePath[rowIndex][colIndex]);
-            }
-            switch (company_->info_->mixType_) {
-                case 0: {
-                    find_good_train_file(diffTechTrainFilePath, aPeriodTrainFiles, colIndex);
-                    break;
-                }
-                case 1: {
-                    find_mixed_startegies(aPeriodTrainFiles);
-                    break;
-                }
-            }
-        }
-    }
+    MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath);
 };
 
+MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window) {
+    vector<string> trainFilePaths;
+    for (auto &techIndex : company_->info_->techIndexs_) {
+        trainFilePaths.push_back(techTrainFilePath[techIndex]);
+    }
+    vector<vector<path>> diffTechTrainFilePath;
+    for (auto trainPath : trainFilePaths) {
+        diffTechTrainFilePath.push_back(get_path(trainPath + window->windowName_));
+    }
+    vector<vector<vector<string>>> aPeriodTrainFiles(company_->info_->mixedTechNum_);
+    for (int colIndex = 0; colIndex < window_->intervalSize_ / 2; colIndex++) {
+        for (int rowIndex = 0; rowIndex < company_->info_->mixedTechNum_; rowIndex++) {
+            aPeriodTrainFiles[rowIndex] = read_data(diffTechTrainFilePath[rowIndex][colIndex]);
+        }
+        switch (company_->info_->mixType_) {
+            case 0: {
+                find_good_train_file(diffTechTrainFilePath, aPeriodTrainFiles, colIndex);
+                break;
+            }
+            case 1: {
+                find_mixed_startegies(aPeriodTrainFiles);
+                break;
+            }
+        }
+    }
+}
+
+void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {
+    goodTrainFiles.resize(window_->intervalSize_ / 2);
+    size_t bestRoRIndex = 0;
+    vector<double> everyRoR;
+    for (auto &trainFile : aPeriodTrainFiles) {
+        everyRoR.push_back(stod(trainFile[10][1]));
+    }
+    bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
+    goodTrainFiles[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
+}
+
+void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {
+    vector<MixedStrategy> strategies;
+    for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
+        MixedStrategy tmp;
+        string tech = (*iter)[0][1];
+        if (tech.back() == '\r') {
+            tech.erase(tech.length() - 1);
+        }
+        tmp.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
+        int decimalNum = 0;
+        switch (tmp.buy_.techIndex_) {
+            case 0:
+            case 1:
+            case 2: {
+                decimalNum = 4;
+                break;
+            }
+            case 3: {
+                decimalNum = 3;
+                break;
+            }
+            default: {
+                cout << "can't find tmp.buy_.techIndex_" << endl;
+                exit(0);
+            }
+        }
+        for (int i = 0; i < decimalNum; i++) {
+            tmp.buy_.decimal_.push_back(stoi((*iter)[i + 12][1]));
+        }
+        tmp.sell_ = tmp.buy_;
+        strategies.push_back(tmp);
+    }
+    vector<MixedStrategy> tmps;
+    for (auto iIter = strategies.begin(); iIter != strategies.end(); iIter++) {
+        for (auto jIter = strategies.begin(); jIter != strategies.end(); jIter++) {
+            MixedStrategy tmp;
+            tmp.buy_ = (*iIter).buy_;
+            tmp.sell_ = (*jIter).sell_;
+            tmps.push_back(tmp);
+        }
+    }
+    tmps.insert(tmps.begin() + 1, *(tmps.end() - 1));
+    tmps.pop_back();
+    mixedStrategies_.push_back(tmps);
+}
+
 class TrainMixed {
-public:
+private:
     CompanyInfo *company_;
     vector<TechTable> *tablesPtr_;
     vector<string> trainFilePath_;
@@ -2032,6 +2037,8 @@ public:
     
     void copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
     void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
+public:
+    vector<Particle> eachIntervalBestP;
     TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window);
 };
 
@@ -2061,12 +2068,13 @@ void TrainMixed::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTr
 
 void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
     cout << window_->windowName_ << endl;
+    eachIntervalBestP.resize(window_->intervalSize_ / 2);
     Particle p;
     p.init(company_, 0);
     p.tables_ = tablesPtr_;
     Particle bestP = p;
-    auto [mixedStratagiesIter, intervalIter] = tuple{mixedTechChooseTrainFile.mixedStrategies_.begin(), window_->interval_.begin()};
-    for (; mixedStratagiesIter != mixedTechChooseTrainFile.mixedStrategies_.end() && intervalIter != window_->interval_.end(); mixedStratagiesIter++, intervalIter += 2) {
+    auto [mixedStratagiesIter, intervalIter, intervalIndex] = tuple{mixedTechChooseTrainFile.mixedStrategies_.begin(), window_->interval_.begin(), 0};
+    for (; mixedStratagiesIter != mixedTechChooseTrainFile.mixedStrategies_.end() && intervalIter != window_->interval_.end(); mixedStratagiesIter++, intervalIter += 2, intervalIndex++) {
         bestP.reset();
         for (auto &strategyIter : (*mixedStratagiesIter)) {
             p.reset();
@@ -2080,9 +2088,7 @@ void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChoos
             bestP.set_strategy((*mixedStratagiesIter)[0].buy_.techIndex_, (*mixedStratagiesIter)[0].buy_.decimal_, (*mixedStratagiesIter)[0].sell_.techIndex_, (*mixedStratagiesIter)[0].sell_.decimal_);
         }
         bestP.record_train_test_data(*intervalIter, *(intervalIter + 1));
-        ofstream out(outputPath_ + get_date((*tablesPtr_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
-        out << bestP.trainOrTestData_;
-        out.close();
+        eachIntervalBestP[intervalIndex] = bestP;
     }
 }
 
@@ -2098,6 +2104,7 @@ private:
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void train_a_window(TrainWindow window);
+    void train_mixed(string &outputPath, TrainWindow &window);
     void train_normal(string &outputPath, TrainWindow &window);
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
@@ -2196,11 +2203,20 @@ void Train::train_a_window(TrainWindow window) {
         return dir;
     }();
     if (company_->info_->mixedTech_) {
-        TrainMixed trainMixed(company_, tablesPtr_, company_->paths_.trainFilePaths_, outputPath, &window);
+        train_mixed(outputPath, window);
     } else {
         train_normal(outputPath, window);
     }
     sem_.notify();
+}
+
+void Train::train_mixed(string &outputPath, TrainWindow &window) {
+    TrainMixed trainMixed(company_, tablesPtr_, company_->paths_.trainFilePaths_, outputPath, &window);
+    auto intervalIter = window.interval_.begin();
+    for (auto &bestP : trainMixed.eachIntervalBestP) {
+        output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
+        intervalIter += 2;
+    }
 }
 
 void Train::train_normal(string &outputPath, TrainWindow &window) {
