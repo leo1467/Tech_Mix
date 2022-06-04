@@ -29,7 +29,7 @@ class Info {
 public:
     int mode_ = 0;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "YYY2YYY";
+    string setWindow_ = "10D10";
 
     vector<int> techIndexs_ = {0, 3};
     int mixType_ = 1;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
@@ -488,6 +488,7 @@ public:
     void output_techTable();
 
     TechTable(CompanyInfo *company, int techIndex, bool checkStartRow = false);
+    TechTable() {};
 };
 
 TechTable::TechTable(CompanyInfo *company, int techIndex, bool checkStartRow) : company_(company), techIndex_(techIndex), techType_(company->info_->allTech_[techIndex]), days_(company->totalDays_ - company->tableStartRow_), checkStartRow_(checkStartRow) {
@@ -960,8 +961,10 @@ public:
     int variableNum_ = 0;
     vector<int> decimal_;
 
+    MixedStrategy strategy_;
+
     vector<TechTable> *tables_ = nullptr;
-    int tableIndex_ = 0;
+//    int tableIndex_ = 0;
 
     double remain_ = 0;
     double RoR_ = 0;
@@ -994,7 +997,7 @@ public:
     void set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false, string *holdDataPtr = nullptr);
-    int set_tableIndex();
+    int set_tableIndex();  // 目前沒用
     bool set_buy_sell_condition(bool &condition, int stockHold, int i, int endRow, bool isBuy);
     void push_holdData_date_price(string *holdDataPtr, int i);
     void push_tradeData_column_name();
@@ -1010,6 +1013,7 @@ public:
     void reset(double RoR = 0);
     void measure(BetaMatrix &betaMatrix);
     void convert_bi_dec();
+    void set_strategy(int buyTechIndex, vector<int> buyDecimal, int sellTechIndex, vector<int> sellDecimal);
     void print(ostream &out);
     void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
 
@@ -1132,23 +1136,26 @@ void Particle::ini_buyNum_sellNum() {
 }
 
 void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdDataPtr) {
-    tableIndex_ = set_tableIndex();
+//    tableIndex_ = set_tableIndex();
     int stockHold = 0;
     push_tradeData_column_name();
     ini_buyNum_sellNum();
     bool buyCondition = false;
     bool sellCondition = false;
     bool techNotAllZeros = !all_of(decimal_.begin(), decimal_.end(), [](int i) { return i == 0; });
+    if (company_->info_->mixedTech_) {
+        techNotAllZeros = true;
+    }
     for (int i = startRow; i <= endRow; i++) {
         push_holdData_date_price(holdDataPtr, i);
         if (set_buy_sell_condition(buyCondition, stockHold, i, endRow, true) && techNotAllZeros) {
-            stockHold = floor(remain_ / (*tables_)[tableIndex_].price_[i]);
-            remain_ = remain_ - stockHold * (*tables_)[tableIndex_].price_[i];
+            stockHold = floor(remain_ / (*tables_)[strategy_.buy_.techIndex_].price_[i]);
+            remain_ = remain_ - stockHold * (*tables_)[strategy_.buy_.techIndex_].price_[i];
             buyNum_++;
             push_tradeData_buy(stockHold, i);
             push_holdData_buy(holdDataPtr, i);
         } else if (set_buy_sell_condition(sellCondition, stockHold, i, endRow, false) && techNotAllZeros) {
-            remain_ = remain_ + (double)stockHold * (*tables_)[tableIndex_].price_[i];
+            remain_ = remain_ + (double)stockHold * (*tables_)[strategy_.sell_.techIndex_].price_[i];
             stockHold = 0;
             sellNum_++;
             push_tradeData_sell(stockHold, i);
@@ -1189,10 +1196,10 @@ int Particle::set_tableIndex() {
 // int sell2 = 20;
 bool Particle::set_buy_sell_condition(bool &condition, int stockHold, int i, int endRow, bool isBuy) {
     if (isBuy) {
-        condition = !stockHold && (*buy[techIndex_])(tables_, tableIndex_, decimal_, i) && i != endRow;
+        condition = !stockHold && (*buy[strategy_.buy_.techIndex_])(tables_, strategy_.buy_.techIndex_, strategy_.buy_.decimal_, i) && i != endRow;
         return condition;
     }
-    condition = stockHold && ((*sell[techIndex_])(tables_, tableIndex_, decimal_, i) || i == endRow);
+    condition = stockHold && ((*sell[strategy_.sell_.techIndex_])(tables_, strategy_.sell_.techIndex_, strategy_.sell_.decimal_, i) || i == endRow);
     return condition;
 
     // 以RSI訓練期的資料為底，測試期的時候再加上MA的條件
@@ -1233,9 +1240,9 @@ bool Particle::set_buy_sell_condition(bool &condition, int stockHold, int i, int
 
 void Particle::push_holdData_date_price(string *holdDataPtr, int i) {
     if (holdDataPtr != nullptr) {
-        (*holdDataPtr) += (*tables_)[tableIndex_].date_[i];
+        (*holdDataPtr) += (*tables_)[strategy_.buy_.techIndex_].date_[i];
         (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[strategy_.buy_.techIndex_].price_[i]);
         (*holdDataPtr) += ",";
     }
 }
@@ -1261,60 +1268,60 @@ void Particle::push_tradeData_column_name() {
 void Particle::push_tradeData_buy(int stockHold, int i) {
     if (isRecordOn_) {
         tradeRecord_ += "buy,";
-        tradeRecord_ += (*tables_)[tableIndex_].date_[i] + ",";
-        tradeRecord_ += set_precision((*tables_)[tableIndex_].price_[i]) + ",";
-        switch (techIndex_) {
+        tradeRecord_ += (*tables_)[strategy_.buy_.techIndex_].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].price_[i]) + ",";
+        switch (strategy_.buy_.techIndex_) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[0]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[1]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].techTable_[i - 1][strategy_.buy_.decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].techTable_[i - 1][strategy_.buy_.decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].techTable_[i][strategy_.buy_.decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].techTable_[i][strategy_.buy_.decimal_[1]]) + ",";
                 break;
             }
             case 3: {
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.buy_.techIndex_].techTable_[i][strategy_.buy_.decimal_[0]]) + ",";
                 break;
             }
         }
         tradeRecord_ += to_string(stockHold) + ",";
         tradeRecord_ += set_precision(remain_) + ",";
-        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[tableIndex_].price_[i]) + "\n";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[strategy_.buy_.techIndex_].price_[i]) + "\n";
     }
 }
 
 void Particle::push_extra_techData(int i, string *holdDataPtr) {
-    switch (techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            for (auto variable : decimal_) {
-                (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][variable]);
-                (*holdDataPtr) += ",";
-            }
-            break;
-        }
-        case 3: {
-            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]);
-            (*holdDataPtr) += ",";
-            (*holdDataPtr) += to_string(decimal_[1]);
-            (*holdDataPtr) += ",";
-            (*holdDataPtr) += to_string(decimal_[2]);
-            (*holdDataPtr) += ",";
-            if (company_->info_->mixedTech_) {
-                (*holdDataPtr) += ",";
-            }
-            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy1]);
-            // (*holdDataPtr) += ",";
-            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy2]);
-            // (*holdDataPtr) += ",";
-            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][sell1]);
-            // (*holdDataPtr) += ",";
-            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][sell2]);
-            break;
-        }
-    }
+//    switch (techIndex_) {
+//        case 0:
+//        case 1:
+//        case 2: {
+//            for (auto variable : decimal_) {
+//                (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][variable]);
+//                (*holdDataPtr) += ",";
+//            }
+//            break;
+//        }
+//        case 3: {
+//            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]);
+//            (*holdDataPtr) += ",";
+//            (*holdDataPtr) += to_string(decimal_[1]);
+//            (*holdDataPtr) += ",";
+//            (*holdDataPtr) += to_string(decimal_[2]);
+//            (*holdDataPtr) += ",";
+//            if (company_->info_->mixedTech_) {
+//                (*holdDataPtr) += ",";
+//            }
+//            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy1]);
+//            // (*holdDataPtr) += ",";
+//            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][buy2]);
+//            // (*holdDataPtr) += ",";
+//            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][sell1]);
+//            // (*holdDataPtr) += ",";
+//            // (*holdDataPtr) += set_precision((*tables_)[1].techTable_[i][sell2]);
+//            break;
+//        }
+//    }
 }
 
 void Particle::push_holdData_buy(string *holdDataPtr, int i) {
@@ -1322,12 +1329,12 @@ void Particle::push_holdData_buy(string *holdDataPtr, int i) {
         if (hold1OrHold2 == 2) {
             (*holdDataPtr) += ",";
         }
-        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[strategy_.buy_.techIndex_].price_[i]);
         if (hold1OrHold2 == 1) {
             (*holdDataPtr) += ",";
         }
         (*holdDataPtr) += ",";
-        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[strategy_.buy_.techIndex_].price_[i]);
         (*holdDataPtr) += ",,,";
         push_extra_techData(i, holdDataPtr);
         (*holdDataPtr) += "\n";
@@ -1337,26 +1344,26 @@ void Particle::push_holdData_buy(string *holdDataPtr, int i) {
 void Particle::push_tradeData_sell(int stockHold, int i) {
     if (isRecordOn_) {
         tradeRecord_ += "sell,";
-        tradeRecord_ += (*tables_)[tableIndex_].date_[i] + ",";
-        tradeRecord_ += set_precision((*tables_)[tableIndex_].price_[i]) + ",";
+        tradeRecord_ += (*tables_)[strategy_.sell_.techIndex_].date_[i] + ",";
+        tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]) + ",";
         switch (techIndex_) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i - 1][decimal_[3]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[2]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[3]]) + ",";
                 break;
             }
             case 3: {
-                tradeRecord_ += set_precision((*tables_)[tableIndex_].techTable_[i][decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[0]]) + ",";
                 break;
             }
         }
         tradeRecord_ += to_string(stockHold) + ",";
         tradeRecord_ += set_precision(remain_) + ",";
-        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[tableIndex_].price_[i]) + "\n\n";
+        tradeRecord_ += set_precision(remain_ + stockHold * (*tables_)[strategy_.sell_.techIndex_].price_[i]) + "\n\n";
     }
 }
 
@@ -1365,17 +1372,17 @@ void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i) {
         if (hold1OrHold2 == 2) {
             (*holdDataPtr) += ",";
         }
-        (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+        (*holdDataPtr) += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]);
         if (hold1OrHold2 == 1) {
             (*holdDataPtr) += ",";
         }
         if (i == endRow) {
             (*holdDataPtr) += ",,";
-            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+            (*holdDataPtr) += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]);
             (*holdDataPtr) += ",,";
         } else {
             (*holdDataPtr) += ",,,";
-            (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+            (*holdDataPtr) += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]);
             (*holdDataPtr) += ",";
         }
         push_extra_techData(i, holdDataPtr);
@@ -1387,7 +1394,7 @@ void Particle::push_holdData_holding(string *holdDataPtr, int i) {
     if (hold1OrHold2 == 2) {
         (*holdDataPtr) += ",";
     }
-    (*holdDataPtr) += set_precision((*tables_)[tableIndex_].price_[i]);
+    (*holdDataPtr) += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]);
     if (hold1OrHold2 == 1) {
         (*holdDataPtr) += ",";
     }
@@ -1432,6 +1439,11 @@ void Particle::reset(double RoR) {
     exp_ = 0;
     isRecordOn_ = false;
     bestCnt_ = 0;
+    
+    strategy_.buy_.techIndex_ = -1;
+    strategy_.sell_.techIndex_ = -1;
+    strategy_.buy_.decimal_.clear();
+    strategy_.sell_.decimal_.clear();
 }
 
 void Particle::measure(BetaMatrix &betaMatrix) {
@@ -1458,6 +1470,14 @@ void Particle::convert_bi_dec() {
         decimal_[1]--;
         decimal_[2]--;
     }
+    set_strategy(techIndex_, decimal_, techIndex_, decimal_);
+}
+
+void Particle::set_strategy(int buyTechIndex, vector<int> buyDecimal, int sellTechIndex, vector<int> sellDecimal) {
+    strategy_.buy_.techIndex_ = buyTechIndex;
+    strategy_.buy_.decimal_ = buyDecimal;
+    strategy_.sell_.techIndex_ = sellTechIndex;
+    strategy_.sell_.decimal_ = sellDecimal;
 }
 
 void Particle::print(ostream &out = cout) {
@@ -1502,27 +1522,37 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
         trainOrTestData_ += "final capital," + set_precision(remain_) + "\n";
         trainOrTestData_ += "final return," + set_precision(remain_ - company_->info_->totalCapitalLV_) + "\n";
         trainOrTestData_ += "return rate," + set_precision(RoR_) + "%\n\n";
-        switch (techIndex_) {
-            case 0:
-            case 1:
-            case 2: {
-                trainOrTestData_ += "buy1," + to_string(decimal_[0]) + "\n";
-                trainOrTestData_ += "buy2," + to_string(decimal_[1]) + "\n";
-                trainOrTestData_ += "sell1," + to_string(decimal_[2]) + "\n";
-                trainOrTestData_ += "sell2," + to_string(decimal_[3]) + "\n\n";
-                break;
-            }
-            case 3: {
-                trainOrTestData_ += "period," + to_string(decimal_[0]) + "\n";
-                trainOrTestData_ += "overSold," + to_string(decimal_[1]) + "\n";
-                trainOrTestData_ += "overBought," + to_string(decimal_[2]) + "\n\n";
-                break;
-            }
-            default: {
-                cout << "print_train_test_data exception" << endl;
-                exit(1);
-            }
+        trainOrTestData_ += company_->info_->allTech_[strategy_.buy_.techIndex_] + "\n";
+        for (auto i : strategy_.buy_.decimal_) {
+            trainOrTestData_ += to_string(i) + ",";
         }
+        trainOrTestData_ += "\n";
+        trainOrTestData_ += company_->info_->allTech_[strategy_.sell_.techIndex_] + "\n";
+        for (auto i : strategy_.sell_.decimal_) {
+            trainOrTestData_ += to_string(i) + ",";
+        }
+        trainOrTestData_ += "\n\n";
+//        switch (techIndex_) {
+//            case 0:
+//            case 1:
+//            case 2: {
+//                trainOrTestData_ += "buy1," + to_string(decimal_[0]) + "\n";
+//                trainOrTestData_ += "buy2," + to_string(decimal_[1]) + "\n";
+//                trainOrTestData_ += "sell1," + to_string(decimal_[2]) + "\n";
+//                trainOrTestData_ += "sell2," + to_string(decimal_[3]) + "\n\n";
+//                break;
+//            }
+//            case 3: {
+//                trainOrTestData_ += "period," + to_string(decimal_[0]) + "\n";
+//                trainOrTestData_ += "overSold," + to_string(decimal_[1]) + "\n";
+//                trainOrTestData_ += "overBought," + to_string(decimal_[2]) + "\n\n";
+//                break;
+//            }
+//            default: {
+//                cout << "print_train_test_data exception" << endl;
+//                exit(1);
+//            }
+//        }
         trainOrTestData_ += "best exp," + to_string(exp_) + "\n";
         trainOrTestData_ += "best gen," + to_string(gen_) + "\n";
         trainOrTestData_ += "best cnt," + to_string(bestCnt_) + "\n\n";
@@ -1908,6 +1938,7 @@ public:
     vector<vector<MixedStrategy>> mixedStrategies_;
     
     void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {
+        goodTrainFiles.resize(window_->intervalSize_ / 2);
         size_t bestRoRIndex = 0;
         vector<double> everyRoR;
         for (auto &trainFile : aPeriodTrainFiles) {
@@ -1956,10 +1987,12 @@ public:
                 tmps.push_back(tmp);
             }
         }
+        tmps.insert(tmps.begin() + 1, *(tmps.end() - 1));
+        tmps.pop_back();
         mixedStrategies_.push_back(tmps);
     }
     
-    MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window), goodTrainFiles(window->intervalSize_ / 2) {
+    MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window) {
         vector<string> trainFilePaths;
         for (auto &techIndex : company_->info_->techIndexs_) {
             trainFilePaths.push_back(techTrainFilePath[techIndex]);
@@ -1990,14 +2023,18 @@ public:
 class Train {
 private:
     CompanyInfo *company_;
-    vector<TechTable> *tables_;
+    vector<TechTable> tables_;
+    vector<TechTable> *tablesPtr_ = nullptr;
 
     Semaphore sem_;
 
+    void set_tables();
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void train_a_window(TrainWindow window);
-    void train_mixed(const string &outputPath, TrainWindow &window);
+    void train_mixed(string &outputPath, TrainWindow &window);
+    void copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window);
+    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window);
     void train_normal(string &outputPath, TrainWindow &window);
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
@@ -2007,7 +2044,15 @@ public:
     Train(CompanyInfo &company);
 };
 
-Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tables_(&tables) {
+void Train::set_tables() {
+    tables_.resize(company_->info_->allTech_.size());
+    for (auto i : company_->info_->techIndexs_) {
+        tables_[i] = TechTable(company_, i);
+    }
+    tablesPtr_ = &tables_;
+}
+
+Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tablesPtr_(&tables) {
     Info info = *company.info_;
     company.info_ = &info;
     company_ = &company;
@@ -2017,13 +2062,12 @@ Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : t
 }
 
 Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(&company), sem_(company.info_->windowThreadNum_) {
-    vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
-    tables_ = &tables;
-    int startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
-    int endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
+    set_tables();
+    int startRow = find_index_of_string_in_vec((*tablesPtr_)[0].date_, startDate);
+    int endRow = find_index_of_string_in_vec((*tablesPtr_)[0].date_, endDate);
     srand(343);
     company_->paths_.trainFilePaths_[company_->info_->techIndex_].clear();
-    TrainAPeriod trainAPeriod(*company_, *tables_, startRow, endRow);
+    TrainAPeriod trainAPeriod(*company_, *tablesPtr_, startRow, endRow);
     print_date_train_file(trainAPeriod.trainData_, startDate, endDate);
 }
 
@@ -2040,12 +2084,22 @@ void Train::print_date_train_file(string &trainData, string startDate, string en
 }
 
 Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->windowThreadNum_) {
-    vector<TechTable> tables;
     if (!company_->info_->mixedTech_) {
-        tables = {TechTable(&company, company.info_->techIndex_)};
-        tables_ = &tables;
+        set_tables();
     } else {
-        TechTable checkStartRow(company_, 0, true);
+        switch (company_->info_->mixType_) {
+            case 0: {
+                TechTable checkStartRow(company_, 0, true);
+                break;
+            }
+            case 1: {
+                set_tables();
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
     train_a_company();
 }
@@ -2086,18 +2140,15 @@ void Train::train_a_window(TrainWindow window) {
     sem_.notify();
 }
 
-void Train::train_mixed(const std::string &outputPath, TrainWindow &window) {
+void Train::train_mixed(string &outputPath, TrainWindow &window) {
     MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
     switch (company_->info_->mixType_) {
         case 0: {
-            cout << "copying " << window.windowName_ << " train files" << endl;
-            for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
-                filesystem::copy(from, outputPath, copy_options::overwrite_existing);
-            }
+            copy_good_trainFile(mixedTechChooseTrainFile, outputPath, window);
             break;
         }
         case 1: {
-            
+            train_mixed_strategies(mixedTechChooseTrainFile, outputPath, window);
             break;
         }
         default: {
@@ -2106,20 +2157,48 @@ void Train::train_mixed(const std::string &outputPath, TrainWindow &window) {
     }
 }
 
-void Train::train_normal(std::string &outputPath, TrainWindow &window) {
+void Train::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window) {
+    cout << "copying " << window.windowName_ << " train files" << endl;
+    for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
+        filesystem::copy(from, outputPath, copy_options::overwrite_existing);
+    }
+}
+
+void Train::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window) {
+    Particle p;
+    p.init(company_, 0);
+    p.tables_ = tablesPtr_;
+    Particle bestP = p;
+    auto [mixedStratagiesIter, intervalIter] = tuple{mixedTechChooseTrainFile.mixedStrategies_.begin(), window.interval_.begin()};
+    for (; mixedStratagiesIter != mixedTechChooseTrainFile.mixedStrategies_.end() && intervalIter != window.interval_.end(); mixedStratagiesIter++, intervalIter += 2) {
+        bestP.reset();
+        for (auto &strategyIter : (*mixedStratagiesIter)) {
+            p.reset();
+            p.set_strategy(strategyIter.buy_.techIndex_, strategyIter.buy_.decimal_, strategyIter.sell_.techIndex_, strategyIter.sell_.decimal_);
+            p.trade(*intervalIter, *(intervalIter + 1));
+            if (p.RoR_ > bestP.RoR_) {
+                bestP = p;
+            }
+        }
+        bestP.record_train_test_data(*intervalIter, *(intervalIter + 1));
+        output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
+    }
+}
+
+void Train::train_normal(string &outputPath, TrainWindow &window) {
     window.print_train();
     srand(343);
     for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-        TrainAPeriod trainAPeriod(*company_, *tables_, *intervalIter, *(intervalIter + 1), window.windowName_);
+        TrainAPeriod trainAPeriod(*company_, *tablesPtr_, *intervalIter, *(intervalIter + 1), window.windowName_);
         cout << company_->companyName_ << "_" << window.windowName_ << "_";
-        cout << (*tables_)[0].date_[*intervalIter] << "~" << (*tables_)[0].date_[*(intervalIter + 1)] << "_";
+        cout << (*tablesPtr_)[0].date_[*intervalIter] << "~" << (*tablesPtr_)[0].date_[*(intervalIter + 1)] << "_";
         cout << trainAPeriod.globalP_[0].RoR_ << "%" << endl;
         output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
     }
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
-    ofstream out(ouputPath + get_date((*tables_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+    ofstream out(ouputPath + get_date((*tablesPtr_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
     out << trainData;
     out.close();
 }
