@@ -27,7 +27,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 11;
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -50,7 +50,7 @@ public:
     double totalCapitalLV_ = 10000000;
 
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 2;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int windowThreadNum_ = 0;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
@@ -1953,7 +1953,9 @@ public:
         for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
             MixedStrategy tmp;
             string tech = (*iter)[0][1];
-            tech.erase(tech.length() - 1);
+            if (tech.back() == '\r') {
+                tech.erase(tech.length() - 1);
+            }
             tmp.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
             int decimalNum = 0;
             switch (tmp.buy_.techIndex_) {
@@ -2815,8 +2817,10 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     } else {
         techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
     }
-    for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
-        push += file[i + 12][1] + ",";
+    if (!(company_.info_->mixType_ == 1)) {
+        for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
+            push += file[i + 12][1] + ",";
+        }
     }
     if (techIndex == 3) {
         push += ",";
