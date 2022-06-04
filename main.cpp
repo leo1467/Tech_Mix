@@ -27,8 +27,8 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 11;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 0;
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0, 3};
@@ -2022,6 +2022,70 @@ public:
     }
 };
 
+class TrainMixed {
+public:
+    CompanyInfo *company_;
+    vector<TechTable> *tablesPtr_;
+    vector<string> trainFilePath_;
+    string outputPath_;
+    TrainWindow *window_;
+    
+    void copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
+    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
+    TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window);
+};
+
+TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window) : company_(company), tablesPtr_(tablesPtr), trainFilePath_(trainFilePath), outputPath_(outputPath), window_(window) {
+    MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &(*window_), trainFilePath_);
+    switch (company_->info_->mixType_) {
+        case 0: {
+            copy_good_trainFile(mixedTechChooseTrainFile);
+            break;
+        }
+        case 1: {
+            train_mixed_strategies(mixedTechChooseTrainFile);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+}
+
+void TrainMixed::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
+    cout << "copying " << window_->windowName_ << " train files" << endl;
+    for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
+        filesystem::copy(from, outputPath_, copy_options::overwrite_existing);
+    }
+}
+
+void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
+    cout << window_->windowName_ << endl;
+    Particle p;
+    p.init(company_, 0);
+    p.tables_ = tablesPtr_;
+    Particle bestP = p;
+    auto [mixedStratagiesIter, intervalIter] = tuple{mixedTechChooseTrainFile.mixedStrategies_.begin(), window_->interval_.begin()};
+    for (; mixedStratagiesIter != mixedTechChooseTrainFile.mixedStrategies_.end() && intervalIter != window_->interval_.end(); mixedStratagiesIter++, intervalIter += 2) {
+        bestP.reset();
+        for (auto &strategyIter : (*mixedStratagiesIter)) {
+            p.reset();
+            p.set_strategy(strategyIter.buy_.techIndex_, strategyIter.buy_.decimal_, strategyIter.sell_.techIndex_, strategyIter.sell_.decimal_);
+            p.trade(*intervalIter, *(intervalIter + 1));
+            if (p.RoR_ > bestP.RoR_) {
+                bestP = p;
+            }
+        }
+        if (bestP.RoR_ == 0) {
+            bestP.set_strategy((*mixedStratagiesIter)[0].buy_.techIndex_, (*mixedStratagiesIter)[0].buy_.decimal_, (*mixedStratagiesIter)[0].sell_.techIndex_, (*mixedStratagiesIter)[0].sell_.decimal_);
+        }
+        bestP.record_train_test_data(*intervalIter, *(intervalIter + 1));
+        ofstream out(outputPath_ + get_date((*tablesPtr_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+        out << bestP.trainOrTestData_;
+        out.close();
+    }
+}
+
 class Train {
 private:
     CompanyInfo *company_;
@@ -2034,9 +2098,6 @@ private:
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void train_a_window(TrainWindow window);
-    void train_mixed(string &outputPath, TrainWindow &window);
-    void copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window);
-    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window);
     void train_normal(string &outputPath, TrainWindow &window);
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
@@ -2045,14 +2106,6 @@ public:
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
 };
-
-void Train::set_tables() {
-    tables_.resize(company_->info_->allTech_.size());
-    for (auto i : company_->info_->techIndexs_) {
-        tables_[i] = TechTable(company_, i);
-    }
-    tablesPtr_ = &tables_;
-}
 
 Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tablesPtr_(&tables) {
     Info info = *company.info_;
@@ -2071,18 +2124,6 @@ Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(
     company_->paths_.trainFilePaths_[company_->info_->techIndex_].clear();
     TrainAPeriod trainAPeriod(*company_, *tablesPtr_, startRow, endRow);
     print_date_train_file(trainAPeriod.trainData_, startDate, endDate);
-}
-
-void Train::print_date_train_file(string &trainData, string startDate, string endDate) {
-    string title = company_->info_->techType_ + "_";
-    title += company_->companyName_ + "_";
-    title += company_->info_->algoType_ + "_";
-    title += remove_zeros_at_end(company_->info_->delta_) + "_";
-    title += startDate + "_";
-    title += endDate + ".csv";
-    ofstream out(title);
-    out << trainData;
-    out.close();
 }
 
 Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->windowThreadNum_) {
@@ -2104,6 +2145,26 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
         }
     }
     train_a_company();
+}
+
+void Train::set_tables() {
+    tables_.resize(company_->info_->allTech_.size());
+    for (auto i : company_->info_->techIndexs_) {
+        tables_[i] = TechTable(company_, i);
+    }
+    tablesPtr_ = &tables_;
+}
+
+void Train::print_date_train_file(string &trainData, string startDate, string endDate) {
+    string title = company_->info_->techType_ + "_";
+    title += company_->companyName_ + "_";
+    title += company_->info_->algoType_ + "_";
+    title += remove_zeros_at_end(company_->info_->delta_) + "_";
+    title += startDate + "_";
+    title += endDate + ".csv";
+    ofstream out(title);
+    out << trainData;
+    out.close();
 }
 
 void Train::train_a_company() {
@@ -2135,60 +2196,11 @@ void Train::train_a_window(TrainWindow window) {
         return dir;
     }();
     if (company_->info_->mixedTech_) {
-        train_mixed(outputPath, window);
+        TrainMixed trainMixed(company_, tablesPtr_, company_->paths_.trainFilePaths_, outputPath, &window);
     } else {
         train_normal(outputPath, window);
     }
     sem_.notify();
-}
-
-void Train::train_mixed(string &outputPath, TrainWindow &window) {
-    MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &window, company_->paths_.trainFilePaths_);
-    switch (company_->info_->mixType_) {
-        case 0: {
-            copy_good_trainFile(mixedTechChooseTrainFile, outputPath, window);
-            break;
-        }
-        case 1: {
-            train_mixed_strategies(mixedTechChooseTrainFile, outputPath, window);
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-}
-
-void Train::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window) {
-    cout << "copying " << window.windowName_ << " train files" << endl;
-    for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
-        filesystem::copy(from, outputPath, copy_options::overwrite_existing);
-    }
-}
-
-void Train::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window) {
-    cout << window.windowName_ << endl;
-    Particle p;
-    p.init(company_, 0);
-    p.tables_ = tablesPtr_;
-    Particle bestP = p;
-    auto [mixedStratagiesIter, intervalIter] = tuple{mixedTechChooseTrainFile.mixedStrategies_.begin(), window.interval_.begin()};
-    for (; mixedStratagiesIter != mixedTechChooseTrainFile.mixedStrategies_.end() && intervalIter != window.interval_.end(); mixedStratagiesIter++, intervalIter += 2) {
-        bestP.reset();
-        for (auto &strategyIter : (*mixedStratagiesIter)) {
-            p.reset();
-            p.set_strategy(strategyIter.buy_.techIndex_, strategyIter.buy_.decimal_, strategyIter.sell_.techIndex_, strategyIter.sell_.decimal_);
-            p.trade(*intervalIter, *(intervalIter + 1));
-            if (p.RoR_ > bestP.RoR_) {
-                bestP = p;
-            }
-        }
-        if (bestP.RoR_ == 0) {
-            bestP.set_strategy((*mixedStratagiesIter)[0].buy_.techIndex_, (*mixedStratagiesIter)[0].buy_.decimal_, (*mixedStratagiesIter)[0].sell_.techIndex_, (*mixedStratagiesIter)[0].sell_.decimal_);
-        }
-        bestP.record_train_test_data(*intervalIter, *(intervalIter + 1));
-        output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
-    }
 }
 
 void Train::train_normal(string &outputPath, TrainWindow &window) {
