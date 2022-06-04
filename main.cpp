@@ -28,8 +28,8 @@ using namespace filesystem;
 class Info {
 public:
     int mode_ = 0;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "10D10";
+    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0, 3};
     int mixType_ = 1;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
@@ -50,7 +50,7 @@ public:
     double totalCapitalLV_ = 10000000;
 
     int companyThreadNum_ = 0;  //若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 6;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int windowThreadNum_ = 2;  //若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;
 
@@ -2165,6 +2165,7 @@ void Train::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFi
 }
 
 void Train::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile, string &outputPath, TrainWindow &window) {
+    cout << window.windowName_ << endl;
     Particle p;
     p.init(company_, 0);
     p.tables_ = tablesPtr_;
@@ -2179,6 +2180,9 @@ void Train::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrai
             if (p.RoR_ > bestP.RoR_) {
                 bestP = p;
             }
+        }
+        if (bestP.RoR_ == 0) {
+            bestP.set_strategy((*mixedStratagiesIter)[0].buy_.techIndex_, (*mixedStratagiesIter)[0].buy_.decimal_, (*mixedStratagiesIter)[0].sell_.techIndex_, (*mixedStratagiesIter)[0].sell_.decimal_);
         }
         bestP.record_train_test_data(*intervalIter, *(intervalIter + 1));
         output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
