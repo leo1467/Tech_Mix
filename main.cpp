@@ -27,7 +27,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 2;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -35,6 +35,7 @@ public:
     int mixType_ = 1;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
     bool mixedTech_;
     int techIndex_;
+    
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     string techType_;
     int mixedTechNum_;
@@ -81,7 +82,9 @@ public:
             techType_ += allTech_[techIndex] + "_";
         }
         techType_.pop_back();
-        techType_ += "_" + to_string(mixType_);
+        if (techIndexs_.size() > 1) {
+            techType_ += "_" + to_string(mixType_);
+        }
         algoType_ = allAlgo_[algoIndex_];
         testLength_ = stod(testEndYear_) - stod(testStartYear_);
         if (techIndexs_.size() == 1) {
@@ -1346,7 +1349,7 @@ void Particle::push_tradeData_sell(int stockHold, int i) {
         tradeRecord_ += "sell,";
         tradeRecord_ += (*tables_)[strategy_.sell_.techIndex_].date_[i] + ",";
         tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].price_[i]) + ",";
-        switch (techIndex_) {
+        switch (strategy_.sell_.techIndex_) {
             case 0:
             case 1:
             case 2: {
@@ -2010,6 +2013,14 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
         for (int i = 0; i < decimalNum; i++) {
             tmp.buy_.decimal_.push_back(stoi((*iter)[i + 12][1]));
         }
+    //    auto getStrategy = [](vector<string> aStrategyStrings) {
+    //        vector<int> aStrategyInt;
+    //        for (auto s : aStrategyStrings) {
+    //            aStrategyInt.push_back(stoi(s));
+    //        }
+    //        return aStrategyInt;
+    //    };
+    //    tmp.buy_.decimal_ = getStrategy((*iter)[13]);
         tmp.sell_ = tmp.buy_;
         strategies.push_back(tmp);
     }
@@ -2093,7 +2104,7 @@ void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChoos
 }
 
 class Train {
-private:
+protected:
     CompanyInfo *company_;
     vector<TechTable> tables_;
     vector<TechTable> *tablesPtr_ = nullptr;
@@ -2112,6 +2123,7 @@ public:
     Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem);
     Train(CompanyInfo &company, string startDate, string endDate);
     Train(CompanyInfo &company);
+    Train() {};
 };
 
 Train::Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem) : tablesPtr_(&tables) {
@@ -2158,6 +2170,10 @@ void Train::set_tables() {
     tables_.resize(company_->info_->allTech_.size());
     for (auto i : company_->info_->techIndexs_) {
         tables_[i] = TechTable(company_, i);
+    }
+    if (company_->info_->mixedTech_ && company_->info_->mixType_) {
+        tables_[tables_.size() - 1].date_ = tables_[company_->info_->techIndexs_[0]].date_;
+        tables_[tables_.size() - 1].price_ = tables_[company_->info_->techIndexs_[0]].price_;
     }
     tablesPtr_ = &tables_;
 }
@@ -2232,7 +2248,7 @@ void Train::train_normal(string &outputPath, TrainWindow &window) {
 }
 
 void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
-    ofstream out(ouputPath + get_date((*tablesPtr_)[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+    ofstream out(ouputPath + get_date((*tablesPtr_)[company_->info_->techIndex_].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
     out << trainData;
     out.close();
 }
@@ -2401,9 +2417,9 @@ public:
     }
 };
 
-class Tradition {
+class Tradition : public Train {
 private:
-    CompanyInfo &company_;
+    CompanyInfo *company_;
     vector<TechTable> tables_;
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
@@ -2418,23 +2434,37 @@ private:
     void set_variables(int index);
 
 public:
-    Tradition(CompanyInfo &company);
+    Tradition(CompanyInfo *company);
 };
 
-Tradition::Tradition(CompanyInfo &company) : company_(company) {
-    if (!company_.info_->mixedTech_) {
-        vector<TechTable> tables{TechTable(&company, company.info_->techIndex_)};
-        tables_ = tables;
+Tradition::Tradition(CompanyInfo *company) : company_(company) {
+    Train::company_ = company_;
+    if (!company_->info_->mixedTech_) {
+        set_tables();
+        tables_ = Train::tables_;
         set_strategy();
         create_particles();
     } else {
-        TechTable checkStartRow(&company_, 0, true);
+        switch (company_->info_->mixType_) {
+            case 0: {
+                TechTable checkStartRow(company_, 0, true);
+                break;
+            }
+            case 1: {
+                set_tables();
+                tables_ = Train::tables_;
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
-    cout << "train " << company_.companyName_ << " tradition" << endl;
-    for (auto windowName : company_.info_->slidingWindows_) {
-        TrainWindow window(company_, windowName);
+    cout << "train " << company_->companyName_ << " tradition" << endl;
+    for (auto windowName : company_->info_->slidingWindows_) {
+        TrainWindow window(*company_, windowName);
         if (window.interval_[0] >= 0) {
-            create_directories(company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + windowName);
+            create_directories(company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + windowName);
             cout << window.windowName_ << endl;
             train_a_tradition_window(window);
         } else {
@@ -2444,12 +2474,12 @@ Tradition::Tradition(CompanyInfo &company) : company_(company) {
 }
 
 void Tradition::set_strategy() {
-    traditionStrategy_ = allTraditionStrategy_[company_.info_->techIndex_];
+    traditionStrategy_ = allTraditionStrategy_[company_->info_->techIndex_];
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
 
 void Tradition::create_particles() {
-    Particle p(&company_, company_.info_->techIndex_);
+    Particle p(company_, company_->info_->techIndex_);
     p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++) {
         particles_.push_back(p);
@@ -2457,14 +2487,15 @@ void Tradition::create_particles() {
 }
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
-    if (company_.info_->mixedTech_) {
-        MixedTechChooseTrainFile mixedTechChooseTrainFile(&company_, &window, company_.paths_.trainTraditionFilePaths_);
-        for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
-            string to = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/";
-            filesystem::copy(from, to, copy_options::overwrite_existing);
+    string outputPath = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
+    if (company_->info_->mixedTech_) {
+        TrainMixed trainMixed(company_, &tables_, company_->paths_.trainTraditionFilePaths_, company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/", &window);
+        auto intervalIter = window.interval_.begin();
+        for (auto &bestP : trainMixed.eachIntervalBestP) {
+            output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
+            intervalIter += 2;
         }
     } else {
-        string outputPath = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_;
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
             for (int i = 0; i < traditionStrategyNum_; i++) {
                 particles_[i].reset();
@@ -2473,7 +2504,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
             }
             stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
             particles_[0].record_train_test_data(*intervalIter, *(intervalIter + 1));
-            out_.open(outputPath + "/" + get_date(tables_[0].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
+            out_.open(outputPath + "/" + get_date(tables_[company_->info_->techIndex_].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
             out_ << particles_[0].trainOrTestData_;
             out_.close();
         }
@@ -2484,6 +2515,11 @@ void Tradition::set_variables(int index) {
     for (int i = 0; i < particles_[i].variableNum_; i++) {
         particles_[index].decimal_[i] = traditionStrategy_[index][i];
     }
+    particles_[index].strategy_.buy_.techIndex_ = company_->info_->techIndex_;
+    particles_[index].strategy_.buy_.decimal_ = particles_[index].decimal_;
+    particles_[index].strategy_.sell_.techIndex_ = company_->info_->techIndex_;
+    particles_[index].strategy_.sell_.decimal_ = particles_[index].decimal_;
+
 }
 
 class HoldFile : public Test {
@@ -3090,7 +3126,7 @@ private:
             }
             case 2: {
                 cout << " train tradition" << endl;
-                Tradition trainTradition(company);
+                Tradition trainTradition(&company);
                 break;
             }
             case 3: {
