@@ -200,4 +200,12 @@ static string remove_zeros_at_end(double n) {
 static string get_date(vector<string> &date, int startRow, int endRow) {
     return date[startRow] + "_" + date[endRow];
 }
+
+vector<int> change_vec_string_to_int(vector<string> aStrategyStrings) {
+    vector<int> aStrategyInt;
+    for (auto s : aStrategyStrings) {
+        aStrategyInt.push_back(stoi(s));
+    }
+    return aStrategyInt;
+}
 #endif /* functions_h */
