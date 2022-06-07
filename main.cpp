@@ -461,20 +461,19 @@ void CompanyInfo::output_Tech() {
 }
 
 void CompanyInfo::set_techFile_title(ofstream &out, int techPerid) {
+    string fileName = paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_;
     if (techPerid < 10) {
-        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_00" + to_string(techPerid) + ".csv");
+        out.open(fileName + "_00" + to_string(techPerid) + ".csv");
     } else if (techPerid >= 10 && techPerid < 100) {
-        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_0" + to_string(techPerid) + ".csv");
+        out.open(fileName + "_0" + to_string(techPerid) + ".csv");
     } else if (techPerid >= 100) {
-        out.open(paths_.techOuputPaths_[info_->techIndex_] + companyName_ + "_" + info_->techType_ + "_" + to_string(techPerid) + ".csv");
+        out.open(fileName + "_" + to_string(techPerid) + ".csv");
     }
 }
 
 class TechTable {
-private:
-    CompanyInfo *company_;
-
 public:
+    CompanyInfo *company_ = nullptr;
     int techIndex_;
     string techType_;
     int days_;
@@ -2106,13 +2105,13 @@ void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChoos
 
 class Train {
 protected:
-    CompanyInfo *company_;
+    CompanyInfo *company_ = nullptr;
     vector<TechTable> tables_;
     vector<TechTable> *tablesPtr_ = nullptr;
 
     Semaphore sem_;
 
-    void set_tables();
+    void set_tables(vector<int> additionTable = {});
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void train_a_window(TrainWindow window);
@@ -2121,10 +2120,10 @@ protected:
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
 public:
-    Train(CompanyInfo *company);
-    Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem);
-    Train(CompanyInfo &company, string startDate, string endDate);
-    Train(CompanyInfo &company);
+    Train(CompanyInfo *company);  // for inheriting
+    Train(CompanyInfo company, vector<TechTable> &tables, Semaphore &sem); // train loop
+    Train(CompanyInfo &company, string startDate, string endDate);  // train date
+    Train(CompanyInfo &company);  // normal train
 };
 
 Train::Train(CompanyInfo *company) : company_(company) {}  // for inheriting
@@ -2169,13 +2168,19 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
     train_a_company();
 }
 
-void Train::set_tables() {
-    tables_.resize(company_->info_->allTech_.size());
+void Train::set_tables(vector<int> additionTable = {}) {
+    vector<int> tmpTechIndexes = company_->info_->techIndexs_;
+    for (auto additionTech : additionTable) {
+        tmpTechIndexes.push_back(additionTech);
+    }
+    sort(tmpTechIndexes.begin(), tmpTechIndexes.end());
+
     auto get_table = [&](vector<TechTable> &tables, int i, Semaphore &sem) {
         sem.wait();
         tables[i] = TechTable(company_, i);
         sem.notify();
     };
+    tables_.resize(company_->info_->allTech_.size());
     vector<thread> threads;
     Semaphore sem(company_->info_->mixedTechNum_);
     for (auto i : company_->info_->techIndexs_) {
@@ -2188,10 +2193,20 @@ void Train::set_tables() {
     for (auto &t : threads) {
         t.join();
     }
+
+    int tableDates = tables_[company_->info_->techIndexs_[0]].days_;
+    for (auto &table : tables_) {
+        if (table.company_ != nullptr && table.days_ != tableDates) {
+            cout << "table days are different" << endl;
+            exit(1);
+        }
+    }
+
     if (company_->info_->mixedTech_ && company_->info_->mixType_) {
         tables_[tables_.size() - 1].date_ = tables_[company_->info_->techIndexs_[0]].date_;
         tables_[tables_.size() - 1].price_ = tables_[company_->info_->techIndexs_[0]].price_;
     }
+    
     tablesPtr_ = &tables_;
 }
 
@@ -2295,91 +2310,70 @@ TrainLoop::TrainLoop(CompanyInfo &company) : company_(company), tables_({TechTab
     }
 }
 
-class Test {
+class Test : public Train {
 protected:
     class Path {
     public:
         string trainFilePaths_;
         string testFileOutputPath_;
     };
-    CompanyInfo &company_;
     Path paths_;
     Particle p_;
-    vector<TechTable> tables_;
-    bool tradition_ = false;
+    string algoOrTradition_;
 
-    void add_tables(vector<int> additionTable = {});
     void set_particle();
     void set_train_test_file_path();
     void test_a_window(TrainWindow &window);
     void check_exception(vector<path> &eachTrainFilePath, TestWindow &window);
     void set_variables(vector<vector<string>> &thisTrainFile);
-    void output_test_file(TestWindow &window, int startRow, int endRow);
 
 public:
-    Test(CompanyInfo &company, bool tradition, vector<int> additionTable = {});
-    Test(CompanyInfo &company) : company_(company){};
+    Test(CompanyInfo *company, string trainOrTest, vector<int> additionTable = {});
+    Test(CompanyInfo *company);
 };
 
-Test::Test(CompanyInfo &company, bool tradition, vector<int> additionTable) : company_(company), tradition_(tradition) {
-    add_tables(additionTable);
+Test::Test(CompanyInfo *company) : Train(company){};
+
+Test::Test(CompanyInfo *company, string algoOrTradition, vector<int> additionTable) : Train(company), algoOrTradition_(algoOrTradition) {
+    set_tables();
     set_particle();
     set_train_test_file_path();
-    for (auto windowName : company_.info_->slidingWindows_) {
+    for (auto windowName : company_->info_->slidingWindows_) {
         if (windowName != "A2A") {
-            TrainWindow window(company_, windowName);
+            TrainWindow window(*company_, windowName);
             cout << window.windowName_ << endl;
             if (window.interval_[0] >= 0) {
-                if (tradition_) {
-                    create_directories(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + windowName);
-                } else {
-                    create_directories(company_.paths_.testFilePaths_[company_.info_->techIndex_] + windowName);
-                }
                 test_a_window(window);
             } else {
-                cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
+                cout << "no " << window.windowName_ << " train window in " << company_->companyName_;
                 cout << ", skip this window" << endl;
             }
         }
     }
 }
 
-void Test::add_tables(vector<int> additionTable) {
-    if (!company_.info_->mixedTech_) {
-        tables_.push_back(TechTable(&company_, company_.info_->techIndex_));
-    } else {
-        for (auto &techIndex : company_.info_->techIndexs_) {
-            tables_.push_back(TechTable(&company_, techIndex));
-        }
-    }
-    if (additionTable.size() > 0) {
-        for (int i = 0; i < additionTable.size(); i++) {
-            tables_.push_back(TechTable(&company_, additionTable[i]));
-        }
-    }
-}
-
 void Test::set_particle() {
-    if (!company_.info_->mixedTech_) {
-        p_.init(&company_, company_.info_->techIndex_);
+    if (!company_->info_->mixedTech_) {
+        p_.init(company_, company_->info_->techIndex_);
     } else {
-        p_.init(&company_, 0);
+        p_.init(company_, 0);
     }
     p_.tables_ = &tables_;
 }
 
 void Test::set_train_test_file_path() {
-    if (tradition_) {
-        paths_.trainFilePaths_ = company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_];
-        paths_.testFileOutputPath_ = company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_];
+    if (algoOrTradition_ == "algo") {
+        paths_.trainFilePaths_ = company_->paths_.trainFilePaths_[company_->info_->techIndex_];
+        paths_.testFileOutputPath_ = company_->paths_.testFilePaths_[company_->info_->techIndex_];
     } else {
-        paths_.trainFilePaths_ = company_.paths_.trainFilePaths_[company_.info_->techIndex_];
-        paths_.testFileOutputPath_ = company_.paths_.testFilePaths_[company_.info_->techIndex_];
+        paths_.trainFilePaths_ = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_];
+        paths_.testFileOutputPath_ = company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_];
     }
-    cout << "test " << company_.companyName_ << endl;
 }
 
 void Test::test_a_window(TrainWindow &window) {
+    string outputPath = paths_.testFileOutputPath_ + window.windowName_ + "/";
+    create_directories(outputPath);
     vector<path> trainFilePaths = get_path(paths_.trainFilePaths_ + window.windowName_);
     vector<vector<string>> thisTrainFiles;
     check_exception(trainFilePaths, window);
@@ -2389,37 +2383,26 @@ void Test::test_a_window(TrainWindow &window) {
         p_.reset();
         set_variables(thisTrainFiles);
         p_.record_train_test_data(*intervalIter, *(intervalIter + 1), nullptr, &thisTrainFiles);
-        output_test_file(window, *intervalIter, *(intervalIter + 1));
+        output_train_file(intervalIter, outputPath, p_.trainOrTestData_);
     }
 }
 
 void Test::check_exception(vector<path> &trainFilePaths, TestWindow &window) {
     if (trainFilePaths.size() != window.intervalSize_ / 2) {
-        cout << company_.companyName_ << " " << window.windowName_ << " test interval number is not equal to train fle number" << endl;
+        cout << company_->companyName_ << " " << window.windowName_ << " test interval number is not equal to train fle number" << endl;
         exit(1);
     }
 }
 
 void Test::set_variables(vector<vector<string>> &thisTrainFile) {
-    if (company_.info_->mixedTech_) {
+    if (company_->info_->mixedTech_) {
         string techUse = thisTrainFile[0][1];
-        int techUseIndex = find_index_of_string_in_vec(company_.info_->allTech_, techUse);
-        p_.init(&company_, techUseIndex);
+        int techUseIndex = find_index_of_string_in_vec(company_->info_->allTech_, techUse);
+        p_.init(company_, techUseIndex);
     }
     for (int i = 0; i < p_.variableNum_; i++) {
         p_.decimal_[i] = stoi(thisTrainFile[i + 12][1]);
     }
-}
-
-void Test::output_test_file(TestWindow &window, int startRow, int endRow) {
-    ofstream out;
-    if (!tradition_) {
-        out.open(company_.paths_.testFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
-    } else {
-        out.open(company_.paths_.testTraditionFilePaths_[company_.info_->techIndex_] + window.windowName_ + "/" + get_date(tables_[0].date_, startRow, endRow) + ".csv");
-    }
-    out << p_.trainOrTestData_;
-    out.close();
 }
 
 class BH {
@@ -2534,7 +2517,7 @@ void Tradition::set_variables(int index) {
 
 class HoldFile : public Test {
 private:
-    CompanyInfo *company_;
+    CompanyInfo *company_ = nullptr;
     bool isTrain_;
     bool isTradition_;
     string targetWindowPaths_;
@@ -2582,9 +2565,9 @@ public:
         }
     }
 
-    HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(*company), company_(company), isTrain_(isTrain), isTradition_(isTradition) {
+    HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(company), company_(company), isTrain_(isTrain), isTradition_(isTradition) {
         set_paths_create_Folder();
-        add_tables();
+        set_tables();
         set_particle();
         vector<vector<string>> thisTargetFile;
         for (auto windowName : company_->info_->slidingWindows_) {
@@ -3131,7 +3114,7 @@ private:
             }
             case 1: {
                 cout << " test" << endl;
-                Test test(company, false);
+                Test test(&company, "algo");
                 break;
             }
             case 2: {
@@ -3141,7 +3124,7 @@ private:
             }
             case 3: {
                 cout << " test tradition" << endl;
-                Test testTradition(company, true);
+                Test testTradition(&company, "tradition");
                 break;
             }
             case 10: {
