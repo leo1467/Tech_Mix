@@ -3068,6 +3068,7 @@ public:
     int variNum_ = 0;
     string tech_;
     ofstream out_;
+    inline static bool ifAsked_ = false;
 
     void reset_file(path fileName);
 
@@ -3075,12 +3076,15 @@ public:
 };
 
 ResetFile::ResetFile(CompanyInfo *company) : company_(company) {
-    cout << "this will reset the formate of the file" << endl;
-    cout << "enter y to continue, enter any other key to abort" << endl;
-    char check;
-    cin >> check;
-    if (check != 'y')
-        exit(0);
+    if (!ifAsked_) {
+        cout << "this will reset the formate of the file" << endl;
+        cout << "enter y to continue, enter any other key to abort" << endl;
+        char check;
+        cin >> check;
+        ifAsked_ = true;
+        if (check != 'y')
+            exit(0);
+    }
     TechTable checkStartRow(company_, company_->info_->techIndex_ > 3 ? 0 : company_->info_->techIndex_, true);
     cout << company_->companyName_ << endl;
     for (int i = 0; i < 4; i++) {
@@ -3105,7 +3109,9 @@ ResetFile::ResetFile(CompanyInfo *company) : company_(company) {
                 }
             }
             nowPath += window.windowName_ + "/";
-            if (window.interval_[0] > 0 && ((windowName != "A2A" && i > 1) || (i < 2))) {
+            if (!is_directory(nowPath)) {
+                continue;
+            } else if (window.interval_[0] > 0 /*  && ((windowName != "A2A" && i > 1) || (i < 2)) */) {
                 cout << window.windowName_ << endl;
                 vector<path> allTrainFile = get_path(nowPath);
                 for (auto filePath : allTrainFile) {
