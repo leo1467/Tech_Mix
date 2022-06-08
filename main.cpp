@@ -1908,11 +1908,11 @@ public:
 
 class MixedTechChooseTrainFile {
 private:
-    CompanyInfo *company_;
-    TrainWindow *window_;
+    CompanyInfo *company_ = nullptr;
+    TrainWindow *window_ = nullptr;
 
 public:
-    vector<path> goodTrainFiles;
+    vector<path> goodTrainFiles_;
     vector<vector<MixedStrategy>> mixedStrategies_;
 
     void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex);
@@ -1949,21 +1949,20 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
 }
 
 void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {
-    goodTrainFiles.resize(window_->intervalSize_ / 2);
+    goodTrainFiles_.resize(window_->intervalSize_ / 2);
     size_t bestRoRIndex = 0;
     vector<double> everyRoR;
     for (auto &trainFile : aPeriodTrainFiles) {
         everyRoR.push_back(stod(trainFile[10][1]));
     }
     bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
-    goodTrainFiles[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
+    goodTrainFiles_[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
 }
 
 void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {
     vector<MixedStrategy> strategies;
+    MixedStrategy tmp;
     for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
-        MixedStrategy tmp;
-
         string tech = (*iter)[12][0];
         tmp.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
         tmp.buy_.decimal_ = change_vec_string_to_int((*iter)[13]);
@@ -1977,7 +1976,6 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
     vector<MixedStrategy> tmps;
     for (auto iIter = strategies.begin(); iIter != strategies.end(); iIter++) {
         for (auto jIter = strategies.begin(); jIter != strategies.end(); jIter++) {
-            MixedStrategy tmp;
             tmp.buy_ = (*iIter).buy_;
             tmp.sell_ = (*jIter).sell_;
             tmps.push_back(tmp);
@@ -1990,29 +1988,28 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
 
 class TrainMixed {
 private:
-    CompanyInfo *company_;
-    vector<TechTable> *tablesPtr_;
+    CompanyInfo *company_ = nullptr;
+    vector<TechTable> *tablesPtr_ = nullptr;
     vector<string> trainFilePath_;
     string outputPath_;
     TrainWindow *window_;
 
-    void copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
     void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
 
 public:
+    MixedTechChooseTrainFile mixedTechChooseTrainFile_;
     vector<Particle> eachIntervalBestP;
+
     TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window);
 };
 
-TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window) : company_(company), tablesPtr_(tablesPtr), trainFilePath_(trainFilePath), outputPath_(outputPath), window_(window) {
-    MixedTechChooseTrainFile mixedTechChooseTrainFile(company_, &(*window_), trainFilePath_);
+TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vector<string> trainFilePath, string outputPath, TrainWindow *window) : company_(company), tablesPtr_(tablesPtr), trainFilePath_(trainFilePath), outputPath_(outputPath), window_(window), mixedTechChooseTrainFile_(company, &(*window), trainFilePath) {
     switch (company_->info_->mixType_) {
         case 0: {
-            copy_good_trainFile(mixedTechChooseTrainFile);
             break;
         }
         case 1: {
-            train_mixed_strategies(mixedTechChooseTrainFile);
+            train_mixed_strategies(mixedTechChooseTrainFile_);
             break;
         }
         default: {
@@ -2021,15 +2018,7 @@ TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vecto
     }
 }
 
-void TrainMixed::copy_good_trainFile(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
-    cout << "copying " << window_->windowName_ << " train files" << endl;
-    for (auto from : mixedTechChooseTrainFile.goodTrainFiles) {
-        filesystem::copy(from, outputPath_, copy_options::overwrite_existing);
-    }
-}
-
 void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
-    // cout << window_->windowName_ << endl;
     eachIntervalBestP.resize(window_->intervalSize_ / 2);
     Particle p;
     p.init(company_, 0);
@@ -2066,7 +2055,7 @@ protected:
     void print_date_train_file(string &trainFileData, string startDate, string endDate);
     void train_a_company();
     void train_a_window(TrainWindow window);
-    void train_mixed(string &outputPath, TrainWindow &window);
+    void train_mixed(string &outputPath, TrainWindow &window, vector<string> &trainFilePaths);
     void train_normal(string &outputPath, TrainWindow &window);
     void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
 
@@ -2204,19 +2193,34 @@ void Train::train_a_window(TrainWindow window) {
         return dir;
     }();
     if (company_->info_->mixedTech_) {
-        train_mixed(outputPath, window);
+        train_mixed(outputPath, window, company_->paths_.trainFilePaths_);
     } else {
         train_normal(outputPath, window);
     }
     sem_.notify();
 }
 
-void Train::train_mixed(string &outputPath, TrainWindow &window) {
-    TrainMixed trainMixed(company_, tablesPtr_, company_->paths_.trainFilePaths_, outputPath, &window);
-    auto intervalIter = window.interval_.begin();
-    for (auto &bestP : trainMixed.eachIntervalBestP) {
-        output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
-        intervalIter += 2;
+void Train::train_mixed(string &outputPath, TrainWindow &window, vector<string> &trainFilePaths) {
+    TrainMixed trainMixed(company_, tablesPtr_, trainFilePaths, outputPath, &window);
+    switch (company_->info_->mixType_) {
+        case 0: {
+            cout << "copying " << window.windowName_ << " train files" << endl;
+            for (auto from : trainMixed.mixedTechChooseTrainFile_.goodTrainFiles_) {
+                filesystem::copy(from, outputPath, copy_options::overwrite_existing);
+            }
+            break;
+        }
+        case 1: {
+            auto intervalIter = window.interval_.begin();
+            for (auto &bestP : trainMixed.eachIntervalBestP) {
+                output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
+                intervalIter += 2;
+            }
+            break;
+        }
+        default: {
+            break;
+        }
     }
 }
 
@@ -2272,7 +2276,6 @@ protected:
     Path paths_;
     Particle p_;
     string algoOrTradition_;
-    MixedStrategy tmp_;
 
     void set_particle();
     void set_train_test_file_path();
@@ -2348,11 +2351,11 @@ void Test::check_exception(vector<path> &trainFilePaths, TestWindow &window) {
 }
 
 void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
-    tmp_.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]);
-    tmp_.buy_.decimal_ = change_vec_string_to_int(thisTrainFile[13]);
-    tmp_.sell_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]);
-    tmp_.sell_.decimal_ = change_vec_string_to_int(thisTrainFile[15]);
-    p_.strategy_ = tmp_;
+    p_.set_strategy(
+        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]), 
+        change_vec_string_to_int(thisTrainFile[13]), 
+        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]), 
+        change_vec_string_to_int(thisTrainFile[15]));
 }
 
 class BH {
@@ -2433,12 +2436,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
     string outputPath = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
     create_directories(outputPath);
     if (company_->info_->mixedTech_) {
-        TrainMixed trainMixed(company_, &tables_, company_->paths_.trainTraditionFilePaths_, company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/", &window);
-        auto intervalIter = window.interval_.begin();
-        for (auto &bestP : trainMixed.eachIntervalBestP) {
-            output_train_file(intervalIter, outputPath, bestP.trainOrTestData_);
-            intervalIter += 2;
-        }
+        train_mixed(outputPath, window, company_->paths_.trainTraditionFilePaths_);
     } else {
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
             for (int strategyIndex = 0; strategyIndex < traditionStrategyNum_; strategyIndex++) {
@@ -2455,7 +2453,6 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
 
 class HoldFile : public Test {
 private:
-    CompanyInfo *company_ = nullptr;
     bool isTrain_;
     bool isTradition_;
     string targetWindowPaths_;
@@ -2473,7 +2470,7 @@ public:
     HoldFile(CompanyInfo *company, bool isTrain, bool isTradition);
 };
 
-HoldFile::HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(company), company_(company), isTrain_(isTrain), isTradition_(isTradition) {
+HoldFile::HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(company), isTrain_(isTrain), isTradition_(isTradition) {
     set_paths_create_Folder();
     set_tables();
     set_particle();
