@@ -28,6 +28,9 @@ static vector<vector<string>> read_data(path filePath) {
         stringstream lineStream(row);
         while (getline(lineStream, cell, ',')) {
             if (cell != "\r") {
+                if (cell.find('\r') != std::string::npos) {
+                    cell.pop_back();
+                }
                 oneRow.push_back(cell);
             }
         }
