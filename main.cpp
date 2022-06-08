@@ -32,7 +32,7 @@ public:
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0, 3};
-    int mixType_ = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
+    int mixType_ = 1;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
     bool mixedTech_;
     int techIndex_;
 
@@ -2289,12 +2289,11 @@ Test::Test(CompanyInfo *company) : Train(company){};
 
 Test::Test(CompanyInfo *company, string algoOrTradition, vector<int> additionTable) : Train(company), algoOrTradition_(algoOrTradition) {
     set_tables();
-    // set_particle();
+    set_particle();
     set_train_test_file_path();
     for (auto windowName : company_->info_->slidingWindows_) {
         if (windowName != "A2A") {
             TrainWindow window(*company_, windowName);
-            cout << window.windowName_ << endl;
             if (window.interval_[0] >= 0) {
                 test_a_window(window);
             } else {
@@ -2325,6 +2324,7 @@ void Test::set_train_test_file_path() {
 }
 
 void Test::test_a_window(TrainWindow &window) {
+    cout << window.windowName_ << endl;
     string outputPath = paths_.testFileOutputPath_ + window.windowName_ + "/";
     create_directories(outputPath);
     vector<path> trainFilePaths = get_path(paths_.trainFilePaths_ + window.windowName_);
@@ -2378,9 +2378,8 @@ private:
     vector<vector<vector<int>>> allTraditionStrategy_{MA::traditionStrategy_, MA::traditionStrategy_, MA::traditionStrategy_, RSI::traditionStrategy_};
 
     void create_particles();
-    void set_strategy();
+    void set_tradition_strategy();
     void train_a_tradition_window(TrainWindow &window);
-    void set_variables(int index);
 
 public:
     Tradition(CompanyInfo *company);
@@ -2389,7 +2388,7 @@ public:
 Tradition::Tradition(CompanyInfo *company) : Train(company) {
     if (!company_->info_->mixedTech_) {
         set_tables();
-        set_strategy();
+        set_tradition_strategy();
         create_particles();
     } else {
         switch (company_->info_->mixType_) {
@@ -2406,12 +2405,9 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
             }
         }
     }
-    cout << "train " << company_->companyName_ << " tradition" << endl;
     for (auto windowName : company_->info_->slidingWindows_) {
         TrainWindow window(*company_, windowName);
         if (window.interval_[0] >= 0) {
-            create_directories(company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + windowName);
-            cout << window.windowName_ << endl;
             train_a_tradition_window(window);
         } else {
             cout << window.windowName_ << " train window is too old, skip this window" << endl;
@@ -2419,7 +2415,7 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
     }
 }
 
-void Tradition::set_strategy() {
+void Tradition::set_tradition_strategy() {
     traditionStrategy_ = allTraditionStrategy_[company_->info_->techIndex_];
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
@@ -2433,7 +2429,9 @@ void Tradition::create_particles() {
 }
 
 void Tradition::train_a_tradition_window(TrainWindow &window) {
+    cout << window.windowName_ << endl;
     string outputPath = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
+    create_directories(outputPath);
     if (company_->info_->mixedTech_) {
         TrainMixed trainMixed(company_, &tables_, company_->paths_.trainTraditionFilePaths_, company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/", &window);
         auto intervalIter = window.interval_.begin();
@@ -2443,26 +2441,16 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
         }
     } else {
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
-            for (int i = 0; i < traditionStrategyNum_; i++) {
-                particles_[i].reset();
-                set_variables(i);
-                particles_[i].trade(*intervalIter, *(intervalIter + 1));
+            for (int strategyIndex = 0; strategyIndex < traditionStrategyNum_; strategyIndex++) {
+                particles_[strategyIndex].reset();
+                particles_[strategyIndex].set_strategy(company_->info_->techIndex_, traditionStrategy_[strategyIndex], company_->info_->techIndex_, traditionStrategy_[strategyIndex]);
+                particles_[strategyIndex].trade(*intervalIter, *(intervalIter + 1));
             }
             stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
             particles_[0].record_train_test_data(*intervalIter, *(intervalIter + 1));
             output_train_file(intervalIter, outputPath, particles_[0].trainOrTestData_);
         }
     }
-}
-
-void Tradition::set_variables(int index) {
-    for (int i = 0; i < particles_[i].variableNum_; i++) {
-        particles_[index].decimal_[i] = traditionStrategy_[index][i];
-    }
-    particles_[index].strategy_.buy_.techIndex_ = company_->info_->techIndex_;
-    particles_[index].strategy_.buy_.decimal_ = particles_[index].decimal_;
-    particles_[index].strategy_.sell_.techIndex_ = company_->info_->techIndex_;
-    particles_[index].strategy_.sell_.decimal_ = particles_[index].decimal_;
 }
 
 class HoldFile : public Test {
@@ -2940,11 +2928,11 @@ public:
     string sortBy_;
     int colToSort_;
 
+    equalIterType findEqualSign(vector<vector<string>> &inputFile);
     void sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter);
     void sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter);
-    equalIterType findEqualSign(vector<vector<string>> &inputFile);
 
-    SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : info_(info), colToSort_(colToSort);
+    SortIRRFileBy(Info *info, string inpuFileName, int colToSort);
     SortIRRFileBy(vector<vector<string>> &inputFile, int colToSort);
 };
 
@@ -2977,7 +2965,7 @@ SortIRRFileBy::SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : i
     sortedFile.close();
 }
 
-equalIterType SortIRRFileBy::findEqualSign(vector<vector<string>> &inputFile) {
+SortIRRFileBy::equalIterType SortIRRFileBy::findEqualSign(vector<vector<string>> &inputFile) {
     equalIterType equalSignIter;
     for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
         if ((*iter).front().front() == '=') {
@@ -2988,18 +2976,18 @@ equalIterType SortIRRFileBy::findEqualSign(vector<vector<string>> &inputFile) {
     return equalSignIter;
 }
 
-void SortIRRFileBy::sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
-    for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
-        sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
-            return stod(s1[colToSort_]) > stod(s2[colToSort_]);
-        });
-    }
-}
-
 void SortIRRFileBy::sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
     for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
         sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
             return s1[0] < s2[0];
+        });
+    }
+}
+
+void SortIRRFileBy::sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
+    for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
+        sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
+            return stod(s1[colToSort_]) > stod(s2[colToSort_]);
         });
     }
 }
@@ -3071,14 +3059,6 @@ void FindBestHold::start_copy(string companyRootPath, string fromFolder, string 
     string to = companyRootPath + trainOrTest + toFolder;
     create_directories(to);
     filesystem::copy(from, to, copy_options::overwrite_existing);
-}
-
-void FindBestHold::sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
-    for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
-        sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
-            return stod(s1[colToSort_]) > stod(s2[colToSort_]);
-        });
-    }
 }
 
 class ResetFile {
