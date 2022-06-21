@@ -31,8 +31,8 @@ public:
     string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};
-    int mixType_ = 1;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣
+    vector<int> techIndexs_ = {3, 0};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
+    int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣
     bool mixedTech_;
     int techIndex_;
 
@@ -77,25 +77,36 @@ public:
     int windowNumber_;
 
     void set_techIndex_and_techType() {
-        sort(techIndexs_.begin(), techIndexs_.end());
+        if (techIndexs_.size() == 1) {
+            mixedTech_ = false;
+        } else {
+            techIndex_ = (int)allTech_.size();
+            mixedTech_ = true;
+        }
+        mixedTechNum_ = (int)techIndexs_.size();
+
+        if (!(mixedTech_ && mixType_ == 2)) {
+            sort(techIndexs_.begin(), techIndexs_.end());
+        }
+
         for (auto &techIndex : techIndexs_) {
             techType_ += allTech_[techIndex] + "_";
         }
         techType_.pop_back();
+
         if (techIndexs_.size() > 1 && mixType_ > 0) {
             techType_ += "_" + to_string(mixType_);
         }
+
         algoType_ = allAlgo_[algoIndex_];
         testLength_ = stod(testEndYear_) - stod(testStartYear_);
+        
         if (techIndexs_.size() == 1) {
             techIndex_ = techIndexs_[0];
-            mixedTech_ = false;
         } else {
             techIndex_ = (int)allTech_.size();
             allTech_.push_back(techType_);
-            mixedTech_ = true;
         }
-        mixedTechNum_ = (int)techIndexs_.size();
     }
 
     void slidingWindowToEx() {
@@ -2352,9 +2363,9 @@ void Test::check_exception(vector<path> &trainFilePaths, TestWindow &window) {
 
 void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
     p_.set_strategy(
-        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]), 
-        change_vec_string_to_int(thisTrainFile[13]), 
-        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]), 
+        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]),
+        change_vec_string_to_int(thisTrainFile[13]),
+        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]),
         change_vec_string_to_int(thisTrainFile[15]));
 }
 
