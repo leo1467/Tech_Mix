@@ -27,11 +27,11 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 10;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
+    int mode_ = 0;
+    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {3, 0};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
+    vector<int> techIndexs_ = {0, 3};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
     int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣
     bool mixedTech_;
     int techIndex_;
@@ -100,7 +100,7 @@ public:
 
         algoType_ = allAlgo_[algoIndex_];
         testLength_ = stod(testEndYear_) - stod(testStartYear_);
-        
+
         if (techIndexs_.size() == 1) {
             techIndex_ = techIndexs_[0];
         } else {
@@ -891,10 +891,10 @@ public:
     }
 
     static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
-        double MAsell1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[2]];
-        double MAsell2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[3]];
-        double MAsell1Today = (*tables)[tableIndex].techTable_[i][decimal[2]];
-        double MAsell2Today = (*tables)[tableIndex].techTable_[i][decimal[3]];
+        double MAsell1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[0]];
+        double MAsell2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[1]];
+        double MAsell1Today = (*tables)[tableIndex].techTable_[i][decimal[0]];
+        double MAsell2Today = (*tables)[tableIndex].techTable_[i][decimal[1]];
         return MAsell1PreDay >= MAsell2PreDay && MAsell1Today < MAsell2Today;
     }
 };
@@ -975,6 +975,7 @@ public:
     vector<int> decimal_;
 
     MixedStrategy strategy_;
+    int buyVariNum_ = -1;
 
     vector<TechTable> *tables_ = nullptr;
     //    int tableIndex_ = 0;
@@ -1044,7 +1045,23 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
     techType_ = company_->info_->techType_;
     remain_ = company->info_->totalCapitalLV_;
     isRecordOn_ = isRecordOn;
-    eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果是mixType 2就要分別設定買賣的參數數量
+        for (auto techIndex : company_->info_->techIndexs_) {
+            if (techIndex < 3) {  // 如果是MA系列，參數是2個，所以begin() + 2
+                eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[techIndex].begin(), allTechEachVariableBitsNum_[techIndex].begin() + 2);
+            } else if (techIndex == 3) {  // 如果是RSI，參數數量不變
+                eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[techIndex].begin(), allTechEachVariableBitsNum_[techIndex].end());
+            }
+            if (buyVariNum_ == -1) {  // 設定買的參數數量有多少
+                buyVariNum_ = eachVariableBitsNum_.size();
+            }
+        }
+        strategy_.buy_.techIndex_ = company_->info_->techIndexs_[0];
+        strategy_.sell_.techIndex_ = company_->info_->techIndexs_[1];
+    }
+    else {
+        eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
+    }
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
     variableNum_ = (int)eachVariableBitsNum_.size();
@@ -1155,19 +1172,19 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     ini_buyNum_sellNum();
     bool buyCondition = false;
     bool sellCondition = false;
-    bool techNotAllZeros = !all_of(decimal_.begin(), decimal_.end(), [](int i) { return i == 0; });
-    if (company_->info_->mixedTech_) {
-        techNotAllZeros = true;
-    }
+    bool techNotAll0 = !all_of(decimal_.begin(), decimal_.end(), [](int i) { return i == 0; });  //檢查策略是不是全0，全0代表global best沒更新，不需要交易
+    // if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // 好像沒有用，要再觀察
+    //     techNotAll0 = true;
+    // }
     for (int i = startRow; i <= endRow; i++) {
         push_holdData_date_price(holdDataPtr, i);
-        if (techNotAllZeros && set_buy_sell_condition(buyCondition, stockHold, i, endRow, true)) {
+        if (techNotAll0 && set_buy_sell_condition(buyCondition, stockHold, i, endRow, true)) {
             stockHold = floor(remain_ / (*tables_)[strategy_.buy_.techIndex_].price_[i]);
             remain_ = remain_ - stockHold * (*tables_)[strategy_.buy_.techIndex_].price_[i];
             buyNum_++;
             push_tradeData_buy(stockHold, i);
             push_holdData_buy(holdDataPtr, i);
-        } else if (techNotAllZeros && set_buy_sell_condition(sellCondition, stockHold, i, endRow, false)) {
+        } else if (techNotAll0 && set_buy_sell_condition(sellCondition, stockHold, i, endRow, false)) {
             remain_ = remain_ + (double)stockHold * (*tables_)[strategy_.sell_.techIndex_].price_[i];
             stockHold = 0;
             sellNum_++;
@@ -1363,10 +1380,10 @@ void Particle::push_tradeData_sell(int stockHold, int i) {
             case 0:
             case 1:
             case 2: {
-                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[3]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[2]]) + ",";
-                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[3]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i - 1][strategy_.sell_.decimal_[1]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[0]]) + ",";
+                tradeRecord_ += set_precision((*tables_)[strategy_.sell_.techIndex_].techTable_[i][strategy_.sell_.decimal_[1]]) + ",";
                 break;
             }
             case 3: {
@@ -1453,10 +1470,10 @@ void Particle::reset(double RoR) {
     isRecordOn_ = false;
     bestCnt_ = 0;
 
-    strategy_.buy_.techIndex_ = -1;
-    strategy_.sell_.techIndex_ = -1;
-    strategy_.buy_.decimal_.clear();
-    strategy_.sell_.decimal_.clear();
+    // strategy_.buy_.techIndex_ = -1;  // 只要買賣的指標都固定同一種，這個應該不需要
+    // strategy_.sell_.techIndex_ = -1;
+    // strategy_.buy_.decimal_.clear();  // 在set_strategy會重新assign，應該不需要clear
+    // strategy_.sell_.decimal_.clear();
 }
 
 void Particle::measure(BetaMatrix &betaMatrix) {
@@ -1479,11 +1496,26 @@ void Particle::convert_bi_dec() {
         decimal_[variableIndex]++;
         bitIndex += eachVariableBitsNum_[variableIndex];
     }
-    if (techIndex_ == 3) {
-        decimal_[1]--;
-        decimal_[2]--;
+    
+    if (!company_->info_->mixedTech_) {  // 買賣都用同一種
+        set_strategy(techIndex_, decimal_, techIndex_, decimal_);
+        if (company_->info_->techIndex_ == 3) {
+            strategy_.buy_.decimal_[1]--;
+            strategy_.buy_.decimal_[2]--;
+            strategy_.sell_.decimal_[1]--;
+            strategy_.sell_.decimal_[2]--;
+        }
+    } else {  // 買賣不同指標
+        set_strategy(company_->info_->techIndexs_[0], vector<int>(decimal_.begin(), decimal_.begin() + buyVariNum_), company_->info_->techIndexs_[1], vector<int>(decimal_.begin() + buyVariNum_, decimal_.end()));
+        
+        if (strategy_.buy_.techIndex_ == 3) {
+            strategy_.buy_.decimal_[1]--;
+            strategy_.buy_.decimal_[2]--;
+        } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2 && strategy_.sell_.techIndex_ == 3) {
+            strategy_.sell_.decimal_[4]--;
+            strategy_.sell_.decimal_[5]--;
+        }
     }
-    set_strategy(techIndex_, decimal_, techIndex_, decimal_);
 }
 
 void Particle::set_strategy(int buyTechIndex, vector<int> buyDecimal, int sellTechIndex, vector<int> sellDecimal) {
@@ -2111,6 +2143,10 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
                 set_tables();
                 break;
             }
+            case 2: {
+                set_tables();
+                break;
+            }
             default: {
                 break;
             }
@@ -2203,7 +2239,7 @@ void Train::train_a_window(TrainWindow window) {
         create_directories(dir);
         return dir;
     }();
-    if (company_->info_->mixedTech_) {
+    if (company_->info_->mixedTech_ && !(company_->info_->mixType_ == 2)) {
         train_mixed(outputPath, window, company_->paths_.trainFilePaths_);
     } else {
         train_normal(outputPath, window);
