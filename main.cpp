@@ -32,7 +32,7 @@ public:
     string setWindow_ = "all";
 
     vector<int> techIndexs_ = {0, 3};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
-    int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣
+    int mixType_ = 3;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的
     bool mixedTech_;
     int techIndex_;
 
@@ -106,6 +106,13 @@ public:
         } else {
             techIndex_ = (int)allTech_.size();
             allTech_.push_back(techType_);
+            if (mixType_ == 3) {  // 如果是mixType 3，需要把mix的名稱放進去，company生路徑
+                for (int i = 0; i < 2; i++) {
+                    string mixeType2 = allTech_[techIndexs_[0]] + "_" + allTech_[techIndexs_[1]] + "_2";
+                    allTech_.push_back(mixeType2);
+                    reverse(techIndexs_.begin(), techIndexs_.end());
+                }
+            }
         }
     }
 
@@ -1058,8 +1065,7 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
         }
         strategy_.buy_.techIndex_ = company_->info_->techIndexs_[0];
         strategy_.sell_.techIndex_ = company_->info_->techIndexs_[1];
-    }
-    else {
+    } else {
         eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
     }
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
@@ -1496,8 +1502,8 @@ void Particle::convert_bi_dec() {
         decimal_[variableIndex]++;
         bitIndex += eachVariableBitsNum_[variableIndex];
     }
-    
-    if (!company_->info_->mixedTech_) {  // 買賣都用同一種
+
+    if (!company_->info_->mixedTech_) {  // 買賣都用同一種指標
         set_strategy(techIndex_, decimal_, techIndex_, decimal_);
         if (company_->info_->techIndex_ == 3) {
             strategy_.buy_.decimal_[1]--;
@@ -1507,7 +1513,7 @@ void Particle::convert_bi_dec() {
         }
     } else {  // 買賣不同指標
         set_strategy(company_->info_->techIndexs_[0], vector<int>(decimal_.begin(), decimal_.begin() + buyVariNum_), company_->info_->techIndexs_[1], vector<int>(decimal_.begin() + buyVariNum_, decimal_.end()));
-        
+
         if (strategy_.buy_.techIndex_ == 3) {
             strategy_.buy_.decimal_[1]--;
             strategy_.buy_.decimal_[2]--;
@@ -1969,17 +1975,24 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
     for (auto &techIndex : company_->info_->techIndexs_) {
         trainFilePaths.push_back(techTrainFilePath[techIndex]);
     }
+    if (company_->info_->mixType_ == 3) {  // 如果是mixType 3，需要把mix的路徑放進去
+        trainFilePaths.push_back(techTrainFilePath[5]);
+        trainFilePaths.push_back(techTrainFilePath[6]);
+    }
+    int trainFilePathsSize = trainFilePaths.size();
+
     vector<vector<path>> diffTechTrainFilePath;
     for (auto trainPath : trainFilePaths) {
         diffTechTrainFilePath.push_back(get_path(trainPath + window->windowName_));
     }
-    vector<vector<vector<string>>> aPeriodTrainFiles(company_->info_->mixedTechNum_);
+    vector<vector<vector<string>>> aPeriodTrainFiles(trainFilePathsSize);
     for (int colIndex = 0; colIndex < window_->intervalSize_ / 2; colIndex++) {
-        for (int rowIndex = 0; rowIndex < company_->info_->mixedTechNum_; rowIndex++) {
+        for (int rowIndex = 0; rowIndex < trainFilePathsSize; rowIndex++) {
             aPeriodTrainFiles[rowIndex] = read_data(diffTechTrainFilePath[rowIndex][colIndex]);
         }
         switch (company_->info_->mixType_) {
-            case 0: {
+            case 0:
+            case 3: {
                 find_good_train_file(diffTechTrainFilePath, aPeriodTrainFiles, colIndex);
                 break;
             }
@@ -2053,6 +2066,9 @@ TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vecto
         }
         case 1: {
             train_mixed_strategies(mixedTechChooseTrainFile_);
+            break;
+        }
+        case 3: {
             break;
         }
         default: {
@@ -2135,7 +2151,8 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
         set_tables();
     } else {
         switch (company_->info_->mixType_) {
-            case 0: {
+            case 0:
+            case 3: {
                 TechTable checkStartRow(company_, 0, true);
                 break;
             }
@@ -2250,7 +2267,8 @@ void Train::train_a_window(TrainWindow window) {
 void Train::train_mixed(string &outputPath, TrainWindow &window, vector<string> &trainFilePaths) {
     TrainMixed trainMixed(company_, tablesPtr_, trainFilePaths, outputPath, &window);
     switch (company_->info_->mixType_) {
-        case 0: {
+        case 0:
+        case 3: {
             cout << "copying " << window.windowName_ << " train files" << endl;
             for (auto from : trainMixed.mixedTechChooseTrainFile_.goodTrainFiles_) {
                 filesystem::copy(from, outputPath, copy_options::overwrite_existing);
@@ -2587,20 +2605,20 @@ public:
         double traditionIRR_;
         double BHIRR_;
         int rank_;
-        vector<vector<int>> techChooseTimes_;
+        // vector<vector<int>> techChooseTimes_;
 
-        void resize_vec(size_t allTechSize) {
-            techChooseTimes_.resize(2);
-            for (auto &row : techChooseTimes_) {
-                row.resize(allTechSize);
-            }
-        }
+        // void resize_vec(size_t allTechSize) {
+        //     techChooseTimes_.resize(2);
+        //     for (auto &row : techChooseTimes_) {
+        //         row.resize(allTechSize);
+        //     }
+        // }
 
-        void fill_zero() {
-            for (auto &row : techChooseTimes_) {
-                fill(row.begin(), row.end(), 0);
-            }
-        }
+        // void fill_zero() {
+        //     for (auto &row : techChooseTimes_) {
+        //         fill(row.begin(), row.end(), 0);
+        //     }
+        // }
     };
 
     class CompanyWindowIRRContainer {
@@ -2696,29 +2714,29 @@ void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
     });
     IRRout.open(info_.rootFolder_ + trainOrTest_ + "_IRR_name_sorted_" + info_.techType_ + ".csv");
     output_IRR(IRRout);
-    if (info_.mixedTech_) {
-        IRRout.open(info_.rootFolder_ + info_.techType_ + "_tech_choosed.csv");
-        vector<string> algoOrTradition{"algo", "tradition"};
-        for (auto &company : allCompanyWindowsIRR_) {
-            IRRout << "=====" << company.companyName_ << "=====,";
-            for (int loop = 0; loop < 2; loop++) {
-                for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
-                    IRRout << algoOrTradition[loop] << " choose " << info_.allTech_[techIndex] << ",";
-                });
-            }
-            IRRout << "\n";
-            for (auto &eachIRR : company.windowsIRR_) {
-                IRRout << eachIRR.windowName_ << ",";
-                for_each(eachIRR.techChooseTimes_.begin(), eachIRR.techChooseTimes_.end(), [&](const vector<int> &i) {
-                    for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &j) {
-                        IRRout << i[j] << ",";
-                    });
-                });
-                IRRout << "\n";
-            }
-        }
-        IRRout.close();
-    }
+    // if (info_.mixedTech_) {
+    //     IRRout.open(info_.rootFolder_ + info_.techType_ + "_tech_choosed.csv");
+    //     vector<string> algoOrTradition{"algo", "tradition"};
+    //     for (auto &company : allCompanyWindowsIRR_) {
+    //         IRRout << "=====" << company.companyName_ << "=====,";
+    //         for (int loop = 0; loop < 2; loop++) {
+    //             for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
+    //                 IRRout << algoOrTradition[loop] << " choose " << info_.allTech_[techIndex] << ",";
+    //             });
+    //         }
+    //         IRRout << "\n";
+    //         for (auto &eachIRR : company.windowsIRR_) {
+    //             IRRout << eachIRR.windowName_ << ",";
+    //             for_each(eachIRR.techChooseTimes_.begin(), eachIRR.techChooseTimes_.end(), [&](const vector<int> &i) {
+    //                 for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &j) {
+    //                     IRRout << i[j] << ",";
+    //                 });
+    //             });
+    //             IRRout << "\n";
+    //         }
+    //     }
+    //     IRRout.close();
+    // }
 }
 
 void CalIRR::output_IRR(ofstream &IRRout) {
@@ -2779,9 +2797,9 @@ vector<string> CalIRR::remove_A2A_and_sort() {
 CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank), trainOrTestIndex_(trainOrTestIndex) {
     set_filePath();
     thisCompanyWindowIRR_.companyName_ = company_.companyName_;
-    if (company_.info_->mixedTech_) {
-        tmpWinodwIRR_.resize_vec(company_.info_->allTech_.size());
-    }
+    // if (company_.info_->mixedTech_) {
+    //     tmpWinodwIRR_.resize_vec(company_.info_->allTech_.size());
+    // }
     for (auto &windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
             cout << windowName << endl;
@@ -2809,7 +2827,7 @@ void CalIRR::CalOneCompanyIRR::set_filePath() {
 
 void CalIRR::CalOneCompanyIRR::cal_window_IRRs(TrainWindow &window) {
     tmpWinodwIRR_.algoIRR_ = cal_one_IRR(allRoRData_.algoRoRoutData_, window, trainOrTestPaths_.front(), false);
-    tmpWinodwIRR_.traditionIRR_ = cal_one_IRR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);  //若還沒有傳統的test這行可以註解
+    tmpWinodwIRR_.traditionIRR_ = cal_one_IRR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);
     if (trainOrTestIndex_ == 0) {
         string trainStartDate = company_.date_[window.interval_.front() + company_.tableStartRow_];
         string trainEndDate = company_.date_[window.interval_.back() + company_.tableStartRow_];
@@ -2818,12 +2836,15 @@ void CalIRR::CalOneCompanyIRR::cal_window_IRRs(TrainWindow &window) {
     }
     tmpWinodwIRR_.windowName_ = window.windowName_;
     thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
-    tmpWinodwIRR_.fill_zero();
+    // tmpWinodwIRR_.fill_zero();
 }
 
 double CalIRR::CalOneCompanyIRR::cal_one_IRR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition) {
     RoRoutData += window.windowName_ + ",";
     double totalRoR = 0;
+    if (!exists(stratgyFilePath + window.windowName_)) {  // 如果傳統的還沒做，回傳-1
+        return -1;
+    }
     vector<path> strategyPaths = get_path(stratgyFilePath + window.windowName_);
     auto [filePathIter, intervalIter] = tuple{strategyPaths.begin(), window.interval_.begin()};
     for (; filePathIter != strategyPaths.end(); filePathIter++, intervalIter += 2) {
@@ -2836,7 +2857,7 @@ double CalIRR::CalOneCompanyIRR::cal_one_IRR(string &RoRoutData, TrainWindow &wi
     } else {
         windowIRR = pow(totalRoR--, 1.0 / company_.info_->testLength_) - 1.0;
     }
-    RoRoutData += ",,,,,,," + window.windowName_ + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
+    RoRoutData += ",,,,,,,,,," + window.windowName_ + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
     return windowIRR;
 }
 
@@ -2862,28 +2883,38 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         }
         push += "," + filePathIter->stem().string() + ",";
     }
-    int techIndex = -1;
-    if (!company_.info_->mixedTech_) {
-        techIndex = company_.info_->techIndex_;
-    } else {
-        techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
+
+    for (auto s : file[13]) {
+        push += s + ",";
     }
-    if (!(company_.info_->mixType_ == 1)) {
-        for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
-            push += file[i + 12][1] + ",";
-        }
+    push += ",";
+
+    for (auto s : file[15]) {
+        push += s + ",";
     }
-    if (techIndex == 3) {
-        push += ",";
-    }
+
+    // int techIndex = -1;
+    // if (!company_.info_->mixedTech_) {
+    //     techIndex = company_.info_->techIndex_;
+    // } else {
+    //     techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
+    // }
+    // if (!(company_.info_->mixType_ == 1)) {
+    //     for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
+    //         push += file[i + 12][1] + ",";
+    //     }
+    // }
+    // if (techIndex == 3) {
+    //     push += ",";
+    // }
     push += file[10][1] + "\n";
-    if (company_.info_->mixedTech_) {
-        if (!tradition) {
-            tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
-        } else {
-            tmpWinodwIRR_.techChooseTimes_[1][techIndex]++;
-        }
-    }
+    // if (company_.info_->mixedTech_) {
+    //     if (!tradition) {
+    //         tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
+    //     } else {
+    //         tmpWinodwIRR_.techChooseTimes_[1][techIndex]++;
+    //     }
+    // }
     return push;
 }
 
