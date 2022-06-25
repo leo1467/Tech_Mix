@@ -1018,7 +1018,6 @@ public:
     void set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false, string *holdDataPtr = nullptr);
-    int set_tableIndex();  // 目前沒用
     bool set_buy_sell_condition(bool &condition, int stockHold, int i, int endRow, bool isBuy);
     void push_holdData_date_price(string *holdDataPtr, int i);
     void push_tradeData_column_name();
@@ -1172,13 +1171,14 @@ void Particle::ini_buyNum_sellNum() {
 }
 
 void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdDataPtr) {
-    //    tableIndex_ = set_tableIndex();
     int stockHold = 0;
     push_tradeData_column_name();
     ini_buyNum_sellNum();
     bool buyCondition = false;
     bool sellCondition = false;
-    bool techNotAll0 = !all_of(decimal_.begin(), decimal_.end(), [](int i) { return i == 0; });  //檢查策略是不是全0，全0代表global best沒更新，不需要交易
+    // 檢查策略是不是全0，全0代表global best沒更新，不需要交易
+    bool techNotAll0 = !all_of(strategy_.buy_.decimal_.begin(), strategy_.buy_.decimal_.end(), [](int i) { return i == 0; });
+    techNotAll0 = techNotAll0 && !all_of(strategy_.sell_.decimal_.begin(), strategy_.sell_.decimal_.end(), [](int i) { return i == 0; });
     // if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // 好像沒有用，要再觀察
     //     techNotAll0 = true;
     // }
@@ -1210,18 +1210,6 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     check_buyNum_sellNum();
     RoR_ = (remain_ - company_->info_->totalCapitalLV_) / company_->info_->totalCapitalLV_ * 100.0;
     push_tradeData_last(lastRecord);
-}
-
-int Particle::set_tableIndex() {
-    if (company_->info_->mixedTech_) {
-        auto [tableIter, tableIndex] = tuple{(*tables_).begin(), 0};
-        for (; tableIter != (*tables_).end(); tableIter++, tableIndex++) {
-            if ((*tableIter).techIndex_ == techIndex_) {
-                return tableIndex;
-            }
-        }
-    }
-    return 0;
 }
 
 // bool RSIhold = true;
@@ -2421,6 +2409,12 @@ void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
         change_vec_string_to_int(thisTrainFile[13]),
         find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]),
         change_vec_string_to_int(thisTrainFile[15]));
+    if (p_.strategy_.buy_.techIndex_ < 3 && p_.strategy_.buy_.decimal_.size() > 2) {
+        p_.strategy_.buy_.decimal_ = vector<int>(p_.strategy_.buy_.decimal_.begin(), p_.strategy_.buy_.decimal_.begin() + 2);
+    } 
+    if (p_.strategy_.sell_.techIndex_ < 3 && p_.strategy_.sell_.decimal_.size() > 2) {
+        p_.strategy_.sell_.decimal_ = vector<int>(p_.strategy_.sell_.decimal_.begin() + 2, p_.strategy_.sell_.decimal_.end());
+    }
 }
 
 class BH {
@@ -2454,13 +2448,14 @@ public:
 };
 
 Tradition::Tradition(CompanyInfo *company) : Train(company) {
-    if (!company_->info_->mixedTech_) {
+    if (!company_->info_->mixedTech_ || company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {
         set_tables();
         set_tradition_strategy();
         create_particles();
     } else {
         switch (company_->info_->mixType_) {
-            case 0: {
+            case 0:
+            case 3: {
                 TechTable checkStartRow(company_, 0, true);
                 break;
             }
@@ -2484,7 +2479,23 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
 }
 
 void Tradition::set_tradition_strategy() {
-    traditionStrategy_ = allTraditionStrategy_[company_->info_->techIndex_];
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果mixType 2，要把兩種指標傳統策略混合 
+        for (auto buyStrategy : allTraditionStrategy_[company_->info_->techIndexs_[0]]) {
+            for (auto sellStrategy : allTraditionStrategy_[company_->info_->techIndexs_[1]]) {
+                vector<int> tmpStrategy;
+                tmpStrategy.insert(tmpStrategy.end(), buyStrategy.begin(), buyStrategy.end());
+                tmpStrategy.insert(tmpStrategy.end(), sellStrategy.begin(), sellStrategy.end());
+                if (company_->info_->techIndexs_[0] == 0) {
+                    tmpStrategy = vector<int>(tmpStrategy.begin() + 2, tmpStrategy.end());
+                } else if (company_->info_->techIndexs_[1] == 0) {
+                    tmpStrategy = vector<int>(tmpStrategy.begin(), tmpStrategy.end() - 2);
+                }
+                traditionStrategy_.push_back(tmpStrategy);
+            }
+        }
+    } else if (!company_->info_->mixedTech_) {  // 只用一種指標的傳統策略
+        traditionStrategy_ = allTraditionStrategy_[company_->info_->techIndex_];
+    }
     traditionStrategyNum_ = (int)traditionStrategy_.size();
 }
 
@@ -2500,13 +2511,19 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
     cout << window.windowName_ << endl;
     string outputPath = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
     create_directories(outputPath);
-    if (company_->info_->mixedTech_) {
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // mixeType除了2以外都用這種mix方式
         train_mixed(outputPath, window, company_->paths_.trainTraditionFilePaths_);
     } else {
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
             for (int strategyIndex = 0; strategyIndex < traditionStrategyNum_; strategyIndex++) {
                 particles_[strategyIndex].reset();
-                particles_[strategyIndex].set_strategy(company_->info_->techIndex_, traditionStrategy_[strategyIndex], company_->info_->techIndex_, traditionStrategy_[strategyIndex]);
+                if (!company_->info_->mixedTech_) {  // 只用一種指標，這樣設定買賣策略
+                    particles_[strategyIndex].set_strategy(company_->info_->techIndex_, traditionStrategy_[strategyIndex], company_->info_->techIndex_, traditionStrategy_[strategyIndex]);
+                } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // mixType 2需要分辨設定買賣策略
+                    vector<int> buystrategy = vector<int>(traditionStrategy_[strategyIndex].begin(), traditionStrategy_[strategyIndex].begin() + particles_[strategyIndex].buyVariNum_);
+                    vector<int> sellstrategy = vector<int>(traditionStrategy_[strategyIndex].begin() + particles_[strategyIndex].buyVariNum_, traditionStrategy_[strategyIndex].end());
+                    particles_[strategyIndex].set_strategy(company_->info_->techIndexs_[0], buystrategy, company_->info_->techIndexs_[1], sellstrategy);
+                }
                 particles_[strategyIndex].trade(*intervalIter, *(intervalIter + 1));
             }
             stable_sort(particles_.begin(), particles_.end(), [](const Particle &a, const Particle &b) { return a.RoR_ > b.RoR_; });
@@ -3342,7 +3359,7 @@ int main(int argc, const char *argv[]) {
             // CalIRR calIRR(companyPricePaths, "train");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "test_IRR_IRR_sorted_SMA_RSI", "algo");
+            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_RSI", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
