@@ -2411,7 +2411,7 @@ void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
         change_vec_string_to_int(thisTrainFile[15]));
     if (p_.strategy_.buy_.techIndex_ < 3 && p_.strategy_.buy_.decimal_.size() > 2) {
         p_.strategy_.buy_.decimal_ = vector<int>(p_.strategy_.buy_.decimal_.begin(), p_.strategy_.buy_.decimal_.begin() + 2);
-    } 
+    }
     if (p_.strategy_.sell_.techIndex_ < 3 && p_.strategy_.sell_.decimal_.size() > 2) {
         p_.strategy_.sell_.decimal_ = vector<int>(p_.strategy_.sell_.decimal_.begin() + 2, p_.strategy_.sell_.decimal_.end());
     }
@@ -2479,7 +2479,7 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
 }
 
 void Tradition::set_tradition_strategy() {
-    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果mixType 2，要把兩種指標傳統策略混合 
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果mixType 2，要把兩種指標傳統策略混合
         for (auto buyStrategy : allTraditionStrategy_[company_->info_->techIndexs_[0]]) {
             for (auto sellStrategy : allTraditionStrategy_[company_->info_->techIndexs_[1]]) {
                 vector<int> tmpStrategy;
@@ -2549,10 +2549,10 @@ public:
     void cal_hold(vector<path> &filePaths, vector<vector<string>> &thisTargetFile, TrainWindow &window);
     void set_paths_create_Folder();
 
-    HoldFile(CompanyInfo *company, bool isTrain, bool isTradition);
+    HoldFile(CompanyInfo *company, string trainOrTest, string algoOrTradition);
 };
 
-HoldFile::HoldFile(CompanyInfo *company, bool isTrain, bool isTradition) : Test(company), isTrain_(isTrain), isTradition_(isTradition) {
+HoldFile::HoldFile(CompanyInfo *company, string trainOrTest, string algoOrTradition) : Test(company), isTrain_([trainOrTest]() { if (trainOrTest == "train") return true; else if (trainOrTest == "test") return false; else exit(1); }()), isTradition_([algoOrTradition]() { if (algoOrTradition == "algo") return false; else if (algoOrTradition == "tradition") return true; else exit(1); }()) {
     set_paths_create_Folder();
     set_tables();
     set_particle();
@@ -3301,8 +3301,8 @@ private:
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
                 // company.output_Tech(company.info_->techIndex_);
-                // HoldFile holdFile(&company, true, false);
-                // HoldFile holFile(&company, false, false);
+                // HoldFile holdFile(&company, "train", "algo");
+                // HoldFile holFile1(&company, "test", "algo");
                 // ResetFile resetFile(&company);
                 break;
             }
@@ -3357,9 +3357,11 @@ int main(int argc, const char *argv[]) {
             RunMode runMode(_info, companyPricePaths);
         } else {
             // CalIRR calIRR(companyPricePaths, "train");
+            // CalIRR calIRR(companyPricePaths, "test");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_RSI", "algo");
+            FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_RSI", "algo");
+            // FindBestHold findBestHold1(&_info, "test_IRR_IRR_sorted_RSI", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
