@@ -27,7 +27,7 @@ using namespace filesystem;
 
 class Info {
 public:
-    int mode_ = 0;
+    int mode_ = 10;
     string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
@@ -625,6 +625,8 @@ public:
 
     void find_test_interval();
     void find_M_test();
+    void push_week(int bigWeekDay, int smallWeekDay, int bigDateRow, int smallDateRow, int dateRow, int &weekCnt, vector<int> &weekVec);
+    bool check_week(int smallWeekDay, int bigWeekDay, int smallDateRow, int bigDateRow, int dateRow);
     void find_W_test();
     void find_D_test();
     void print_test();
@@ -696,30 +698,35 @@ void TestWindow::find_M_test() {
 void TestWindow::find_W_test() {
     vector<int> startRow, endRow;
     int smallWeekDay = -1, bigWeekDay = -1;
-    for (int dateRow = company_.testStartRow_, monthCnt = testLength_ - 1; dateRow < company_.testEndRow_; dateRow++) {
+    startRow.push_back(company_.testStartRow_);
+    for (int dateRow = company_.testStartRow_ + 1, startRowWeekCnt = 0, endRowWeekCnt = 0; dateRow <= company_.testEndRow_; dateRow++) {
         smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
         bigWeekDay = cal_weekday(company_.date_[dateRow]);
-        if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow - 1], company_.date_[dateRow])) {
-            monthCnt++;
-            if (monthCnt == testLength_) {
-                startRow.push_back(dateRow);
-                monthCnt = 0;
-            }
-        }
-    }
-    for (int dateRow = company_.testStartRow_, monthCnt = 0; dateRow <= company_.testEndRow_; dateRow++) {
+        push_week(smallWeekDay, bigWeekDay, dateRow - 1, dateRow, dateRow, startRowWeekCnt, startRow);
+
         smallWeekDay = cal_weekday(company_.date_[dateRow]);
         bigWeekDay = cal_weekday(company_.date_[dateRow + 1]);
-        if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow], company_.date_[dateRow + 1])) {
-            monthCnt++;
-            if (monthCnt == testLength_ || dateRow == company_.testEndRow_) {
-                endRow.push_back(dateRow);
-                monthCnt = 0;
-            }
-        }
+        push_week(smallWeekDay, bigWeekDay, dateRow, dateRow + 1, dateRow, endRowWeekCnt, endRow);
+    }
+    if (endRow.back() != company_.testEndRow_) {
+        endRow.push_back(company_.testEndRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
+}
+
+void TestWindow::push_week(int smallWeekDay, int bigWeekDay, int smallDateRow, int bigDateRow, int dateRow, int &weekCnt, vector<int> &weekVec) {
+    if (check_week(smallWeekDay, bigWeekDay, smallDateRow, bigDateRow, dateRow)) {
+        weekCnt++;
+        if (weekCnt == testLength_) {
+            weekVec.push_back(dateRow);
+            weekCnt = 0;
+        }
+    }
+}
+
+bool TestWindow::check_week(int smallWeekDay, int bigWeekDay, int smallDateRow, int bigDateRow, int dateRow) {
+    return smallWeekDay > bigWeekDay || is_over_7_days(company_.date_[smallDateRow], company_.date_[bigDateRow]);
 }
 
 void TestWindow::find_D_test() {
@@ -730,7 +737,7 @@ void TestWindow::find_D_test() {
     for (int dateRow = company_.testStartRow_ + testLength_ - 1; dateRow <= company_.testEndRow_; dateRow += testLength_) {
         endRow.push_back(dateRow);
     }
-    if (startRow.size() > endRow.size()) {
+    if (endRow.back() != company_.testEndRow_) {
         endRow.push_back(company_.testEndRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
@@ -849,18 +856,25 @@ void TrainWindow::find_W_train() {
     vector<int> startRow, endRow;
     int smallWeekDay = -1, bigWeekDay = -1;
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2) {
-        for (int dateRow = TestWindow::interval_[intervalIndex] - 1 + tableStartRow_, weekCnt = 0; dateRow > 0; dateRow--) {
+        for (int dateRow = TestWindow::interval_[intervalIndex] + tableStartRow_, startRowWeekCnt = -1; dateRow > 0; dateRow--) {
             smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
             bigWeekDay = cal_weekday(company_.date_[dateRow]);
-            if (bigWeekDay < smallWeekDay || is_over_7_days(company_.date_[dateRow - 1], company_.date_[dateRow])) {
-                weekCnt++;
-                if (weekCnt == trainLength_) {
+            if (check_week(smallWeekDay, bigWeekDay, dateRow - 1, dateRow, dateRow)) {
+                startRowWeekCnt++;
+                if (startRowWeekCnt == trainLength_) {
                     startRow.push_back(dateRow);
                     break;
                 }
             }
         }
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
+        for (int dateRow = TestWindow::interval_[intervalIndex] + tableStartRow_; dateRow > 0; dateRow--) {
+            smallWeekDay = cal_weekday(company_.date_[dateRow]);
+            bigWeekDay = cal_weekday(company_.date_[dateRow + 1]);
+            if (check_week(smallWeekDay, bigWeekDay, dateRow, dateRow + 1, dateRow)) {
+                endRow.push_back(dateRow);
+                break;
+            }
+        }
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
@@ -1960,13 +1974,20 @@ public:
 
 MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath) : company_(company), window_(window) {
     vector<string> trainFilePaths;
-    for (auto &techIndex : company_->info_->techIndexs_) {
-        trainFilePaths.push_back(techTrainFilePath[techIndex]);
-    }
-    if (company_->info_->mixType_ == 3) {  // 如果是mixType 3，需要把mix的路徑放進去
-        trainFilePaths.push_back(techTrainFilePath[5]);
-        trainFilePaths.push_back(techTrainFilePath[6]);
-    }
+    // for (auto &techIndex : company_->info_->techIndexs_) {
+    //     trainFilePaths.push_back(techTrainFilePath[techIndex]);
+    // }
+    // if (company_->info_->mixType_ == 3) {  // 如果是mixType 3，需要把mix的路徑放進去
+    //     trainFilePaths.push_back(techTrainFilePath[5]);
+    //     trainFilePaths.push_back(techTrainFilePath[6]);
+    // }
+
+    // 表現最好的組合
+    trainFilePaths.push_back(techTrainFilePath[6]);
+    trainFilePaths.push_back(techTrainFilePath[5]);
+    trainFilePaths.push_back(techTrainFilePath[0]);
+    trainFilePaths.push_back(techTrainFilePath[3]);
+
     int trainFilePathsSize = trainFilePaths.size();
 
     vector<vector<path>> diffTechTrainFilePath;
@@ -2196,8 +2217,8 @@ void Train::set_tables(vector<int> additionTable) {
     }
 
     if (company_->info_->mixedTech_ && company_->info_->mixType_) {
-        tables_[tables_.size() - 1].date_ = tables_[company_->info_->techIndexs_[0]].date_;
-        tables_[tables_.size() - 1].price_ = tables_[company_->info_->techIndexs_[0]].price_;
+        tables_[company_->info_->techIndex_].date_ = tables_[company_->info_->techIndexs_[0]].date_;
+        tables_[company_->info_->techIndex_].price_ = tables_[company_->info_->techIndexs_[0]].price_;
     }
 
     tablesPtr_ = &tables_;
@@ -2283,7 +2304,7 @@ void Train::train_normal(string &outputPath, TrainWindow &window) {
     for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
         TrainAPeriod trainAPeriod(*company_, *tablesPtr_, *intervalIter, *(intervalIter + 1), window.windowName_);
         cout << company_->companyName_ << "_" << window.windowName_ << "_";
-        cout << (*tablesPtr_)[0].date_[*intervalIter] << "~" << (*tablesPtr_)[0].date_[*(intervalIter + 1)] << "_";
+        cout << (*tablesPtr_)[company_->info_->techIndex_].date_[*intervalIter] << "~" << (*tablesPtr_)[company_->info_->techIndex_].date_[*(intervalIter + 1)] << "_";
         cout << trainAPeriod.globalP_[0].RoR_ << "%" << endl;
         output_train_file(intervalIter, outputPath, trainAPeriod.trainData_);
     }
@@ -2696,7 +2717,7 @@ public:
 
     void output_all_IRR();
     void output_IRR(ofstream &IRRout);
-    void output_all_window_rank();
+    void output_all_window_rank(int rankType);
     vector<string> remove_A2A_and_sort();
 
     CalIRR(vector<path> &companyPricePaths, string trainOrTest);
@@ -2718,7 +2739,7 @@ CalIRR::CalIRR(vector<path> &companyPricePaths, string trainOrTest) : companyPri
         output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.traditionRoRoutData_);
     }
     output_all_IRR();
-    output_all_window_rank();
+    output_all_window_rank(0);
 }
 
 void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
@@ -2758,24 +2779,24 @@ void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
 
 void CalIRR::output_IRR(ofstream &IRRout) {
     for (auto &company : allCompanyWindowsIRR_) {
-        IRRout << "=====" << company.companyName_ << "=====";
-        IRRout << "," << info_.techType_ << " algo," << info_.techType_ << " Tradition,";
+        IRRout << "=====" << company.companyName_ << "=====,";
+        // IRRout << "," << info_.techType_ << " algo," << info_.techType_ << " Tradition,";
         if (trainOrTest_ == "train")
             IRRout << "B&H";
-        IRRout << "\n";
         for (auto &eachIRR : company.windowsIRR_) {
-            IRRout << eachIRR.windowName_ << ",";
+            // IRRout << eachIRR.windowName_ << ",";
             IRRout << set_precision(eachIRR.algoIRR_) << ",";
-            IRRout << set_precision(eachIRR.traditionIRR_) << ",";
+            // IRRout << set_precision(eachIRR.traditionIRR_) << ",";
             if (trainOrTest_ == "train")
                 IRRout << set_precision(eachIRR.BHIRR_) << ",";
-            IRRout << "\n";
+            // IRRout << "\n";
         }
+        IRRout << "\n";
     }
     IRRout.close();
 }
 
-void CalIRR::output_all_window_rank() {
+void CalIRR::output_all_window_rank(int rankType) {
     vector<string> windowSort = remove_A2A_and_sort();
     ofstream rankOut(info_.rootFolder_ + trainOrTest_ + "_windowRank_" + info_.techType_ + ".csv");
     rankOut << "algo window rank\n,";
@@ -2783,20 +2804,51 @@ void CalIRR::output_all_window_rank() {
         rankOut << windowName << ",";
     }
     rankOut << endl;
-    for (auto &i : allCompanyWindowRank_) {
-        rankOut << i.companyName_ << ",";
-        for (auto &j : i.algoWindowRank_) {
-            rankOut << j << ",";
+    switch (rankType) {
+        case 0: {
+            for (auto &i : allCompanyWindowRank_) {
+                rankOut << i.companyName_ << ",";
+                for (auto &j : i.algoWindowRank_) {
+                    rankOut << j << ",";
+                }
+                rankOut << endl;
+            }
+            rankOut << "\n\ntradition window rank\n";
+            for (auto &i : allCompanyWindowRank_) {
+                rankOut << i.companyName_ << ",";
+                for (auto &j : i.traditionWindowRank_) {
+                    rankOut << j << ",";
+                }
+                rankOut << endl;
+            }
+            break;
         }
-        rankOut << endl;
-    }
-    rankOut << "\n\ntradition window rank\n";
-    for (auto &i : allCompanyWindowRank_) {
-        rankOut << i.companyName_ << ",";
-        for (auto &j : i.traditionWindowRank_) {
-            rankOut << j << ",";
+        case 1: {
+            for (auto &company : allCompanyWindowsIRR_) {
+                rankOut << company.companyName_ << ",";
+                if (trainOrTest_ == "train")
+                    rankOut << "B&H";
+                for (auto &eachIRR : company.windowsIRR_) {
+                    rankOut << set_precision(eachIRR.algoIRR_) << ",";
+                    if (trainOrTest_ == "train")
+                        rankOut << set_precision(eachIRR.BHIRR_) << ",";
+                }
+                rankOut << "\n";
+            }
+            rankOut << "\n\ntradition window rank\n";
+            for (auto &company : allCompanyWindowsIRR_) {
+                rankOut << company.companyName_ << ",";
+                if (trainOrTest_ == "train")
+                    rankOut << "B&H";
+                for (auto &eachIRR : company.windowsIRR_) {
+                    rankOut << set_precision(eachIRR.traditionIRR_) << ",";
+                    if (trainOrTest_ == "train")
+                        rankOut << set_precision(eachIRR.BHIRR_) << ",";
+                }
+                rankOut << "\n";
+            }
+            break;
         }
-        rankOut << endl;
     }
     rankOut.close();
 }
@@ -2901,6 +2953,8 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
         push += "," + filePathIter->stem().string() + ",";
     }
 
+    push += file[10][1] + ",";
+
     for (auto s : file[13]) {
         push += s + ",";
     }
@@ -2909,29 +2963,7 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     for (auto s : file[15]) {
         push += s + ",";
     }
-
-    // int techIndex = -1;
-    // if (!company_.info_->mixedTech_) {
-    //     techIndex = company_.info_->techIndex_;
-    // } else {
-    //     techIndex = find_index_of_string_in_vec(company_.info_->allTech_, file[0][1]);
-    // }
-    // if (!(company_.info_->mixType_ == 1)) {
-    //     for (int i = 0; i < eachVariableNum_[techIndex]; i++) {
-    //         push += file[i + 12][1] + ",";
-    //     }
-    // }
-    // if (techIndex == 3) {
-    //     push += ",";
-    // }
-    push += file[10][1] + "\n";
-    // if (company_.info_->mixedTech_) {
-    //     if (!tradition) {
-    //         tmpWinodwIRR_.techChooseTimes_[0][techIndex]++;
-    //     } else {
-    //         tmpWinodwIRR_.techChooseTimes_[1][techIndex]++;
-    //     }
-    // }
+    push += "\n";
     return push;
 }
 
@@ -3360,8 +3392,8 @@ int main(int argc, const char *argv[]) {
             // CalIRR calIRR(companyPricePaths, "test");
             // MergeIRRFile mergeFile;
             // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_RSI", "algo");
-            // FindBestHold findBestHold1(&_info, "test_IRR_IRR_sorted_RSI", "algo");
+            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_RSI", "algo");
+            // FindBestHold findBestHold1(&_info, "test_IRR_IRR_sorted_RSI_SMA_2", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
