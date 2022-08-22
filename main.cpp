@@ -28,11 +28,11 @@ using namespace filesystem;
 class Info {
 public:
     int mode_ = 10;
-    string setCompany_ = "AAPL";  //AAPL to JPM, KO to ^NYA
+    string setCompany_ = "^DJI";  //AAPL to JPM, KO to ^NYA
     string setWindow_ = "all";
 
-    vector<int> techIndexs_ = {0, 3};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
-    int mixType_ = 3;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的
+    vector<int> techIndexs_ = {3, 0};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
+    int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的
     bool mixedTech_;
     int techIndex_;
 
@@ -1011,6 +1011,9 @@ public:
     int bestCnt_ = 0;
     bool isRecordOn_ = false;
 
+    int BHHold_ = 0;
+    double BHremain_ = 0;
+
     double actualDelta_ = -1;
 
     string trainOrTestData_;
@@ -1109,7 +1112,7 @@ void Particle::instant_trade(string startDate, string endDate, bool hold) {
 void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&holdDataPtr, string windowName) {
     if (hold) {
         holdData.clear();
-        holdData += "Date,Price,hold 1,hold 2,buy,sell date,sell," + windowName + " capital level, " + techType_ + ",";
+        holdData += "Date,Price,hold 1,hold 2,buy,sell date,sell," + windowName + " capital level,B&H capital level," + techType_ + ",";
         if (!company_->info_->mixedTech_) {
             switch (techIndex_) {
                 case 0:
@@ -1196,6 +1199,10 @@ void Particle::trade(int startRow, int endRow, bool lastRecord, string *holdData
     // if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // 好像沒有用，要再觀察
     //     techNotAll0 = true;
     // }
+    if (holdDataPtr != nullptr && BHremain_ == company_->info_->totalCapitalLV_) {
+        BHHold_ = floor(BHremain_ / (*tables_)[strategy_.buy_.techIndex_].price_[startRow]);
+        BHremain_ = BHremain_ - BHHold_ * (*tables_)[strategy_.buy_.techIndex_].price_[startRow];
+    }
     for (int i = startRow; i <= endRow; i++) {
         push_holdData_date_price(holdDataPtr, i);
         if (techNotAll0 && set_buy_sell_condition(buyCondition, stockHold, i, endRow, true)) {
@@ -1375,7 +1382,8 @@ void Particle::push_holdData_buy(string *holdDataPtr, int i, double capitalLV) {
         (*holdDataPtr) += set_precision((*tables_)[strategy_.buy_.techIndex_].price_[i]);
         (*holdDataPtr) += ",,,";
         push_extra_techData(i, holdDataPtr);
-        (*holdDataPtr) += set_precision(capitalLV);
+        (*holdDataPtr) += set_precision(capitalLV) + ",";
+        (*holdDataPtr) += set_precision(BHHold_ * (*tables_)[strategy_.buy_.techIndex_].price_[i] + BHremain_) + ",";
         (*holdDataPtr) += "\n";
     }
 }
@@ -1425,7 +1433,8 @@ void Particle::push_holdData_sell(int endRow, string *holdDataPtr, int i, double
             (*holdDataPtr) += ",";
         }
         push_extra_techData(i, holdDataPtr);
-        (*holdDataPtr) += set_precision(capitalLV);
+        (*holdDataPtr) += set_precision(capitalLV) + ",";
+        (*holdDataPtr) += set_precision(BHHold_ * (*tables_)[strategy_.sell_.techIndex_].price_[i] + BHremain_) + ",";
         (*holdDataPtr) += "\n";
     }
 }
@@ -1440,14 +1449,16 @@ void Particle::push_holdData_holding(string *holdDataPtr, int i, double capitalL
     }
     (*holdDataPtr) += ",,,,";
     push_extra_techData(i, holdDataPtr);
-    (*holdDataPtr) += set_precision(capitalLV);
+    (*holdDataPtr) += set_precision(capitalLV) + ",";
+    (*holdDataPtr) += set_precision(BHHold_ * (*tables_)[strategy_.buy_.techIndex_].price_[i] + BHremain_) + ",";
     (*holdDataPtr) += "\n";
 }
 
 void Particle::push_holdData_not_holding(string *holdDataPtr, int i, double capitalLV) {
     (*holdDataPtr) += ",,,,,";
     push_extra_techData(i, holdDataPtr);
-    (*holdDataPtr) += set_precision(capitalLV);
+    (*holdDataPtr) += set_precision(capitalLV) + ",";
+    (*holdDataPtr) += set_precision(BHHold_ * (*tables_)[strategy_.buy_.techIndex_].price_[i] + BHremain_) + ",";
     (*holdDataPtr) += "\n";
 }
 
@@ -2630,6 +2641,7 @@ void HoldFile::cal_hold(vector<path> &filePaths, vector<vector<string>> &thisTar
     }
     auto [filePathIter, intervalIter] = tuple{filePaths.begin(), interval.begin()};
     double capitalLV = company_->info_->totalCapitalLV_;
+    p_.BHremain_ = company_->info_->totalCapitalLV_;
     for (int periodIndex = 0; periodIndex < window.intervalSize_ / 2; periodIndex++, filePathIter++, intervalIter += 2) {
         thisTargetFile = read_data(*filePathIter);
         p_.reset();
