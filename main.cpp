@@ -69,7 +69,8 @@ public:
 
     string expFolder_ = "exp_result/";
     string rootFolder_ = "result_";
-
+    string techFolder_ = "tech/"
+;
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     map<string, tuple<string, char, int, int>> slidingWindowPairs_;
@@ -153,6 +154,8 @@ public:
     void set_folder() {
         priceFolder_ = current_path().string() + "/" + priceFolder_;
         expFolder_ = current_path().parent_path().string() + "/" + expFolder_;
+        techFolder_ = expFolder_ + techFolder_;
+        // techFolder_ = current_path().parent_path().string() + "/" + techFolder_;
         create_directories(expFolder_);
         current_path(expFolder_);
         rootFolder_ = rootFolder_ + to_string(stoi(testEndYear_) - 1) + "/";
@@ -235,7 +238,7 @@ CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.st
 
 void CompanyInfo::set_paths(Path &paths) {
     for (auto tech : info_->allTech_) {
-        paths.techOuputPaths_.push_back(info_->rootFolder_ + "/tech/" + tech + "/" + companyName_ + "/");
+        paths.techOuputPaths_.push_back(info_->techFolder_ + tech + "/" + companyName_ + "/");
 
         paths.resultOutputPaths_.push_back(info_->rootFolder_ + "result_" + tech + "/");
 
@@ -595,8 +598,9 @@ void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) 
 void TechTable::output_techTable() {
     ofstream out;
     out.open(company_->companyName_ + "_" + company_->info_->techType_ + "_table.csv");
+    out << techType_ << ",";
     for (int i = 1; i < 257; i++) {
-        out << "," << i;
+        out << i << ",";
     }
     out << endl;
     for (int i = 0; i < days_; i++) {
