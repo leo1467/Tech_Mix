@@ -174,6 +174,9 @@ static int find_index_of_string_in_vec(const vector<string> &stringVector, const
 }
 
 static vector<string> set_certain_range_of_vec(const string &inputString, vector<string> &targetVector) {
+    if (auto findComma = find_if(inputString.begin(), inputString.end(), [](char isComma) { return isComma == ','; }); findComma != inputString.end()) {
+        return cut_string(inputString, ',');
+    }
     string inputForSetTarget = [&]() {
         if (inputString == "all") {
             return targetVector.front() + " to " + targetVector.back();
@@ -205,10 +208,13 @@ static string get_date(vector<string> &date, int startRow, int endRow) {
 }
 
 vector<int> change_vec_string_to_int(vector<string> aStrategyStrings) {
-    vector<int> aStrategyInt;
-    for (auto s : aStrategyStrings) {
-        aStrategyInt.push_back(stoi(s));
+    if (aStrategyStrings.size() != 0) {
+        vector<int> aStrategyInt;
+        for (auto s : aStrategyStrings) {
+            aStrategyInt.push_back(stoi(s));
+        }
+        return aStrategyInt;
     }
-    return aStrategyInt;
+    return vector<int>{};
 }
 #endif /* functions_h */
