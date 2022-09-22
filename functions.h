@@ -174,7 +174,7 @@ static int find_index_of_string_in_vec(const vector<string> &stringVector, const
 }
 
 static vector<string> set_certain_range_of_vec(const string &inputString, vector<string> &targetVector) {
-    if (auto findComma = find_if(inputString.begin(), inputString.end(), [](char isComma) { return isComma == ','; }); findComma != inputString.end()) {
+    if (inputString.find(",") != string::npos) {
         return cut_string(inputString, ',');
     }
     string inputForSetTarget = [&]() {

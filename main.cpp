@@ -4,7 +4,7 @@
 #include <condition_variable>
 #include <ctime>
 #include <exception>
-#include <filesystem>
+#include <filesystem>  // C++17以上才有的library
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -17,22 +17,20 @@
 #include <tuple>
 #include <vector>
 
-//#include "CompanyInfo.h"
-//#include "TechTable.h"
-#include "functions.h"
+#include "functions.h"  // 一些常用的函式放在這邊
 
 using namespace std;
 using namespace chrono;
-using namespace filesystem;
+using namespace filesystem;  // C++17以上才有的library
 
-class Info {
+class Info {  // 放各種參數，要改參數大部分都在這邊
 public:
-    int mode_ = 11;
-    string setCompany_ = "all";  //AAPL to JPM, KO to ^NYA
-    string setWindow_ = "all";
+    int mode_ = 0;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能, 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能
+    string setCompany_ = "AAPL";  // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
+    string setWindow_ = "all";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
 
-    vector<int> techIndexs_ = {0};  // if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
-    int mixType_ = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的
+    vector<int> techIndexs_ = {3, 0};  // 0: SMA, 1: WMA, 2: EMA, 3: RSI, if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
+    int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
     bool mixedTech_;
     int techIndex_;
 
@@ -40,7 +38,7 @@ public:
     string techType_;
     int mixedTechNum_;
 
-    int algoIndex_ = 2;
+    int algoIndex_ = 2;  // 根據下面演算法的index選擇要跑什麼
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
@@ -48,29 +46,30 @@ public:
     int expNum_ = 50;  // SMA: 50, RSI: 3
     int genNum_ = 10000;
     int particleNum_ = 10;
-    double iniFundLV_ = 10000000;
+    double iniFundLV_ = 10000000;  // 初始資金
 
     int companyThreadNum_ = 0;  // 若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
     int windowThreadNum_ = 0;  // 若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
-    bool debug_ = false;
+    bool debug_ = false;  // 若要debug則改成true，會印出每個粒子的資訊
 
-    int testDeltaLoop_ = 0;
-    double testDeltaGap_ = 0.00001;
-    double multiplyUp_ = 1.01;
-    double multiplyDown_ = 0.99;
-    int compareMode_ = 0;
+    int testDeltaLoop_ = 0;  // 用來測試delta的迴圈數量，確認哪一個delta比較好
+    double testDeltaGap_ = 0.00001;  // 根據上面的迴圈數量，每個迴圈都會減少這麼多的delta
 
-    string testStartYear_ = "2012-01";
-    string testEndYear_ = "2022-01";
+    double multiplyUp_ = 1.01;  // KNQTS用
+    double multiplyDown_ = 0.99;  // KNQTS用
+    int compareMode_ = 0;  // KNQTS用, 0: 比較漢明距, 1: 比較10進位距離
+
+    string testStartYear_ = "2012-01";  // 測試期開始年月
+    string testEndYear_ = "2022-01";    // 測試期結束的下一個月
     double testLength_;
 
-    string priceFolder_ = "price_2021/";  // 通常不會換price，只有在更新股價檔的時後才改
+    string priceFolder_ = "price_2021/";  // 股價的folder名稱，通常不會換，只有在更新股價檔的時後才改，股價資料夾要放在同一個路徑
 
-    string expFolder_ = "exp_result/";
-    string rootFolder_ = "result_";
-    string techFolder_ = "tech/"
-;
+    string expFolder_ = "exp_result/";  // 所有的實驗的output都在這裡
+    string rootFolder_ = "resultxxx_";  // 訓練期及測試期的相關資料在這
+    string techFolder_ = "tech/";  // 存計算出來的技術指標
+
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
 
     map<string, tuple<string, char, int, int>> slidingWindowPairs_;
@@ -106,10 +105,26 @@ public:
             techIndex_ = techIndexs_[0];
         } else {
             techIndex_ = (int)allTech_.size();
+            // =====改tech名稱=====
+            if (techType_ == "SMA_RSI_2") {
+                techType_ = "HI-SR";
+            } else if (techType_ == "RSI_SMA_2") {
+                techType_ = "HI-RS";
+            } else if (techType_ == "SMA_RSI_3") {
+                techType_ = "HI-all";
+            }
+            // ===================
             allTech_.push_back(techType_);
-            if (mixType_ == 3) {  // 如果是mixType 3，需要把mix的名稱放進去，company生路徑
+            if (mixType_ == 3) {  // 如果mixType = 3，需要把mix的名稱放進去，company生路徑
                 for (int i = 0; i < 2; i++) {
                     string mixeType2 = allTech_[techIndexs_[0]] + "_" + allTech_[techIndexs_[1]] + "_2";
+                    // =====改tech名稱=====
+                    if (mixeType2 == "SMA_RSI_2") {
+                        mixeType2 = "HI-SR";
+                    } else if (mixeType2 == "RSI_SMA_2") {
+                        mixeType2 = "HI-RS";
+                    }
+                    // ===================
                     allTech_.push_back(mixeType2);
                     reverse(techIndexs_.begin(), techIndexs_.end());
                 }
@@ -154,8 +169,8 @@ public:
     void set_folder() {
         priceFolder_ = current_path().string() + "/" + priceFolder_;
         expFolder_ = current_path().parent_path().string() + "/" + expFolder_;
-        techFolder_ = expFolder_ + techFolder_;
-        // techFolder_ = current_path().parent_path().string() + "/" + techFolder_;
+        // techFolder_ = expFolder_ + techFolder_;
+        techFolder_ = current_path().string() + "/" + techFolder_;
         create_directories(expFolder_);
         current_path(expFolder_);
         rootFolder_ = rootFolder_ + to_string(stoi(testEndYear_) - 1) + "/";
@@ -170,7 +185,7 @@ public:
     }
 } _info;
 
-class CompanyInfo {
+class CompanyInfo {  // 放各種跟公司有關的資料
 public:
     class Path {
     public:
@@ -211,18 +226,19 @@ public:
     vector<vector<double>> techTable_;
     int tableStartRow_ = -1;
 
-    vector<void (CompanyInfo::*)(vector<double> &)> cal_tech_{&CompanyInfo::cal_SMA, &CompanyInfo::cal_WMA, &CompanyInfo::cal_EMA, &CompanyInfo::cal_RSI};  // outside the class (company.*(company.cal_tech_[company.info_.techIndex_]))(tmp);
+    typedef vector<void (CompanyInfo::*)(vector<double> &)> calTech;
+    calTech cal_tech_{&CompanyInfo::cal_SMA, &CompanyInfo::cal_WMA, &CompanyInfo::cal_EMA, &CompanyInfo::cal_RSI};
 
     void set_paths(Path &paths);
     void store_date_price(path priceFilePath);
-    void create_folder(Path &paths);
+    void create_folder(Path &paths);  // 用不到
     void find_table_start_row();
     void store_tech_to_vector(int techIndex);
     void cal_SMA(vector<double> &tmp);
     void cal_WMA(vector<double> &tmp);
     void cal_EMA(vector<double> &tmp);
     void cal_RSI(vector<double> &tmp);
-    void output_Tech(int techIndex);
+    void output_tech_file(int techIndex);
     void set_techFile_title(ofstream &out, int techPerid, int techIndex);
 
     CompanyInfo(path pricePath, Info &info);
@@ -236,7 +252,7 @@ CompanyInfo::CompanyInfo(path pricePath, Info &info) : companyName_(pricePath.st
     cout << companyName_ << endl;
 }
 
-void CompanyInfo::set_paths(Path &paths) {
+void CompanyInfo::set_paths(Path &paths) {  // 設定各種路徑
     for (auto tech : info_->allTech_) {
         paths.techOuputPaths_.push_back(info_->techFolder_ + tech + "/" + companyName_ + "/");
 
@@ -268,7 +284,7 @@ void CompanyInfo::set_paths(Path &paths) {
     }
 }
 
-void CompanyInfo::store_date_price(path priceFilePath) {
+void CompanyInfo::store_date_price(path priceFilePath) {  // 讀股價
     vector<vector<string>> priceFile = read_data(priceFilePath);
     totalDays_ = (int)priceFile.size() - 1;
     date_.resize(totalDays_);
@@ -292,7 +308,7 @@ void CompanyInfo::store_date_price(path priceFilePath) {
     oneYearDays_ = testDays_ / info_->testLength_;
 }
 
-void CompanyInfo::create_folder(Path &paths) {
+void CompanyInfo::create_folder(Path &paths) {  // 用不到
     if (!info_->mixedTech_) {
         create_directories(paths.techOuputPaths_[info_->techIndex_]);
     }
@@ -312,7 +328,7 @@ void CompanyInfo::create_folder(Path &paths) {
     }
 }
 
-void CompanyInfo::find_table_start_row() {
+void CompanyInfo::find_table_start_row() {  // TechTable要從date和price的哪一個row開始
     int longestTrainMonth = -1;
     for (auto windowComponent : info_->slidingWindowPairs_) {
         int trainMonth;
@@ -348,10 +364,11 @@ void CompanyInfo::store_tech_to_vector(int techIndex) {
     vector<double> tmp;
     techTable_.push_back(tmp);
     (this->*cal_tech_[techIndex])(tmp);  // or (*this.*cal_tech_[info_->techIndex_])(tmp);
+    // outside the class (company.*(company.cal_tech_[company.info_.techIndex_]))(tmp);
     cout << "done calculating" << endl;
 }
 
-void CompanyInfo::cal_SMA(vector<double> &tmp) {
+void CompanyInfo::cal_SMA(vector<double> &tmp) {  // 計算SMA
     for (int period = 1; period < 257; period++) {
         for (int dateRow = period - 1; dateRow < totalDays_; dateRow++) {
             double MARangePriceSum = 0;
@@ -365,7 +382,7 @@ void CompanyInfo::cal_SMA(vector<double> &tmp) {
     }
 }
 
-void CompanyInfo::cal_WMA(vector<double> &tmp) {
+void CompanyInfo::cal_WMA(vector<double> &tmp) {  // 計算WMA
     for (int period = 1; period < 257; period++) {
         for (int dateRow = period - 1; dateRow < totalDays_; dateRow++) {
             double weightedPriceSum = 0;
@@ -381,7 +398,7 @@ void CompanyInfo::cal_WMA(vector<double> &tmp) {
     }
 }
 
-void CompanyInfo::cal_EMA(vector<double> &tmp) {
+void CompanyInfo::cal_EMA(vector<double> &tmp) {  // 未完成，有bug
     for (int period = 1; period < 257; period++) {
         double alpha = 2.0 / (double(period) + 1.0);
         double EMA = 0;
@@ -398,7 +415,7 @@ void CompanyInfo::cal_EMA(vector<double> &tmp) {
     }
 }
 
-void CompanyInfo::cal_RSI(vector<double> &tmp) {
+void CompanyInfo::cal_RSI(vector<double> &tmp) {  // 計算RSI
     vector<double> priceGainLoss(totalDays_ - 1);
     for (int priceDateRow = 1; priceDateRow < totalDays_; priceDateRow++) {
         priceGainLoss[priceDateRow - 1] = price_[priceDateRow] - price_[priceDateRow - 1];
@@ -437,11 +454,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp) {
     }
 }
 
-void CompanyInfo::output_Tech(int techIndex) {
-    // if (info_->mixedTech_) {
-    //     cout << "mixed tech no need to ouput tech" << endl;
-    //     exit(1);
-    // }
+void CompanyInfo::output_tech_file(int techIndex) {  // 輸出技術指標資料
     create_directories(paths_.techOuputPaths_[techIndex]);
     store_tech_to_vector(techIndex);
     cout << "saving " << info_->techType_ << " file" << endl;
@@ -492,7 +505,7 @@ void CompanyInfo::set_techFile_title(ofstream &out, int techPerid, int techIndex
     }
 }
 
-class TechTable {
+class TechTable {  // 存技術指標資料
 public:
     CompanyInfo *company_ = nullptr;
     int techIndex_;
@@ -502,13 +515,13 @@ public:
     vector<double> price_;
     vector<vector<double>> techTable_;
 
-    bool checkStartRow_;
+    bool checkStartRow_;  // 若是true，只會檢查技術指標資料的第一天是否比訓練期第一天還晚
 
     tuple<vector<path>, int> get_file_path_and_check();
     void create_techTable(vector<path> &techFilePath, int techFilePathSize);
     void ask_generate_tech_file();
     void read_techFile(vector<path> &techFilePath, int techFilePathSize);
-    void output_techTable();
+    void output_techTable();  // 輸出讀進來的技術指標資料到一份csv
 
     TechTable(CompanyInfo *company, int techIndex, bool checkStartRow = false);
     TechTable(){};
@@ -546,7 +559,7 @@ void TechTable::ask_generate_tech_file() {
     cin >> choose;
     switch (choose) {
         case 'y': {
-            company_->output_Tech(techIndex_);
+            company_->output_tech_file(techIndex_);
             break;
         }
         case 'n': {
@@ -595,7 +608,7 @@ void TechTable::read_techFile(vector<path> &techFilePath, int techFilePathSize) 
     }
 }
 
-void TechTable::output_techTable() {
+void TechTable::output_techTable() {  // 輸出讀進來的技術指標資料到一份csv
     ofstream out;
     out.open(company_->companyName_ + "_" + company_->info_->techType_ + "_table.csv");
     out << techType_ << ",";
@@ -613,7 +626,7 @@ void TechTable::output_techTable() {
     out.close();
 }
 
-class TestWindow {
+class TestWindow {  // 裝測試期滑動視窗區間
 protected:
     CompanyInfo &company_;
 
@@ -633,7 +646,7 @@ public:
     bool check_week(int smallWeekDay, int bigWeekDay, int smallDateRow, int bigDateRow, int dateRow);
     void find_W_test();
     void find_D_test();
-    void print_test();
+    void print_test();  // 印出滑動視窗測試期區間
 
     TestWindow(CompanyInfo &company, string window);
 };
@@ -748,7 +761,7 @@ void TestWindow::find_D_test() {
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TestWindow::print_test() {
+void TestWindow::print_test() {  // 印出滑動視窗測試期區間
     cout << "test window: " << windowName_ << "=" << get<0>(windowComponent_) << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
         cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
@@ -756,7 +769,7 @@ void TestWindow::print_test() {
     cout << "==========" << endl;
 }
 
-class TrainWindow : public TestWindow {
+class TrainWindow : public TestWindow {  // 裝訓練期滑動視窗區間
 public:
     vector<int> interval_;
     int trainDays_ = 0;
@@ -767,7 +780,7 @@ public:
     void find_star_train(vector<int> &endRow, vector<int> &startRow);
     void find_W_train();
     void find_D_train();
-    void print_train();
+    void print_train();  // 印出滑動視窗訓練期區間
 
     TrainWindow(CompanyInfo &company, string window);
 };
@@ -894,7 +907,7 @@ void TrainWindow::find_D_train() {
     interval_ = save_startRow_EndRow(startRow, endRow);
 }
 
-void TrainWindow::print_train() {
+void TrainWindow::print_train() {  // 印出滑動視窗訓練期區間
     cout << "train window: " << windowName_ << "=" << get<0>(windowComponent_) << endl;
     for (auto it = interval_.begin(); it != interval_.end(); it++) {
         cout << company_.date_[*it + tableStartRow_] << "~" << company_.date_[*(++it) + tableStartRow_] << endl;
@@ -902,12 +915,12 @@ void TrainWindow::print_train() {
     cout << "==========" << endl;
 }
 
-class MA {
+class MA {  // 裝MA資料
 public:
-    static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};
+    static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};  // MA每個參數要多少個bits
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 120, 20, 120}, {20, 240, 20, 240}, {60, 120, 60, 120}, {60, 240, 60, 240}};
 
-    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 買入判斷
         double MAbuy1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[0]];
         double MAbuy2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[1]];
         double MAbuy1Today = (*tables)[tableIndex].techTable_[i][decimal[0]];
@@ -915,7 +928,7 @@ public:
         return MAbuy1PreDay <= MAbuy2PreDay && MAbuy1Today > MAbuy2Today;
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 賣出判斷
         double MAsell1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[0]];
         double MAsell2PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[1]];
         double MAsell1Today = (*tables)[tableIndex].techTable_[i][decimal[0]];
@@ -924,38 +937,38 @@ public:
     }
 };
 
-class RSI {
+class RSI {  // 裝RSI資料
 public:
-    static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};
+    static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};  // RSI每個參數要多少個bits
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
 
-    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+    static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 買入判斷
         double RSI = (*tables)[tableIndex].techTable_[i][decimal[0]];
         return RSI <= decimal[1];
     }
 
-    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {
+    static bool sell_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 賣出判斷
         double RSI = (*tables)[tableIndex].techTable_[i][decimal[0]];
         return RSI >= decimal[2];
     }
 };
 
-class BetaMatrix {
+class BetaMatrix {  // 放 beta matrix & 其資料
 public:
     int variableNum_ = 0;
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<double> matrix_;
 
-    void reset();
-    void print(ostream &out);
+    void reset();  // 重置 beta matrix
+    void print(ostream &out);  // 印 beta matrix
 };
 
-void BetaMatrix::reset() {
+void BetaMatrix::reset() {  // 重置 beta matrix
     fill(matrix_.begin(), matrix_.end(), 0.5);
 }
 
-void BetaMatrix::print(ostream &out = cout) {
+void BetaMatrix::print(ostream &out = cout) {  // 印 beta matrix
     out << "beta matrix" << endl;
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
         for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
@@ -966,7 +979,7 @@ void BetaMatrix::print(ostream &out = cout) {
     out << endl;
 }
 
-class MixedStrategy {
+class Strategy {  // 裝買賣策略
 public:
     class StrategyBuyorSell {
     public:
@@ -976,13 +989,13 @@ public:
     StrategyBuyorSell buy_;
     StrategyBuyorSell sell_;
 
-    MixedStrategy(int techIndexBuy, vector<int> strategyBuy, int techIndexSell, vector<int> strategySell) {
+    Strategy(int techIndexBuy, vector<int> strategyBuy, int techIndexSell, vector<int> strategySell) {
         buy_.techIndex_ = techIndexBuy;
         buy_.decimal_ = strategyBuy;
         sell_.techIndex_ = techIndexSell;
         sell_.decimal_ = strategySell;
     }
-    MixedStrategy(){};
+    Strategy(){};
 };
 
 class Particle {
@@ -999,11 +1012,10 @@ public:
     int variableNum_ = 0;
     vector<int> decimal_;
 
-    MixedStrategy strategy_;
+    Strategy strategy_;
     int buyVariNum_ = -1;
 
     vector<TechTable> *tables_ = nullptr;
-    //    int tableIndex_ = 0;
 
     double remain_ = 0;
     double RoR_ = 0;
@@ -1024,18 +1036,18 @@ public:
 
     int hold1OrHold2_ = 1;
 
-    typedef vector<bool (*)(vector<TechTable> *, int, vector<int> &, int)> buy_sell;
-    buy_sell buy{MA::buy_condition0, MA::buy_condition0, MA::buy_condition0, RSI::buy_condition0};
-    buy_sell sell{MA::sell_condition0, MA::sell_condition0, MA::sell_condition0, RSI::sell_condition0};
+    typedef vector<bool (*)(vector<TechTable> *, int, vector<int> &, int)> buyOrSell;
+    buyOrSell buy{MA::buy_condition0, MA::buy_condition0, MA::buy_condition0, RSI::buy_condition0};
+    buyOrSell sell{MA::sell_condition0, MA::sell_condition0, MA::sell_condition0, RSI::sell_condition0};
 
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
     void init(CompanyInfo *company, int techIndex, bool isRecordOn = false, vector<int> variables = {});
-    void instant_trade(string startDate, string endDate, bool hold = false);
+    void instant_trade(string startDate, string endDate, bool hold = false);  // 可以輸入日期區間直接進行交易
     void push_holdData_column_Name(bool hold, string &holdData, string *&holdDataPtr, string windowName);
     string set_title_variables();
     void set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate);
-    void output_trade_record(ofstream &out);
+    void output_trade_record(ofstream &out);  // 輸出交易記錄
     void set_instant_trade_holdData(bool hold, const string &holdData, const string &startDate, const string &endDate);
     void ini_buyNum_sellNum();
     void trade(int startRow, int endRow, bool lastRecord = false, string *holdDataPtr = nullptr);
@@ -1051,13 +1063,13 @@ public:
     void push_holdData_not_holding(string *holdDataPtr, int i, double fundLV);
     void push_tradeData_last(bool lastRecord);
     void check_buyNum_sellNum();
-    void reset(double RoR = 0);
+    void reset(double RoR = 0);  // 重置粒子內的訓練資訊
     void measure(BetaMatrix &betaMatrix);
     void convert_bi_dec();
     void determine_techIndex_and_set_strategy();
     void set_strategy(int buyTechIndex, vector<int> buyDecimal, int sellTechIndex, vector<int> sellDecimal);
-    void print(ostream &out);
-    void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);
+    void print(ostream &out);  // 印出粒子資訊
+    void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);  // 記錄訓練期跟測試期跑完資訊
 
     Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
     Particle(){};
@@ -1073,7 +1085,11 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
     techType_ = company_->info_->techType_;
     remain_ = company->info_->iniFundLV_;
     isRecordOn_ = isRecordOn;
-    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果是mixType 2就要分別設定買賣的參數數量
+    if (!company_->info_->mixedTech_) {
+        eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
+        strategy_.buy_.techIndex_ = techIndex_;
+        strategy_.sell_.techIndex_ = techIndex_;
+    } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果是mixType 2就要分別設定買賣的參數數量
         for (auto techIndex : company_->info_->techIndexs_) {
             if (techIndex < 3) {  // 如果是MA系列，參數是2個，所以begin() + 2
                 eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[techIndex].begin(), allTechEachVariableBitsNum_[techIndex].begin() + 2);
@@ -1086,10 +1102,6 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
         }
         strategy_.buy_.techIndex_ = company_->info_->techIndexs_[0];
         strategy_.sell_.techIndex_ = company_->info_->techIndexs_[1];
-    } else {
-        eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
-        strategy_.buy_.techIndex_ = techIndex_;
-        strategy_.sell_.techIndex_ = techIndex_;
     }
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
@@ -1100,7 +1112,7 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
     }
 }
 
-void Particle::instant_trade(string startDate, string endDate, bool hold) {
+void Particle::instant_trade(string startDate, string endDate, bool hold) {  // 可以輸入日期區間直接進行交易
     vector<TechTable> tmp = {TechTable(company_, techIndex_)};
     tables_ = &tmp;
     int startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
@@ -1181,7 +1193,7 @@ string Particle::set_title_variables() {
     return titleVariables;
 }
 
-void Particle::output_trade_record(ofstream &out) {
+void Particle::output_trade_record(ofstream &out) {  // 輸出交易記錄
     out << tradeRecord_;
 }
 
@@ -1527,7 +1539,7 @@ void Particle::push_tradeData_last(bool lastRecord) {
     }
 }
 
-void Particle::reset(double RoR) {
+void Particle::reset(double RoR) {  // 重置粒子內的訓練資訊
     fill(binary_.begin(), binary_.end(), 0);
     fill(decimal_.begin(), decimal_.end(), 0);
     buyNum_ = 0;
@@ -1607,20 +1619,22 @@ void Particle::set_strategy(int buyTechIndex, vector<int> buyDecimal, int sellTe
     strategy_.sell_.decimal_ = sellDecimal;
 }
 
-void Particle::print(ostream &out = cout) {
-    for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
-            out << binary_[bitIndex] << ",";
+void Particle::print(ostream &out = cout) {  // 印出粒子資訊
+    if (company_->info_->debug_) {
+        for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
+            for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
+                out << binary_[bitIndex] << ",";
+            }
+            out << " ,";
         }
-        out << " ,";
-    }
-    for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
-        out << decimal_[variableIndex] << ",";
+        for (int variableIndex = 0; variableIndex < variableNum_; variableIndex++) {
+            out << decimal_[variableIndex] << ",";
+        }
     }
     out << set_precision(RoR_) << "%," << endl;
 }
 
-void Particle::record_train_test_data(int startRow, int endRow, string *holdDataPtr, vector<vector<string>> *trainFile) {
+void Particle::record_train_test_data(int startRow, int endRow, string *holdDataPtr, vector<vector<string>> *trainFile) {  // 記錄訓練期跟測試期跑完資訊
     isRecordOn_ = true;
     if (holdDataPtr == nullptr) {
         remain_ = company_->info_->iniFundLV_;
@@ -1658,24 +1672,26 @@ void Particle::record_train_test_data(int startRow, int endRow, string *holdData
             trainOrTestData_ += to_string(i) + ",";
         }
         trainOrTestData_ += "\n\n";
-        trainOrTestData_ += "best exp," + to_string(exp_) + "\n";
-        trainOrTestData_ += "best gen," + to_string(gen_) + "\n";
         if (remain_ - company_->info_->iniFundLV_ == 0) {
+            exp_ = 0;
+            gen_ = 0;
             bestCnt_ = 0;
         }
+        trainOrTestData_ += "best exp," + to_string(exp_) + "\n";
+        trainOrTestData_ += "best gen," + to_string(gen_) + "\n";
         trainOrTestData_ += "best cnt," + to_string(bestCnt_) + "\n\n";
         trainOrTestData_ += "trade," + to_string(sellNum_) + "\n";
         trainOrTestData_ += tradeRecord_;
     }
 }
 
-class TrainAPeriod {
+class TrainAPeriod {  // 訓練一個區間
 public:
     CompanyInfo &company_;
     vector<TechTable> &tables_;
 
     vector<Particle> particles_;
-    vector<Particle> globalP_;  // 0:best,1:globalBest,2:globalWorst,3:localBest,4:localWorst
+    vector<Particle> globalP_;  // 0: best, 1: globalBest, 2: globalWorst, 3: localBest, 4: localWorst
     BetaMatrix betaMatrix_;
 
     int startRow_ = -1;
@@ -1693,7 +1709,7 @@ public:
 
     void create_particles();
     void create_betaMatrix();
-    ofstream set_debug_file(int expCnt);
+    ofstream set_debug_file(int expCnt);  // 設定 debug 檔案
     void start_exp(int expCnt);
     void initialize_KNQTS();
     void output_debug_exp(int expCnt);
@@ -1704,7 +1720,7 @@ public:
     void store_exp_gen(int expCnt, int genCnt);
     void update_local();
     void update_global();
-    void run_algo();
+    void choose_algo();
     void QTS();
     void GQTS();
     void GNQTS();
@@ -1751,7 +1767,7 @@ void TrainAPeriod::create_betaMatrix() {
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
 
-ofstream TrainAPeriod::set_debug_file(int expCnt) {
+ofstream TrainAPeriod::set_debug_file(int expCnt) {  // 設定 debug 檔案
     ofstream out;
     if (debug_) {
         string delta = remove_zeros_at_end(actualDelta_);
@@ -1801,7 +1817,7 @@ void TrainAPeriod::start_gen(int expCnt, int genCnt) {
     store_exp_gen(expCnt, genCnt);
     update_local();
     update_global();
-    run_algo();
+    choose_algo();
     output_debug_beta();
 }
 
@@ -1849,7 +1865,7 @@ void TrainAPeriod::update_global() {
     }
 }
 
-void TrainAPeriod::run_algo() {
+void TrainAPeriod::choose_algo() {
     switch (company_.info_->algoIndex_) {
         case 0: {
             if (globalP_[3].RoR_ > 0) {
@@ -1919,7 +1935,7 @@ void TrainAPeriod::GNQTS() {
 }
 
 void TrainAPeriod::KNQTScompare() {
-    switch (company_.info_->compareMode_) {
+    switch (company_.info_->compareMode_) {  // KNQTS用, 0: 比較漢明距, 1: 比較10進位距離
         case 0: {
             auto localBestBinaryIter = globalP_[3].binary_.begin(), localWorstBinaryIter = globalP_[4].binary_.begin();
             for (; localBestBinaryIter != globalP_[3].binary_.end();) {
@@ -1990,7 +2006,7 @@ void TrainAPeriod::update_best(int renewBest) {
     if (globalP_[0].RoR_ < globalP_[1].RoR_) {
         globalP_[0] = globalP_[1];
     }
-    switch (renewBest) {
+    switch (renewBest) {  // 0: 全域最佳解看binary更新，1: 全域最佳解看RoR更新
         case 0: {
             if (globalP_[1].binary_ == globalP_[0].binary_) {
                 globalP_[0].bestCnt_++;
@@ -2010,7 +2026,7 @@ void TrainAPeriod::update_best(int renewBest) {
     }
 }
 
-class Semaphore {
+class Semaphore {  // thread 用
 private:
     mutex mtx;
     condition_variable cv;
@@ -2043,10 +2059,10 @@ private:
 
 public:
     vector<path> goodTrainFiles_;
-    vector<vector<MixedStrategy>> mixedStrategies_;
+    vector<vector<Strategy>> mixedStrategies_;
 
-    void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex);
-    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles);
+    void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex);  // 在不同指標訓練期中選比較好的出來
+    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles);  // mixType_ == 1 用，應該不會再用到
 
     MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath);
 };
@@ -2062,10 +2078,12 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
     // }
 
     // 表現最好的組合
-    trainFilePaths.push_back(techTrainFilePath[6]);
-    trainFilePaths.push_back(techTrainFilePath[3]);
-    trainFilePaths.push_back(techTrainFilePath[0]);
-    trainFilePaths.push_back(techTrainFilePath[5]);
+    if (company_->info_->mixType_ == 3) {  // 如果是mixType 3，需要把mix的路徑放進去
+        trainFilePaths.push_back(techTrainFilePath[6]);
+        trainFilePaths.push_back(techTrainFilePath[3]);
+        trainFilePaths.push_back(techTrainFilePath[0]);
+        trainFilePaths.push_back(techTrainFilePath[5]);
+    }
 
     int trainFilePathsSize = trainFilePaths.size();
 
@@ -2092,7 +2110,7 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
     }
 }
 
-void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {
+void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex) {  // 在不同指標訓練期中選比較好的出來
     goodTrainFiles_.resize(window_->intervalSize_ / 2);
     size_t bestRoRIndex = 0;
     vector<double> everyRoR;
@@ -2103,9 +2121,9 @@ void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTe
     goodTrainFiles_[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
 }
 
-void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {
-    vector<MixedStrategy> strategies;
-    MixedStrategy tmp;
+void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {  // mixType_ == 1 用，應該不會再用到
+    vector<Strategy> strategies;
+    Strategy tmp;
     for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
         string tech = (*iter)[12][0];
         tmp.buy_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
@@ -2117,7 +2135,7 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
 
         strategies.push_back(tmp);
     }
-    vector<MixedStrategy> tmps;
+    vector<Strategy> tmps;
     for (auto iIter = strategies.begin(); iIter != strategies.end(); iIter++) {
         for (auto jIter = strategies.begin(); jIter != strategies.end(); jIter++) {
             tmp.buy_ = (*iIter).buy_;
@@ -2138,7 +2156,7 @@ private:
     string outputPath_;
     TrainWindow *window_;
 
-    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);
+    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);  // mixType_ == 1 用，應該不會再用到
 
 public:
     MixedTechChooseTrainFile mixedTechChooseTrainFile_;
@@ -2165,7 +2183,7 @@ TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vecto
     }
 }
 
-void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {
+void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {  // mixType_ == 1 用，應該不會再用到
     eachIntervalBestP.resize(window_->intervalSize_ / 2);
     Particle p;
     p.init(company_, 0);
@@ -2190,7 +2208,7 @@ void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChoos
     }
 }
 
-class Train {
+class Train {  // 訓練期
 protected:
     CompanyInfo *company_ = nullptr;
     vector<TechTable> tables_;
@@ -2198,13 +2216,13 @@ protected:
 
     Semaphore sem_;
 
-    void set_tables(vector<int> additionTable = {});
-    void print_date_train_file(string &trainFileData, string startDate, string endDate);
+    void set_tables(vector<int> additionTable = {});  // 讀 tech file
+    void print_date_train_file(string &trainFileData, string startDate, string endDate);  // 輸出指定日期的訓練資料
     void train_a_company();
     void train_a_window(TrainWindow window);
     void train_mixed(string &outputPath, TrainWindow &window, vector<string> &trainFilePaths);
     void train_normal(string &outputPath, TrainWindow &window);
-    void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);
+    void output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData);  // 輸出普通訓練資料
 
 public:
     Train(CompanyInfo *company);  // for inheriting
@@ -2235,6 +2253,7 @@ Train::Train(CompanyInfo &company, string startDate, string endDate) : company_(
 }
 
 Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->windowThreadNum_) {  // normal train
+    cout << "train " << company_->info_->techType_ << endl;
     if (!company_->info_->mixedTech_) {
         set_tables();
     } else {
@@ -2260,25 +2279,25 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
     train_a_company();
 }
 
-void Train::set_tables(vector<int> additionTable) {
+void Train::set_tables(vector<int> additionTable) {  // 讀 tech file
     vector<int> tmpTechIndexes = company_->info_->techIndexs_;
     for (auto additionTech : additionTable) {
         tmpTechIndexes.push_back(additionTech);
     }
     sort(tmpTechIndexes.begin(), tmpTechIndexes.end());
 
-    auto get_table = [&](vector<TechTable> &tables, int i, Semaphore &sem) {
+    auto get_table = [company_ = this->company_](vector<TechTable> &tables, int i, Semaphore &sem) {  // 用來讀 TechTable
         sem.wait();
         tables[i] = TechTable(company_, i);
         sem.notify();
     };
     tables_.resize(company_->info_->allTech_.size());
     vector<thread> threads;
-    Semaphore sem(company_->info_->mixedTechNum_);
-    for (auto i : company_->info_->techIndexs_) {
-        if (company_->info_->companyThreadNum_ * company_->info_->mixedTechNum_ < thread::hardware_concurrency()) {
+    Semaphore sem(tmpTechIndexes.size());
+    for (auto i : tmpTechIndexes) {
+        if (company_->info_->companyThreadNum_ * tmpTechIndexes.size() < thread::hardware_concurrency()) {
             threads.push_back(thread(get_table, ref(tables_), i, ref(sem)));
-            this_thread::sleep_for(0.1s);  // 不sleep的話Techtable天數不同會有error
+            this_thread::sleep_for(0.1s);  // 不 sleep 的話 TechTable 天數不同會有 error
         } else {
             tables_[i] = TechTable(company_, i);
         }
@@ -2303,7 +2322,7 @@ void Train::set_tables(vector<int> additionTable) {
     tablesPtr_ = &tables_;
 }
 
-void Train::print_date_train_file(string &trainData, string startDate, string endDate) {
+void Train::print_date_train_file(string &trainData, string startDate, string endDate) {  // // 輸出指定日期的訓練資料
     string title = company_->info_->techType_ + "_";
     title += company_->companyName_ + "_";
     title += company_->info_->algoType_ + "_";
@@ -2389,13 +2408,13 @@ void Train::train_normal(string &outputPath, TrainWindow &window) {
     }
 }
 
-void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {
+void Train::output_train_file(vector<int>::iterator &intervalIter, string &ouputPath, string &trainData) {  // 輸出普通訓練資料
     ofstream out(ouputPath + get_date((*tablesPtr_)[company_->info_->techIndex_].date_, *intervalIter, *(intervalIter + 1)) + ".csv");
     out << trainData;
     out.close();
 }
 
-class TrainLoop {
+class TrainLoop {  // 用來 loop delta
 private:
     CompanyInfo &company_;
     vector<TechTable> tables_;
@@ -2473,7 +2492,7 @@ void Test::set_train_test_file_path() {
     if (algoOrTrad_ == "algo") {
         paths_.trainFilePaths_ = company_->paths_.trainFilePaths_[company_->info_->techIndex_];
         paths_.testFileOutputPath_ = company_->paths_.testFilePaths_[company_->info_->techIndex_];
-    } else {
+    } else if (algoOrTrad_ == "tradition") {
         paths_.trainFilePaths_ = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_];
         paths_.testFileOutputPath_ = company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_];
     }
@@ -2504,20 +2523,14 @@ void Test::check_exception(vector<path> &trainFilePaths, TestWindow &window) {
 }
 
 void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
-    p_.set_strategy(
-        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]),
-        change_vec_string_to_int(thisTrainFile[13]),
-        find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]),
-        change_vec_string_to_int(thisTrainFile[15]));
-    if (p_.strategy_.buy_.techIndex_ < 3 && p_.strategy_.buy_.decimal_.size() > 2) {
-        p_.strategy_.buy_.decimal_ = vector<int>(p_.strategy_.buy_.decimal_.begin(), p_.strategy_.buy_.decimal_.begin() + 2);
-    }
-    if (p_.strategy_.sell_.techIndex_ < 3 && p_.strategy_.sell_.decimal_.size() > 2) {
-        p_.strategy_.sell_.decimal_ = vector<int>(p_.strategy_.sell_.decimal_.begin() + 2, p_.strategy_.sell_.decimal_.end());
-    }
+    int buyIndex = find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[12][0]);
+    vector<int> buyStrategy = change_vec_string_to_int(thisTrainFile[13]);
+    int sellIndex = find_index_of_string_in_vec(company_->info_->allTech_, thisTrainFile[14][0]);
+    vector<int> sellStrategy = change_vec_string_to_int(thisTrainFile[15]);
+    p_.set_strategy(buyIndex, buyStrategy, sellIndex, sellStrategy);
 }
 
-class BH {
+class BH {  // 計算 B&H
 public:
     double BHRoR;
     BH(CompanyInfo &company, string startDate, string endDate) {
@@ -2530,7 +2543,7 @@ public:
     }
 };
 
-class Tradition : public Train {
+class Tradition : public Train {  // 訓練傳統策略
 private:
     vector<Particle> particles_;
     vector<vector<int>> traditionStrategy_;
@@ -2579,7 +2592,7 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
 }
 
 void Tradition::set_tradition_strategy() {
-    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果mixType 2，要把兩種指標傳統策略混合
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果 mixType_ == 2，要把兩種指標傳統策略混合
         for (auto buyStrategy : allTraditionStrategy_[company_->info_->techIndexs_[0]]) {
             for (auto sellStrategy : allTraditionStrategy_[company_->info_->techIndexs_[1]]) {
                 vector<int> tmpStrategy;
@@ -2633,7 +2646,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
     }
 }
 
-class HoldFile : public Test {
+class HoldFile : public Test {  // 計算持有區間跟資金水位
 private:
     bool isTrain_;
     bool isTradition_;
@@ -2678,16 +2691,16 @@ void HoldFile::set_paths_create_Folder() {
     };
     string trainFilePaths;
     string holdFilePath;
-    if (isTrain_ && !isTradition_) {  //train
+    if (isTrain_ && !isTradition_) {  // train
         trainFilePaths = company_->paths_.trainFilePaths_[company_->info_->techIndex_];
         holdFilePath = company_->paths_.trainHoldFilePaths_[company_->info_->techIndex_];
-    } else if (!isTrain_ && !isTradition_) {  //test
+    } else if (!isTrain_ && !isTradition_) {  // test
         trainFilePaths = company_->paths_.testFilePaths_[company_->info_->techIndex_];
         holdFilePath = company_->paths_.testHoldFilePaths_[company_->info_->techIndex_];
-    } else if (isTrain_ && isTradition_) {  //train tradition
+    } else if (isTrain_ && isTradition_) {  // train tradition
         trainFilePaths = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_];
         holdFilePath = company_->paths_.trainTraditionHoldFilePaths_[company_->info_->techIndex_];
-    } else if (!isTrain_ && isTradition_) {  //test tradition
+    } else if (!isTrain_ && isTradition_) {  // test tradition
         trainFilePaths = company_->paths_.testTraditionFilePaths_[company_->info_->techIndex_];
         holdFilePath = company_->paths_.testTraditionHoldFilePaths_[company_->info_->techIndex_];
     }
@@ -2719,35 +2732,21 @@ void HoldFile::cal_hold(vector<path> &filePaths, vector<vector<string>> &thisTar
     out_.close();
 }
 
-class CalIRR {
+class CalARR {
 public:
-    class WindowIRR {
+    class WindowARR {
     public:
         string windowName_;
-        double algoIRR_;
-        double traditionIRR_;
-        double BHIRR_;
+        double algoARR_;
+        double traditionARR_;
+        double BHARR_;
         int rank_;
-        // vector<vector<int>> techChooseTimes_;
-
-        // void resize_vec(size_t allTechSize) {
-        //     techChooseTimes_.resize(2);
-        //     for (auto &row : techChooseTimes_) {
-        //         row.resize(allTechSize);
-        //     }
-        // }
-
-        // void fill_zero() {
-        //     for (auto &row : techChooseTimes_) {
-        //         fill(row.begin(), row.end(), 0);
-        //     }
-        // }
     };
 
-    class CompanyWindowIRRContainer {
+    class CompanyWindowARRContainer {
     public:
         string companyName_;
-        vector<WindowIRR> windowsIRR_;
+        vector<WindowARR> windowsARR_;
     };
 
     class Rank {
@@ -2763,14 +2762,14 @@ public:
         string traditionRoRoutData_;
     };
 
-    class CalOneCompanyIRR {
+    class CalOneCompanyARR {
     public:
         CompanyInfo &company_;
-        vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR_;
+        vector<CompanyWindowARRContainer> &allCompanyWindowsARR_;
         vector<Rank> &allCompanyWindowRank_;
-        CompanyWindowIRRContainer thisCompanyWindowIRR_;
+        CompanyWindowARRContainer thisCompanyWindowARR_;
         CompanyAllRoRData allRoRData_;
-        WindowIRR tmpWinodwIRR_;
+        WindowARR tmpWinodwARR_;
 
         vector<size_t> eachVariableNum_{MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), MA::eachVariableBitsNum_.size(), RSI::eachVariableBitsNum_.size()};
 
@@ -2778,110 +2777,87 @@ public:
         vector<string> trainOrTestPaths_;
 
         void set_filePath();
-        void cal_window_IRRs(TrainWindow &window);
-        double cal_one_IRR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition);
+        void cal_windows_ARR(TrainWindow &window);
+        double cal_one_ARR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition);
         string compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition, vector<int>::iterator &intervalIter);
-        WindowIRR cal_BH_IRR();
-        void rank_algo_and_tradition_window(vector<WindowIRR> &windowsIRR);
-        void sort_by_tradition_IRR(vector<WindowIRR> &windowsIRR);
-        void rank_window(vector<WindowIRR> &windowsIRR);
-        void sort_by_window_name(vector<WindowIRR> &windowsIRR);
-        void sort_by_algo_IRR(vector<WindowIRR> &windowsIRR);
+        WindowARR cal_BH_ARR();
+        void rank_algo_and_tradition_window(vector<WindowARR> &windowsARR);
+        void sort_by_tradition_ARR(vector<WindowARR> &windowsARR);
+        void rank_window(vector<WindowARR> &windowsARR);
+        void sort_by_window_name(vector<WindowARR> &windowsARR);
+        void sort_by_algo_ARR(vector<WindowARR> &windowsARR);
 
-        CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex);
+        CalOneCompanyARR(CompanyInfo &company, vector<CompanyWindowARRContainer> &allCompanyWindowsARR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex);
     };
 
     Info info_;
     vector<path> &companyPricePaths_;
     vector<Rank> allCompanyWindowRank_;
-    vector<CompanyWindowIRRContainer> allCompanyWindowsIRR_;
+    vector<CompanyWindowARRContainer> allCompanyWindowsARR_;
 
     int trainOrTestIndex_;
     vector<string> trainOrTestVec_ = {"train", "test"};
     string trainOrTest_;
 
-    void output_all_IRR();
-    void output_IRR(ofstream &IRRout);
+    void output_all_ARR();
+    void output_ARR(ofstream &ARRout);
     void output_all_window_rank(int rankType);
     vector<string> remove_A2A_and_sort();
 
-    CalIRR(vector<path> &companyPricePaths, string trainOrTest);
+    CalARR(vector<path> &companyPricePaths, string trainOrTest);
 };
 
-CalIRR::CalIRR(vector<path> &companyPricePaths, string trainOrTest) : companyPricePaths_(companyPricePaths), trainOrTest_(trainOrTest) {
+CalARR::CalARR(vector<path> &companyPricePaths, string trainOrTest) : companyPricePaths_(companyPricePaths), trainOrTest_(trainOrTest) {
     trainOrTestIndex_ = find_index_of_string_in_vec(trainOrTestVec_, trainOrTest_);
     for (auto &companyPricePath : companyPricePaths_) {
         CompanyInfo company(companyPricePath, info_);
         TechTable checkStartRow(&company, company.info_->techIndex_ > 3 ? 0 : company.info_->techIndex_, true);
-        CalOneCompanyIRR calOneCompanyIRR(company, allCompanyWindowsIRR_, allCompanyWindowRank_, trainOrTestIndex_);
-        auto output_company_all_window_IRR = [](ofstream &out, const string &outputData) {
+        CalOneCompanyARR calOneCompanyARR(company, allCompanyWindowsARR_, allCompanyWindowRank_, trainOrTestIndex_);
+        auto output_company_all_window_ARR = [](ofstream &out, const string &outputData) {
             out << outputData;
             out.close();
         };
         ofstream out(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_" + trainOrTest_ + "RoR.csv");
-        output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.algoRoRoutData_);
+        output_company_all_window_ARR(out, calOneCompanyARR.allRoRData_.algoRoRoutData_);
         out.open(company.paths_.companyRootPaths_[company.info_->techIndex_] + company.companyName_ + "_" + trainOrTest_ + "TraditionRoR.csv");
-        output_company_all_window_IRR(out, calOneCompanyIRR.allRoRData_.traditionRoRoutData_);
+        output_company_all_window_ARR(out, calOneCompanyARR.allRoRData_.traditionRoRoutData_);
     }
-    output_all_IRR();
+    output_all_ARR();
     output_all_window_rank(0);
 }
 
-void CalIRR::output_all_IRR() {  //輸出以視窗名稱排序以及IRR排序
-    ofstream IRRout(info_.rootFolder_ + trainOrTest_ + "_IRR_IRR_sorted_" + info_.techType_ + ".csv");
-    output_IRR(IRRout);
-    for_each(allCompanyWindowsIRR_.begin(), allCompanyWindowsIRR_.end(), [](CompanyWindowIRRContainer &eachCompanyContainer) {
-        sort(eachCompanyContainer.windowsIRR_.begin(), eachCompanyContainer.windowsIRR_.end(), [](const WindowIRR &w1, const WindowIRR &w2) {
+void CalARR::output_all_ARR() {  //輸出以視窗名稱排序以及ARR排序
+    ofstream ARRout(info_.rootFolder_ + trainOrTest_ + "_ARR_ARR_sorted_" + info_.techType_ + ".csv");
+    output_ARR(ARRout);
+    for_each(allCompanyWindowsARR_.begin(), allCompanyWindowsARR_.end(), [](CompanyWindowARRContainer &eachCompanyContainer) {
+        sort(eachCompanyContainer.windowsARR_.begin(), eachCompanyContainer.windowsARR_.end(), [](const WindowARR &w1, const WindowARR &w2) {
             return w1.windowName_ < w2.windowName_;
         });
     });
-    IRRout.open(info_.rootFolder_ + trainOrTest_ + "_IRR_name_sorted_" + info_.techType_ + ".csv");
-    output_IRR(IRRout);
-    // if (info_.mixedTech_) {
-    //     IRRout.open(info_.rootFolder_ + info_.techType_ + "_tech_choosed.csv");
-    //     vector<string> algoOrTrad{"algo", "tradition"};
-    //     for (auto &company : allCompanyWindowsIRR_) {
-    //         IRRout << "=====" << company.companyName_ << "=====,";
-    //         for (int loop = 0; loop < 2; loop++) {
-    //             for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &techIndex) {
-    //                 IRRout << algoOrTrad[loop] << " choose " << info_.allTech_[techIndex] << ",";
-    //             });
-    //         }
-    //         IRRout << "\n";
-    //         for (auto &eachIRR : company.windowsIRR_) {
-    //             IRRout << eachIRR.windowName_ << ",";
-    //             for_each(eachIRR.techChooseTimes_.begin(), eachIRR.techChooseTimes_.end(), [&](const vector<int> &i) {
-    //                 for_each(info_.techIndexs_.begin(), info_.techIndexs_.end(), [&](const int &j) {
-    //                     IRRout << i[j] << ",";
-    //                 });
-    //             });
-    //             IRRout << "\n";
-    //         }
-    //     }
-    //     IRRout.close();
-    // }
+    ARRout.open(info_.rootFolder_ + trainOrTest_ + "_ARR_name_sorted_" + info_.techType_ + ".csv");
+    output_ARR(ARRout);
 }
 
-void CalIRR::output_IRR(ofstream &IRRout) {
-    for (auto &company : allCompanyWindowsIRR_) {
-        IRRout << "=====" << company.companyName_ << "=====";
-        IRRout << "," << info_.techType_ << " algo," << info_.techType_ << " Tradition,";
+void CalARR::output_ARR(ofstream &ARRout) {
+    for (auto &company : allCompanyWindowsARR_) {
+        ARRout << "=====" << company.companyName_ << "=====";
+        ARRout << "," << info_.techType_ << " algo," << info_.techType_ << " Tradition,";
         if (trainOrTest_ == "train")
-            IRRout << "B&H";
-        IRRout << "\n";
-        for (auto &eachIRR : company.windowsIRR_) {
-            IRRout << eachIRR.windowName_ << ",";
-            IRRout << set_precision(eachIRR.algoIRR_) << ",";
-            IRRout << set_precision(eachIRR.traditionIRR_) << ",";
+            ARRout << "B&H";
+        ARRout << "\n";
+        for (auto &eachARR : company.windowsARR_) {
+            ARRout << eachARR.windowName_ << ",";
+            ARRout << set_precision(eachARR.algoARR_) << ",";
+            ARRout << set_precision(eachARR.traditionARR_) << ",";
             if (trainOrTest_ == "train")
-                IRRout << set_precision(eachIRR.BHIRR_) << ",";
-            IRRout << "\n";
+                ARRout << set_precision(eachARR.BHARR_) << ",";
+            ARRout << "\n";
         }
     }
-    IRRout.close();
+    ARRout.close();
 }
 
-void CalIRR::output_all_window_rank(int rankType) {
+void CalARR::output_all_window_rank(int rankType) {
     vector<string> windowSort = remove_A2A_and_sort();
     ofstream rankOut(info_.rootFolder_ + trainOrTest_ + "_windowRank_" + info_.techType_ + ".csv");
     rankOut << "algo window rank\n,";
@@ -2889,7 +2865,7 @@ void CalIRR::output_all_window_rank(int rankType) {
         rankOut << windowName << ",";
     }
     rankOut << endl;
-    switch (rankType) {
+    switch (rankType) {  // 0: 一般視窗排名, 1: 總和ARR排名
         case 0: {
             for (auto &i : allCompanyWindowRank_) {
                 rankOut << i.companyName_ << ",";
@@ -2909,26 +2885,26 @@ void CalIRR::output_all_window_rank(int rankType) {
             break;
         }
         case 1: {
-            for (auto &company : allCompanyWindowsIRR_) {
+            for (auto &company : allCompanyWindowsARR_) {
                 rankOut << company.companyName_ << ",";
                 if (trainOrTest_ == "train")
                     rankOut << "B&H";
-                for (auto &eachIRR : company.windowsIRR_) {
-                    rankOut << set_precision(eachIRR.algoIRR_) << ",";
+                for (auto &eachARR : company.windowsARR_) {
+                    rankOut << set_precision(eachARR.algoARR_) << ",";
                     if (trainOrTest_ == "train")
-                        rankOut << set_precision(eachIRR.BHIRR_) << ",";
+                        rankOut << set_precision(eachARR.BHARR_) << ",";
                 }
                 rankOut << "\n";
             }
             rankOut << "\n\ntradition window rank\n";
-            for (auto &company : allCompanyWindowsIRR_) {
+            for (auto &company : allCompanyWindowsARR_) {
                 rankOut << company.companyName_ << ",";
                 if (trainOrTest_ == "train")
                     rankOut << "B&H";
-                for (auto &eachIRR : company.windowsIRR_) {
-                    rankOut << set_precision(eachIRR.traditionIRR_) << ",";
+                for (auto &eachARR : company.windowsARR_) {
+                    rankOut << set_precision(eachARR.traditionARR_) << ",";
                     if (trainOrTest_ == "train")
-                        rankOut << set_precision(eachIRR.BHIRR_) << ",";
+                        rankOut << set_precision(eachARR.BHARR_) << ",";
                 }
                 rankOut << "\n";
             }
@@ -2938,7 +2914,7 @@ void CalIRR::output_all_window_rank(int rankType) {
     rankOut.close();
 }
 
-vector<string> CalIRR::remove_A2A_and_sort() {
+vector<string> CalARR::remove_A2A_and_sort() {
     vector<string> windowSort = info_.slidingWindows_;
     auto A2Aiter = find(windowSort.begin(), windowSort.end(), "A2A");
     if (A2Aiter != windowSort.end())
@@ -2948,30 +2924,27 @@ vector<string> CalIRR::remove_A2A_and_sort() {
     return windowSort;
 }
 
-CalIRR::CalOneCompanyIRR::CalOneCompanyIRR(CompanyInfo &company, vector<CompanyWindowIRRContainer> &allCompanyWindowsIRR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex) : company_(company), allCompanyWindowsIRR_(allCompanyWindowsIRR), allCompanyWindowRank_(allCompanyWindowRank), trainOrTestIndex_(trainOrTestIndex) {
+CalARR::CalOneCompanyARR::CalOneCompanyARR(CompanyInfo &company, vector<CompanyWindowARRContainer> &allCompanyWindowsARR, vector<Rank> &allCompanyWindowRank, int trainOrTestIndex) : company_(company), allCompanyWindowsARR_(allCompanyWindowsARR), allCompanyWindowRank_(allCompanyWindowRank), trainOrTestIndex_(trainOrTestIndex) {
     set_filePath();
-    thisCompanyWindowIRR_.companyName_ = company_.companyName_;
-    // if (company_.info_->mixedTech_) {
-    //     tmpWinodwIRR_.resize_vec(company_.info_->allTech_.size());
-    // }
+    thisCompanyWindowARR_.companyName_ = company_.companyName_;
     for (auto &windowName : company_.info_->slidingWindows_) {
         if (windowName != "A2A") {
-            cout << windowName << endl;
+            // cout << windowName << endl;
             TrainWindow window(company_, windowName);
             if (window.interval_[0] >= 0) {
-                cal_window_IRRs(window);
+                cal_windows_ARR(window);
             } else {
                 cout << "no " << window.windowName_ << " train window in " << company_.companyName_;
                 cout << ", skip this window" << endl;
             }
         }
     }
-    thisCompanyWindowIRR_.windowsIRR_.push_back(cal_BH_IRR());
-    rank_algo_and_tradition_window(thisCompanyWindowIRR_.windowsIRR_);
-    allCompanyWindowsIRR_.push_back(thisCompanyWindowIRR_);
+    thisCompanyWindowARR_.windowsARR_.push_back(cal_BH_ARR());
+    rank_algo_and_tradition_window(thisCompanyWindowARR_.windowsARR_);
+    allCompanyWindowsARR_.push_back(thisCompanyWindowARR_);
 }
 
-void CalIRR::CalOneCompanyIRR::set_filePath() {
+void CalARR::CalOneCompanyARR::set_filePath() {
     if (trainOrTestIndex_ == 0) {
         trainOrTestPaths_ = {company_.paths_.trainFilePaths_[company_.info_->techIndex_], company_.paths_.trainTraditionFilePaths_[company_.info_->techIndex_]};
     } else {
@@ -2979,21 +2952,25 @@ void CalIRR::CalOneCompanyIRR::set_filePath() {
     }
 }
 
-void CalIRR::CalOneCompanyIRR::cal_window_IRRs(TrainWindow &window) {
-    tmpWinodwIRR_.algoIRR_ = cal_one_IRR(allRoRData_.algoRoRoutData_, window, trainOrTestPaths_.front(), false);
-    tmpWinodwIRR_.traditionIRR_ = cal_one_IRR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);
+void CalARR::CalOneCompanyARR::cal_windows_ARR(TrainWindow &window) {
+    tmpWinodwARR_.algoARR_ = cal_one_ARR(allRoRData_.algoRoRoutData_, window, trainOrTestPaths_.front(), false);
+    tmpWinodwARR_.traditionARR_ = cal_one_ARR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);
+    // double BH_DRR = 0;
+    // double BH_RoR = 0;
     if (trainOrTestIndex_ == 0) {
         string trainStartDate = company_.date_[window.interval_.front() + company_.tableStartRow_];
         string trainEndDate = company_.date_[window.interval_.back() + company_.tableStartRow_];
         BH bh(company_, trainStartDate, trainEndDate);
-        tmpWinodwIRR_.BHIRR_ = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front()) * company_.oneYearDays_) - 1.0;
+        tmpWinodwARR_.BHARR_ = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front() + 1) * company_.oneYearDays_) - 1.0;
+        // BH_RoR = bh.BHRoR;
+        // BH_DRR = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front() + 1)) - 1.0;
     }
-    tmpWinodwIRR_.windowName_ = window.windowName_;
-    thisCompanyWindowIRR_.windowsIRR_.push_back(tmpWinodwIRR_);
-    // tmpWinodwIRR_.fill_zero();
+    tmpWinodwARR_.windowName_ = window.windowName_;
+    thisCompanyWindowARR_.windowsARR_.push_back(tmpWinodwARR_);
+    // cout << window.windowName_ + "," << window.interval_.back() - window.interval_.front() + 1 << "," << set_precision(tmpWinodwARR_.BHARR_) << "," << set_precision(BH_RoR) << "," << set_precision(BH_DRR) << endl;
 }
 
-double CalIRR::CalOneCompanyIRR::cal_one_IRR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition) {
+double CalARR::CalOneCompanyARR::cal_one_ARR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition) {
     RoRoutData += window.windowName_ + ",";
     double totalRoR = 0;
     if (!exists(stratgyFilePath + window.windowName_)) {  // 如果傳統的還沒做，回傳-1
@@ -3004,34 +2981,34 @@ double CalIRR::CalOneCompanyIRR::cal_one_IRR(string &RoRoutData, TrainWindow &wi
     for (; filePathIter != strategyPaths.end(); filePathIter++, intervalIter += 2) {
         RoRoutData += compute_and_record_window_RoR(strategyPaths, filePathIter, totalRoR, tradition, intervalIter);
     }
-    double windowIRR = 0;
+    double windowARR = 0;
     if (trainOrTestIndex_ == 0) {
         totalRoR = totalRoR / (window.intervalSize_ / 2);
-        windowIRR = pow(totalRoR--, company_.oneYearDays_) - 1.0;
+        windowARR = pow(totalRoR--, company_.oneYearDays_) - 1.0;
     } else {
-        windowIRR = pow(totalRoR--, 1.0 / company_.info_->testLength_) - 1.0;
+        windowARR = pow(totalRoR--, 1.0 / company_.info_->testLength_) - 1.0;
     }
-    RoRoutData += ",,,,,,,,,," + window.windowName_ + "," + set_precision(totalRoR) + "," + set_precision(windowIRR) + "\n\n";
-    return windowIRR;
+    RoRoutData += ",,,,,,,,,," + window.windowName_ + "," + set_precision(totalRoR) + "," + set_precision(windowARR) + "\n\n";
+    return windowARR;
 }
 
-string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition, vector<int>::iterator &intervalIter) {
+string CalARR::CalOneCompanyARR::compute_and_record_window_RoR(vector<path> &strategyPaths, const vector<path>::iterator &filePathIter, double &totalRoR, bool tradition, vector<int>::iterator &intervalIter) {
     vector<vector<string>> file = read_data(*filePathIter);
     double RoR = stod(file[10][1]);
     string push;
-    auto cal_IRR = [](double periodDays, double RoR) {
+    auto cal_ARR = [](double periodDays, double RoR) {
         return pow(RoR / 100.0 + 1.0, 1.0 / periodDays);
     };
     if (filePathIter == strategyPaths.begin()) {
         if (trainOrTestIndex_ == 0) {
-            totalRoR = cal_IRR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
+            totalRoR = cal_ARR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
         } else {
             totalRoR = RoR / 100.0 + 1.0;
         }
         push += filePathIter->stem().string() + ",";
     } else {
         if (trainOrTestIndex_ == 0) {
-            totalRoR += cal_IRR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
+            totalRoR += cal_ARR(*(intervalIter + 1) - *(intervalIter) + 1.0, RoR);
         } else {
             totalRoR = totalRoR * (RoR / 100.0 + 1.0);
         }
@@ -3052,66 +3029,66 @@ string CalIRR::CalOneCompanyIRR::compute_and_record_window_RoR(vector<path> &str
     return push;
 }
 
-CalIRR::WindowIRR CalIRR::CalOneCompanyIRR::cal_BH_IRR() {
+CalARR::WindowARR CalARR::CalOneCompanyARR::cal_BH_ARR() {
     BH bh(company_, company_.date_[company_.testStartRow_], company_.date_[company_.testEndRow_]);
-    tmpWinodwIRR_.windowName_ = "B&H";
-    tmpWinodwIRR_.algoIRR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_->testLength_) - 1.0;
-    tmpWinodwIRR_.traditionIRR_ = tmpWinodwIRR_.algoIRR_;
-    tmpWinodwIRR_.BHIRR_ = tmpWinodwIRR_.algoIRR_;
-    return tmpWinodwIRR_;
+    tmpWinodwARR_.windowName_ = "B&H";
+    tmpWinodwARR_.algoARR_ = pow(bh.BHRoR + 1.0, 1.0 / company_.info_->testLength_) - 1.0;
+    tmpWinodwARR_.traditionARR_ = tmpWinodwARR_.algoARR_;
+    tmpWinodwARR_.BHARR_ = tmpWinodwARR_.algoARR_;
+    return tmpWinodwARR_;
 }
 
-void CalIRR::CalOneCompanyIRR::rank_algo_and_tradition_window(vector<WindowIRR> &windowsIRR) {
+void CalARR::CalOneCompanyARR::rank_algo_and_tradition_window(vector<WindowARR> &windowsARR) {
     Rank tmpRank;
     tmpRank.companyName_ = company_.companyName_;
-    sort_by_tradition_IRR(windowsIRR);  //將視窗按照傳統的IRR排序
-    rank_window(windowsIRR);
-    sort_by_window_name(windowsIRR);  //將視窗按照名字排序
-    for (auto &windowIRR : windowsIRR) {
-        tmpRank.traditionWindowRank_.push_back(windowIRR.rank_);
+    sort_by_tradition_ARR(windowsARR);  // 將視窗按照傳統的ARR排序
+    rank_window(windowsARR);
+    sort_by_window_name(windowsARR);  // 將視窗按照名字排序
+    for (auto &windowARR : windowsARR) {
+        tmpRank.traditionWindowRank_.push_back(windowARR.rank_);
     }
-    sort_by_algo_IRR(windowsIRR);  //將視窗按照用演算法的IRR排序
-    rank_window(windowsIRR);
-    sort_by_window_name(windowsIRR);  //將視窗按照名字排序
-    for (auto &windowIRR : windowsIRR) {
-        tmpRank.algoWindowRank_.push_back(windowIRR.rank_);
+    sort_by_algo_ARR(windowsARR);  // 將視窗按照用演算法的ARR排序
+    rank_window(windowsARR);
+    sort_by_window_name(windowsARR);  // 將視窗按照名字排序
+    for (auto &windowARR : windowsARR) {
+        tmpRank.algoWindowRank_.push_back(windowARR.rank_);
     }
-    sort_by_algo_IRR(windowsIRR);
+    sort_by_algo_ARR(windowsARR);
     allCompanyWindowRank_.push_back(tmpRank);
 }
 
-void CalIRR::CalOneCompanyIRR::sort_by_tradition_IRR(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.traditionIRR_ > w2.traditionIRR_; });
+void CalARR::CalOneCompanyARR::sort_by_tradition_ARR(vector<WindowARR> &windowsARR) {
+    sort(windowsARR.begin(), windowsARR.end(), [](const WindowARR &w1, const WindowARR &w2) { return w1.traditionARR_ > w2.traditionARR_; });
 }
 
-void CalIRR::CalOneCompanyIRR::rank_window(vector<WindowIRR> &windowsIRR) {
-    for (int i = 0; i < windowsIRR.size(); i++) {
-        windowsIRR[i].rank_ = i + 1;
+void CalARR::CalOneCompanyARR::rank_window(vector<WindowARR> &windowsARR) {
+    for (int i = 0; i < windowsARR.size(); i++) {
+        windowsARR[i].rank_ = i + 1;
     }
 }
 
-void CalIRR::CalOneCompanyIRR::sort_by_window_name(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.windowName_ < w2.windowName_; });
+void CalARR::CalOneCompanyARR::sort_by_window_name(vector<WindowARR> &windowsARR) {
+    sort(windowsARR.begin(), windowsARR.end(), [](const WindowARR &w1, const WindowARR &w2) { return w1.windowName_ < w2.windowName_; });
 }
 
-void CalIRR::CalOneCompanyIRR::sort_by_algo_IRR(vector<WindowIRR> &windowsIRR) {
-    sort(windowsIRR.begin(), windowsIRR.end(), [](const WindowIRR &w1, const WindowIRR &w2) { return w1.algoIRR_ > w2.algoIRR_; });
+void CalARR::CalOneCompanyARR::sort_by_algo_ARR(vector<WindowARR> &windowsARR) {
+    sort(windowsARR.begin(), windowsARR.end(), [](const WindowARR &w1, const WindowARR &w2) { return w1.algoARR_ > w2.algoARR_; });
 }
 
-class MergeIRRFile {  //這邊會將mixed IRR file全部放在一起輸出成一個csv方便比較，可能用不到，直接打開csv手動複製就好
+class MergeARRFile {  // 這邊會將mixed ARR file全部放在一起輸出成一個csv方便比較，可能用不到，直接打開csv手動複製就好
 public:
     Info *info_;
 
-    MergeIRRFile(Info *info);
+    MergeARRFile(Info *info);
 };
 
-MergeIRRFile::MergeIRRFile(Info *info) : info_(info) {
+MergeARRFile::MergeARRFile(Info *info) : info_(info) {
     if (info_->techIndexs_.size() > 1) {
         vector<vector<vector<string>>> files;
         for (auto &techIndex : info_->techIndexs_) {
-            files.push_back(read_data(info_->rootFolder_ + info_->allTech_[techIndex] + "_test_IRR.csv"));
+            files.push_back(read_data(info_->rootFolder_ + info_->allTech_[techIndex] + "_test_ARR.csv"));
         }
-        vector<vector<string>> newFile = read_data(info_->rootFolder_ + info_->techType_ + "_test_IRR.csv");
+        vector<vector<string>> newFile = read_data(info_->rootFolder_ + info_->techType_ + "_test_ARR.csv");
         for (auto &file : files) {
             for (size_t row = 0; row < file.size(); row++) {
                 for (size_t col = 0; col < file[row].size(); col++) {
@@ -3119,7 +3096,7 @@ MergeIRRFile::MergeIRRFile(Info *info) : info_(info) {
                 }
             }
         }
-        ofstream n(info_->rootFolder_ + "merge_" + info_->techType_ + "_IRR.csv");
+        ofstream n(info_->rootFolder_ + "merge_" + info_->techType_ + "_ARR.csv");
         for (auto &row : newFile) {
             for (auto &col : row) {
                 n << col << ",";
@@ -3130,7 +3107,7 @@ MergeIRRFile::MergeIRRFile(Info *info) : info_(info) {
     }
 }
 
-class SortIRRFileBy {  //選擇特定的IRR file，將整份文件以視窗名稱排序，或是以IRR排序(用第幾個col調整)
+class SortARRFileBy {  // 選擇特定的ARR file，將整份文件以視窗名稱排序，或是以ARR排序(用第幾個col調整)
 public:
     typedef vector<vector<vector<string>>::iterator> equalIterType;
     Info *info_;
@@ -3139,22 +3116,22 @@ public:
 
     equalIterType findEqualSign(vector<vector<string>> &inputFile);
     void sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter);
-    void sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter);
+    void sortByARR(vector<vector<string>> &inputFile, equalIterType &equalSignIter);
 
-    SortIRRFileBy(Info *info, string inpuFileName, int colToSort);
-    SortIRRFileBy(vector<vector<string>> &inputFile, int colToSort);
+    SortARRFileBy(Info *info, string inpuFileName, int colToSort);
+    SortARRFileBy(vector<vector<string>> &inputFile, int colToSort);
 };
 
-SortIRRFileBy::SortIRRFileBy(vector<vector<string>> &inputFile, int colToSort) : colToSort_(colToSort) {
+SortARRFileBy::SortARRFileBy(vector<vector<string>> &inputFile, int colToSort) : colToSort_(colToSort) {
     equalIterType equalSignIter = findEqualSign(inputFile);
-    sortByIRR(inputFile, equalSignIter);
+    sortByARR(inputFile, equalSignIter);
 }
 
-SortIRRFileBy::SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : info_(info), colToSort_(colToSort) {
+SortARRFileBy::SortARRFileBy(Info *info, string inpuFileName, int colToSort) : info_(info), colToSort_(colToSort) {
     sortBy_ = [](int colToSort) {
         if (colToSort == 0)
             return "name";
-        return "IRR";
+        return "ARR";
     }(colToSort_);
     inpuFileName += ".csv";
     vector<vector<string>> inputFile = read_data(info_->rootFolder_ + inpuFileName);
@@ -3162,7 +3139,7 @@ SortIRRFileBy::SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : i
     if (colToSort_ == 0)
         sortByName(inputFile, equalSignIter);
     else
-        sortByIRR(inputFile, equalSignIter);
+        sortByARR(inputFile, equalSignIter);
 
     ofstream sortedFile(info_->rootFolder_ + cut_string(inpuFileName, '.')[0] + "_sorted_by_" + sortBy_ + ".csv");
     for (auto &row : inputFile) {
@@ -3174,7 +3151,7 @@ SortIRRFileBy::SortIRRFileBy(Info *info, string inpuFileName, int colToSort) : i
     sortedFile.close();
 }
 
-SortIRRFileBy::equalIterType SortIRRFileBy::findEqualSign(vector<vector<string>> &inputFile) {
+SortARRFileBy::equalIterType SortARRFileBy::findEqualSign(vector<vector<string>> &inputFile) {
     equalIterType equalSignIter;
     for (auto iter = inputFile.begin(); iter != inputFile.end(); iter++) {
         if ((*iter).front().front() == '=') {
@@ -3185,7 +3162,7 @@ SortIRRFileBy::equalIterType SortIRRFileBy::findEqualSign(vector<vector<string>>
     return equalSignIter;
 }
 
-void SortIRRFileBy::sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
+void SortARRFileBy::sortByName(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
     for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
         sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [](const vector<string> &s1, const vector<string> &s2) {
             return s1[0] < s2[0];
@@ -3193,7 +3170,7 @@ void SortIRRFileBy::sortByName(vector<vector<string>> &inputFile, equalIterType 
     }
 }
 
-void SortIRRFileBy::sortByIRR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
+void SortARRFileBy::sortByARR(vector<vector<string>> &inputFile, equalIterType &equalSignIter) {
     for (size_t eachEqualIndex = 0; eachEqualIndex < equalSignIter.size() - 1; eachEqualIndex++) {
         sort(equalSignIter[eachEqualIndex] + 1, equalSignIter[eachEqualIndex + 1], [&](const vector<string> &s1, const vector<string> &s2) {
             return stod(s1[colToSort_]) > stod(s2[colToSort_]);
@@ -3210,22 +3187,22 @@ public:
 
     void start_copy(string companyRootPath, string fromFolder, string toFolder, string trainOrTest, string company, string window);
     void copyBestHold(vector<vector<string>> &companyBestPeriod);
-    vector<vector<string>> findBestWindow(vector<vector<string>> &IRRFile);
+    vector<vector<string>> findBestWindow(vector<vector<string>> &ARRFile);
 
-    FindBestHold(Info *info, string IRRFileName, string algoOrTrad);
+    FindBestHold(Info *info, string ARRFileName, string algoOrTrad);
 };
 
-FindBestHold::FindBestHold(Info *info, string IRRFileName, string algoOrTrad) : info_(info), trainOrTest_(cut_string(IRRFileName, '_')[0]), algoOrTrad_(algoOrTrad) {
-    IRRFileName += ".csv";
+FindBestHold::FindBestHold(Info *info, string ARRFileName, string algoOrTrad) : info_(info), trainOrTest_(cut_string(ARRFileName, '_')[0]), algoOrTrad_(algoOrTrad) {
+    ARRFileName += ".csv";
     techUse_ = [&]() {
         string sorted = "sorted_";
-        size_t found = IRRFileName.find(sorted) + sorted.length();
-        return cut_string(IRRFileName.substr(found, IRRFileName.length() - found), '.')[0];
+        size_t found = ARRFileName.find(sorted) + sorted.length();
+        return cut_string(ARRFileName.substr(found, ARRFileName.length() - found), '.')[0];
     }();
-    vector<vector<string>> IRRFile = read_data(info_->rootFolder_ + IRRFileName);
-    vector<vector<string>> companyBestWindow1 = findBestWindow(IRRFile);
-    SortIRRFileBy sortIRRFileBy(IRRFile, 2);
-    vector<vector<string>> companyBestWindow2 = findBestWindow(IRRFile);
+    vector<vector<string>> ARRFile = read_data(info_->rootFolder_ + ARRFileName);
+    vector<vector<string>> companyBestWindow1 = findBestWindow(ARRFile);
+    SortARRFileBy sortARRFileBy(ARRFile, 2);
+    vector<vector<string>> companyBestWindow2 = findBestWindow(ARRFile);
     auto [bestIter1, bestIter2] = tuple{companyBestWindow1.begin(), companyBestWindow2.begin()};
     for (; bestIter1 != companyBestWindow1.end(); bestIter1++, bestIter2++) {
         (*bestIter1).push_back((*bestIter2)[1]);
@@ -3233,9 +3210,9 @@ FindBestHold::FindBestHold(Info *info, string IRRFileName, string algoOrTrad) : 
     copyBestHold(companyBestWindow1);
 }
 
-vector<vector<string>> FindBestHold::findBestWindow(vector<vector<string>> &IRRFile) {
+vector<vector<string>> FindBestHold::findBestWindow(vector<vector<string>> &ARRFile) {
     vector<vector<string>> companyBestWindow;
-    for (auto rowIter = IRRFile.begin(); rowIter != IRRFile.end(); rowIter++) {
+    for (auto rowIter = ARRFile.begin(); rowIter != ARRFile.end(); rowIter++) {
         if ((*rowIter)[0].front() == '=') {
             vector<string> toPush;
             toPush.push_back((*rowIter)[0]);
@@ -3279,21 +3256,21 @@ public:
     ofstream out_;
     inline static bool ifAsked_ = false;
 
-    void reset_file(path fileName);
+    int reset_file(path fileName);
 
     ResetFile(CompanyInfo *company);
 };
 
 ResetFile::ResetFile(CompanyInfo *company) : company_(company) {
-    if (!ifAsked_) {
-        cout << "this will reset the formate of the file" << endl;
-        cout << "enter y to continue, enter any other key to abort" << endl;
-        char check;
-        cin >> check;
-        ifAsked_ = true;
-        if (check != 'y')
-            exit(0);
-    }
+    // if (!ifAsked_) {
+    //     cout << "this will reset the formate of the file" << endl;
+    //     cout << "enter y to continue, enter any other key to abort" << endl;
+    //     char check;
+    //     cin >> check;
+    //     ifAsked_ = true;
+    //     if (check != 'y')
+    //         exit(0);
+    // }
     TechTable checkStartRow(company_, company_->info_->techIndex_ > 3 ? 0 : company_->info_->techIndex_, true);
     cout << company_->companyName_ << endl;
     for (int i = 0; i < 4; i++) {
@@ -3331,47 +3308,54 @@ ResetFile::ResetFile(CompanyInfo *company) : company_(company) {
     }
 }
 
-void ResetFile::reset_file(path fileName) {
+int ResetFile::reset_file(path fileName) {
     vector<vector<string>> file = read_data(fileName);
-    tech_ = file[0][1];
-    if (tech_ == "SMA") {
-        variNum_ = 4;
-    } else if (tech_ == "RSI") {
-        variNum_ = 3;
-    } else if (variNum_ == 0) {
-        cout << "tech is not defind" << endl;
-        exit(1);
+    if (file[13].size() > 2) {
+        file[15] = vector<string>(file[13].begin() + 2, file[13].begin() + 4);
+        file[13] = vector<string>(file[13].begin() + 0, file[13].begin() + 2);
+    } else {
+        return 0;
     }
-    if (file[12][0] != "SMA" and file[12][0] != "RSI") {
-        vector<string> vecTech = {tech_};
-        auto iter = file.begin();
+    // tech_ = file[0][1];
+    // if (tech_ == "SMA") {
+    //     variNum_ = 4;
+    // } else if (tech_ == "RSI") {
+    //     variNum_ = 3;
+    // } else if (variNum_ == 0) {
+    //     cout << "tech is not defind" << endl;
+    //     exit(1);
+    // }
+    // if (file[12][0] != "SMA" and file[12][0] != "RSI") {
+    //     vector<string> vecTech = {tech_};
+    //     auto iter = file.begin();
 
-        vector<int> stratey;
-        for (int i = 0; i < variNum_; i++) {
-            stratey.push_back(stoi(file[i + 12][1]));
-        }
-        vector<string> s;
-        for (auto i : stratey) {
-            s.push_back(to_string(i));
-        }
+    //     vector<int> stratey;
+    //     for (int i = 0; i < variNum_; i++) {
+    //         stratey.push_back(stoi(file[i + 12][1]));
+    //     }
+    //     vector<string> s;
+    //     for (auto i : stratey) {
+    //         s.push_back(to_string(i));
+    //     }
 
-        file.erase(iter + 12, iter + 12 + variNum_);
-        for (int i = 0; i < 2; i++) {
-            file.insert(iter + 12, s);
-            file.insert(iter + 12, vecTech);
-        }
-        // vector<string> s;
-        // file.insert(iter + 16, s);
+    //     file.erase(iter + 12, iter + 12 + variNum_);
+    //     for (int i = 0; i < 2; i++) {
+    //         file.insert(iter + 12, s);
+    //         file.insert(iter + 12, vecTech);
+    //     }
+    //     // vector<string> s;
+    //     // file.insert(iter + 16, s);
 
-        out_.open(fileName);
-        for (auto &s : file) {
-            for (auto ss : s) {
-                out_ << ss << ",";
-            }
-            out_ << "\n";
+    // }
+    out_.open(fileName);
+    for (auto &s : file) {
+        for (auto ss : s) {
+            out_ << ss << ",";
         }
-        out_.close();
+        out_ << "\n";
     }
+    out_.close();
+    return 0;
 }
 
 class RunMode {
@@ -3407,9 +3391,9 @@ private:
             }
             case 10: {
                 cout << " mode 10" << endl;
-                // Test(company, company.info_->setWindow_, false, true, vector<int>{0});
-                // Tradition tradition(company);
-                // Train train(company, "2011-12-01", "2011-12-30");
+                // company.output_tech_file(company.info_->techIndex_);  // 輸出技術指標資料
+                // TechTable table(&company, company.info_->techIndex_);  // 輸出讀進來的技術指標資料到一份csv
+                // Train train(company, "2011-12-01", "2011-12-30");  // 訓練特定日期
                 // Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
                 // Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
                 // Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
@@ -3417,7 +3401,6 @@ private:
                 // Test test(company, company.info_->setWindow_, false, true, vector<int>{0});
                 // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
                 // TrainLoop loop(company);
-                // company.output_Tech(company.info_->techIndex_);
                 // HoldFile holdFile(&company, "train", "algo");
                 // HoldFile holFile1(&company, "test", "algo");
                 // ResetFile resetFile(&company);
@@ -3447,13 +3430,22 @@ public:
 static vector<path> set_company_price_paths(const Info &info) {
     vector<path> companiesPricePath = get_path(info.priceFolder_);
     if (info.setCompany_ != "all") {
-        vector<string> setCcompany = cut_string(info.setCompany_);
         auto find_Index = [&](string &traget) {
             return distance(companiesPricePath.begin(), find_if(companiesPricePath.begin(), companiesPricePath.end(), [&](path &pricePath) { return pricePath.stem() == traget; }));
         };
-        size_t startIndex = find_Index(setCcompany.front());
-        size_t endIndex = find_Index(setCcompany.back()) + 1;
-        companiesPricePath = vector<path>(companiesPricePath.begin() + startIndex, companiesPricePath.begin() + endIndex);
+        if (info.setCompany_.find(",") != string::npos) {
+            vector<string> setCcompany = cut_string(info.setCompany_, ',');
+            vector<path> tmp;
+            for (auto companyName: setCcompany) {
+                tmp.push_back(companiesPricePath[find_Index(companyName)]);
+            }
+            companiesPricePath = tmp;
+        } else {
+            vector<string> setCcompany = cut_string(info.setCompany_);
+            size_t startIndex = find_Index(setCcompany.front());
+            size_t endIndex = find_Index(setCcompany.back()) + 1;
+            companiesPricePath = vector<path>(companiesPricePath.begin() + startIndex, companiesPricePath.begin() + endIndex);
+        }
     }
     return companiesPricePath;
 }
@@ -3471,17 +3463,17 @@ int main(int argc, const char *argv[]) {
                 if (check != 'y')
                     exit(0);
             }
-            // for (; _info.mode_ < 4; _info.mode_++) {
+            for (; _info.mode_ < 2; _info.mode_++) {
             RunMode runMode(_info, companyPricePaths);
-            // }
+            }
         } 
         else {
-            // CalIRR calIRR(companyPricePaths, "train");
-            // CalIRR calIRR1(companyPricePaths, "test");
-            // MergeIRRFile mergeFile;
-            // SortIRRFileBy IRR(&_info, "train_IRR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "train_IRR_IRR_sorted_SMA_RSI_3", "algo");
-            // FindBestHold findBestHold1(&_info, "test_IRR_IRR_sorted_SMA_RSI_3", "algo");
+            // CalARR calARR(companyPricePaths, "train");
+            // CalARR calARR1(companyPricePaths, "test");
+            // MergeARRFile mergeFile;
+            // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);
+            // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");
+            // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
