@@ -2812,10 +2812,10 @@ public:
     void output_all_window_rank(int rankType);
     vector<string> remove_A2A_and_sort();
 
-    CalARR(vector<path> &companyPricePaths, string trainOrTest);
+    CalARR(vector<path> &companyPricePaths, string trainOrTest, Info &info);
 };
 
-CalARR::CalARR(vector<path> &companyPricePaths, string trainOrTest) : companyPricePaths_(companyPricePaths), trainOrTest_(trainOrTest) {
+CalARR::CalARR(vector<path> &companyPricePaths, string trainOrTest, Info &info) : companyPricePaths_(companyPricePaths), trainOrTest_(trainOrTest), info_(info) {
     trainOrTestIndex_ = find_index_of_string_in_vec(trainOrTestVec_, trainOrTest_);
     for (auto &companyPricePath : companyPricePaths_) {
         CompanyInfo company(companyPricePath, info_);
@@ -3470,8 +3470,8 @@ int main(int argc, const char *argv[]) {
             }
         } 
         else {
-            // CalARR calARR(companyPricePaths, "train");  // 輸出訓練期所有ARR
-            // CalARR calARR1(companyPricePaths, "test");  // 輸出測試期所有ARR
+            // CalARR calARR(companyPricePaths, "train", _info);  // 輸出訓練期所有ARR
+            // CalARR calARR1(companyPricePaths, "test", _info);  // 輸出測試期所有ARR
             // MergeARRFile mergeFile;  // 合併檔案
             // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);  // 根據ARR或是視窗名稱排序ARR file
             // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo訓練期每間公司最好的持有區間
