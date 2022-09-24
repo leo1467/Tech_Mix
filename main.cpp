@@ -1,3 +1,4 @@
+// https://github.com/leo1467/Tech_Mix
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -25,14 +26,15 @@ using namespace filesystem;  // C++17以上才有的library
 
 class Info {  // 放各種參數，要改參數大部分都在這邊
 public:
-    int mode_ = 0;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能, 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能
+    int mode_ = 10;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能, 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能
     string setCompany_ = "AAPL";  // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
-    string setWindow_ = "all";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
+    string setWindow_ = "Y2Y";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
 
-    vector<int> techIndexs_ = {3, 0};  // 0: SMA, 1: WMA, 2: EMA, 3: RSI, if mixType_ == 2, 先後順序決定買賣指標(買, 賣)
-    int mixType_ = 2;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
+    vector<int> techIndexs_ = {0};  // 0: SMA, 1: WMA, 2: EMA, 3: RSI, if mixType_ 2, 先後順序決定買賣指標(買, 賣)
+    int mixType_ = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
     bool mixedTech_;
     int techIndex_;
+    vector<int> instantTrade = {};  // instant_trade用的指標，配合techIndexs_使用，如SMA會是{5, 20, 5, 20}，RSI{14, 30, 70}, HI-SR{5, 20, 14, 30, 70}, HI-RS{14, 30, 70, 5, 20}
 
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     string techType_;
@@ -67,7 +69,7 @@ public:
     string priceFolder_ = "price_2021/";  // 股價的folder名稱，通常不會換，只有在更新股價檔的時後才改，股價資料夾要放在同一個路徑
 
     string expFolder_ = "exp_result/";  // 所有的實驗的output都在這裡
-    string rootFolder_ = "resultxxx_";  // 訓練期及測試期的相關資料在這
+    string rootFolder_ = "result_";  // 訓練期及測試期的相關資料在這
     string techFolder_ = "tech/";  // 存計算出來的技術指標
 
     vector<string> slidingWindows_ = {"A2A", "YYY2YYY", "YYY2YY", "YYY2YH", "YYY2Y", "YYY2H", "YYY2Q", "YYY2M", "YY2YY", "YY2YH", "YY2Y", "YY2H", "YY2Q", "YY2M", "YH2YH", "YH2Y", "YH2H", "YH2Q", "YH2M", "Y2Y", "Y2H", "Y2Q", "Y2M", "H2H", "H2Q", "H2M", "Q2Q", "Q2M", "M2M", "H#", "Q#", "M#", "20D20", "20D15", "20D10", "20D5", "15D15", "15D10", "15D5", "10D10", "10D5", "5D5", "5D4", "5D3", "5D2", "4D4", "4D3", "4D2", "3D3", "3D2", "2D2", "4W4", "4W3", "4W2", "4W1", "3W3", "3W2", "3W1", "2W2", "2W1", "1W1"};
@@ -115,7 +117,7 @@ public:
             }
             // ===================
             allTech_.push_back(techType_);
-            if (mixType_ == 3) {  // 如果mixType = 3，需要把mix的名稱放進去，company生路徑
+            if (mixType_ == 3) {  // 如果mixType_ 3，需要把mix的名稱放進去，company生路徑
                 for (int i = 0; i < 2; i++) {
                     string mixeType2 = allTech_[techIndexs_[0]] + "_" + allTech_[techIndexs_[1]] + "_2";
                     // =====改tech名稱=====
@@ -919,6 +921,7 @@ class MA {  // 裝MA資料
 public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 8, 8, 8};  // MA每個參數要多少個bits
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 5, 20}, {5, 60, 5, 60}, {10, 20, 10, 20}, {10, 60, 10, 60}, {20, 120, 20, 120}, {20, 240, 20, 240}, {60, 120, 60, 120}, {60, 240, 60, 240}};
+    static const inline int paraNum = 2;
 
     static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 買入判斷
         double MAbuy1PreDay = (*tables)[tableIndex].techTable_[i - 1][decimal[0]];
@@ -941,6 +944,7 @@ class RSI {  // 裝RSI資料
 public:
     static const inline vector<int> eachVariableBitsNum_ = {8, 7, 7};  // RSI每個參數要多少個bits
     static const inline vector<vector<int>> traditionStrategy_ = {{5, 20, 80}, {5, 30, 70}, {6, 20, 80}, {6, 30, 70}, {14, 20, 80}, {14, 30, 70}};
+    static const inline int paranNum = 3;
 
     static bool buy_condition0(vector<TechTable> *tables, int tableIndex, vector<int> &decimal, int i) {  // 買入判斷
         double RSI = (*tables)[tableIndex].techTable_[i][decimal[0]];
@@ -953,22 +957,22 @@ public:
     }
 };
 
-class BetaMatrix {  // 放 beta matrix & 其資料
+class BetaMatrix {  // 放beta matrix & 其資料
 public:
     int variableNum_ = 0;
     vector<int> eachVariableBitsNum_;
     int bitsNum_ = 0;
     vector<double> matrix_;
 
-    void reset();  // 重置 beta matrix
-    void print(ostream &out);  // 印 beta matrix
+    void reset();  // 重置beta matrix
+    void print(ostream &out);  // 印beta matrix
 };
 
-void BetaMatrix::reset() {  // 重置 beta matrix
+void BetaMatrix::reset() {  // 重置beta matrix
     fill(matrix_.begin(), matrix_.end(), 0.5);
 }
 
-void BetaMatrix::print(ostream &out = cout) {  // 印 beta matrix
+void BetaMatrix::print(ostream &out = cout) {  // 印beta matrix
     out << "beta matrix" << endl;
     for (int variableIndex = 0, bitIndex = 0; variableIndex < variableNum_; variableIndex++) {
         for (int fakeBitIndex = 0; fakeBitIndex < eachVariableBitsNum_[variableIndex]; fakeBitIndex++, bitIndex++) {
@@ -1014,6 +1018,7 @@ public:
 
     Strategy strategy_;
     int buyVariNum_ = -1;
+    int sellVariNum_ = -1;
 
     vector<TechTable> *tables_ = nullptr;
 
@@ -1040,9 +1045,10 @@ public:
     buyOrSell buy{MA::buy_condition0, MA::buy_condition0, MA::buy_condition0, RSI::buy_condition0};
     buyOrSell sell{MA::sell_condition0, MA::sell_condition0, MA::sell_condition0, RSI::sell_condition0};
 
+    vector<int> techParaNum{MA::paraNum, MA::paraNum, MA::paraNum, RSI::paranNum};
     vector<vector<int>> allTechEachVariableBitsNum_{MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, MA::eachVariableBitsNum_, RSI::eachVariableBitsNum_};
 
-    void init(CompanyInfo *company, int techIndex, bool isRecordOn = false, vector<int> variables = {});
+    void init(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
     void instant_trade(string startDate, string endDate, bool hold = false);  // 可以輸入日期區間直接進行交易
     void push_holdData_column_Name(bool hold, string &holdData, string *&holdDataPtr, string windowName);
     string set_title_variables();
@@ -1071,37 +1077,35 @@ public:
     void print(ostream &out);  // 印出粒子資訊
     void record_train_test_data(int startRow, int endRow, string *holdDataPtr = nullptr, vector<vector<string>> *trainFile = nullptr);  // 記錄訓練期跟測試期跑完資訊
 
-    Particle(CompanyInfo *company, int techIndex_, bool isRecordOn = false, vector<int> variables = {});
+    Particle(CompanyInfo *company, bool isRecordOn = false, vector<int> variables = {});
     Particle(){};
 };
 
-Particle::Particle(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) {
-    init(company, techIndex, isRecordOn, variables);
+Particle::Particle(CompanyInfo *company, bool isRecordOn, vector<int> variables) {
+    init(company, isRecordOn, variables);
 }
 
-void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector<int> variables) {
+void Particle::init(CompanyInfo *company, bool isRecordOn, vector<int> variables) {
     company_ = company;
-    techIndex_ = techIndex;
+    techIndex_ = company_->info_->techIndex_;
     techType_ = company_->info_->techType_;
     remain_ = company->info_->iniFundLV_;
     isRecordOn_ = isRecordOn;
+
+    buyVariNum_ = techParaNum[company_->info_->techIndexs_.front()];
+    sellVariNum_ = techParaNum[company_->info_->techIndexs_.back()];
+    strategy_.buy_.techIndex_ = company_->info_->techIndexs_.front();
+    strategy_.sell_.techIndex_ = company_->info_->techIndexs_.back();
+
     if (!company_->info_->mixedTech_) {
         eachVariableBitsNum_ = allTechEachVariableBitsNum_[techIndex_];
-        strategy_.buy_.techIndex_ = techIndex_;
-        strategy_.sell_.techIndex_ = techIndex_;
     } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果是mixType 2就要分別設定買賣的參數數量
-        for (auto techIndex : company_->info_->techIndexs_) {
-            if (techIndex < 3) {  // 如果是MA系列，參數是2個，所以begin() + 2
-                eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[techIndex].begin(), allTechEachVariableBitsNum_[techIndex].begin() + 2);
-            } else if (techIndex == 3) {  // 如果是RSI，參數數量不變
-                eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[techIndex].begin(), allTechEachVariableBitsNum_[techIndex].end());
-            }
-            if (buyVariNum_ == -1) {  // 設定買的參數數量有多少
-                buyVariNum_ = eachVariableBitsNum_.size();
-            }
-        }
-        strategy_.buy_.techIndex_ = company_->info_->techIndexs_[0];
-        strategy_.sell_.techIndex_ = company_->info_->techIndexs_[1];
+        eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[strategy_.buy_.techIndex_].begin(), allTechEachVariableBitsNum_[strategy_.buy_.techIndex_].begin() + buyVariNum_);
+        eachVariableBitsNum_.insert(eachVariableBitsNum_.end(), allTechEachVariableBitsNum_[strategy_.sell_.techIndex_].begin(), allTechEachVariableBitsNum_[strategy_.sell_.techIndex_].begin() + sellVariNum_);
+    }
+    if (variables.size() > 0) {
+        strategy_.buy_.decimal_ = vector<int>(variables.begin() + 0, variables.begin() + techParaNum[company_->info_->techIndexs_.front()]);
+        strategy_.sell_.decimal_ = vector<int>(variables.begin() + techParaNum[company_->info_->techIndexs_.front()], variables.end());
     }
     bitsNum_ = accumulate(eachVariableBitsNum_.begin(), eachVariableBitsNum_.end(), 0);
     binary_.resize(bitsNum_);
@@ -1113,10 +1117,17 @@ void Particle::init(CompanyInfo *company, int techIndex, bool isRecordOn, vector
 }
 
 void Particle::instant_trade(string startDate, string endDate, bool hold) {  // 可以輸入日期區間直接進行交易
-    vector<TechTable> tmp = {TechTable(company_, techIndex_)};
+    vector<TechTable> tmp(company_->info_->allTech_.size());
+    for (auto techIndex : company_->info_->techIndexs_) {
+        tmp[techIndex] = TechTable(company_, techIndex);
+    }
+    if (tmp[company_->info_->techIndex_].company_ == nullptr) {
+        tmp[company_->info_->techIndex_].date_ = tmp[strategy_.buy_.techIndex_].date_;
+        tmp[company_->info_->techIndex_].price_ = tmp[strategy_.buy_.techIndex_].price_;
+    }
     tables_ = &tmp;
-    int startRow = find_index_of_string_in_vec((*tables_)[0].date_, startDate);
-    int endRow = find_index_of_string_in_vec((*tables_)[0].date_, endDate);
+    int startRow = find_index_of_string_in_vec((*tables_)[company_->info_->techIndexs_.front()].date_, startDate);
+    int endRow = find_index_of_string_in_vec((*tables_)[company_->info_->techIndexs_.back()].date_, endDate);
     string holdData;
     string *holdDataPtr = nullptr;
     push_holdData_column_Name(hold, holdData, holdDataPtr, "");
@@ -1160,35 +1171,30 @@ void Particle::push_holdData_column_Name(bool hold, string &holdData, string *&h
 void Particle::set_instant_trade_file(ofstream &out, const string &startDate, const string &endDate) {
     string titleVariables = set_title_variables();
     string showVariablesInFile;
-    for (auto i : decimal_) {
+    for (auto i : strategy_.buy_.decimal_) {
         showVariablesInFile += ",";
         showVariablesInFile += to_string(i);
     }
-    out.open(company_->companyName_ + "_" + techType_ + titleVariables + "_instantTrade_" + startDate + "_" + endDate + ".csv");
-    switch (techIndex_) {
-        case 0:
-        case 1:
-        case 2: {
-            out << "company,startDate,endDate,buy1,buy2,sell1,sell2" << endl;
-            break;
-        }
-        case 3: {
-            out << "company,startDate,endDate,period,overSold,overBought" << endl;
-            break;
-        }
-        default: {
-            cout << "set_instant_trade_file exception" << endl;
-            exit(1);
-        }
+    showVariablesInFile += ",";
+    for (auto i : strategy_.sell_.decimal_) {
+        showVariablesInFile += ",";
+        showVariablesInFile += to_string(i);
     }
+    out.open(company_->companyName_ + "_" + techType_ + titleVariables + "instantTrade_" + startDate + "_" + endDate + ".csv");
+    out << "company,startDate,endDate," << endl;
     out << company_->companyName_ << "," << startDate << "," << endDate << showVariablesInFile << "\n\n";
 }
 
 string Particle::set_title_variables() {
     string titleVariables;
-    for (auto i : decimal_) {
+    for (auto i : strategy_.buy_.decimal_) {
         titleVariables += "_";
         titleVariables += to_string(i);
+    }
+    titleVariables += "-";
+    for (auto i : strategy_.sell_.decimal_) {
+        titleVariables += to_string(i);
+        titleVariables += "_";
     }
     return titleVariables;
 }
@@ -1599,7 +1605,11 @@ void Particle::determine_techIndex_and_set_strategy() {
             }
         }
     } else {  // 買賣不同指標
-        set_strategy(company_->info_->techIndexs_[0], vector<int>(decimal_.begin(), decimal_.begin() + buyVariNum_), company_->info_->techIndexs_[1], vector<int>(decimal_.begin() + buyVariNum_, decimal_.end()));
+        int buyIndex = company_->info_->techIndexs_.front();
+        int sellIndex = company_->info_->techIndexs_.back();
+        vector<int> buyVari = vector<int>(decimal_.begin(), decimal_.begin() + buyVariNum_);
+        vector<int> sellVari = vector<int>(decimal_.begin() + buyVariNum_, decimal_.end());
+        set_strategy(buyIndex, buyVari, sellIndex, sellVari);
 
         if (strategy_.buy_.techIndex_ == 3) {
             strategy_.buy_.decimal_[1]--;
@@ -1709,7 +1719,7 @@ public:
 
     void create_particles();
     void create_betaMatrix();
-    ofstream set_debug_file(int expCnt);  // 設定 debug 檔案
+    ofstream set_debug_file(int expCnt);  // 設定debug檔案
     void start_exp(int expCnt);
     void initialize_KNQTS();
     void output_debug_exp(int expCnt);
@@ -1749,7 +1759,7 @@ TrainAPeriod::TrainAPeriod(CompanyInfo &company, vector<TechTable> &tables, int 
 }
 
 void TrainAPeriod::create_particles() {
-    Particle p(&company_, company_.info_->techIndex_, debug_);
+    Particle p(&company_, debug_);
     p.tables_ = &tables_;
     p.actualDelta_ = actualDelta_;
     for (int i = 0; i < company_.info_->particleNum_; i++) {
@@ -1767,7 +1777,7 @@ void TrainAPeriod::create_betaMatrix() {
     betaMatrix_.bitsNum_ = particles_[0].bitsNum_;
 }
 
-ofstream TrainAPeriod::set_debug_file(int expCnt) {  // 設定 debug 檔案
+ofstream TrainAPeriod::set_debug_file(int expCnt) {  // 設定debug檔案
     ofstream out;
     if (debug_) {
         string delta = remove_zeros_at_end(actualDelta_);
@@ -2026,7 +2036,7 @@ void TrainAPeriod::update_best(int renewBest) {
     }
 }
 
-class Semaphore {  // thread 用
+class Semaphore {  // thread用
 private:
     mutex mtx;
     condition_variable cv;
@@ -2062,7 +2072,7 @@ public:
     vector<vector<Strategy>> mixedStrategies_;
 
     void find_good_train_file(vector<vector<path>> &diffTechTrainFilePath, vector<vector<vector<string>>> &aPeriodTrainFiles, int colIndex);  // 在不同指標訓練期中選比較好的出來
-    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles);  // mixType_ == 1 用，應該不會再用到
+    void find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles);  // mixType_ 1用，應該不會再用到
 
     MixedTechChooseTrainFile(CompanyInfo *company, TrainWindow *window, vector<string> &techTrainFilePath);
 };
@@ -2121,7 +2131,7 @@ void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTe
     goodTrainFiles_[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
 }
 
-void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {  // mixType_ == 1 用，應該不會再用到
+void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string>>> &aPeriodTrainFiles) {  // mixType_ 1用，應該不會再用到
     vector<Strategy> strategies;
     Strategy tmp;
     for (auto iter = aPeriodTrainFiles.begin(); iter != aPeriodTrainFiles.end(); iter++) {
@@ -2156,7 +2166,7 @@ private:
     string outputPath_;
     TrainWindow *window_;
 
-    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);  // mixType_ == 1 用，應該不會再用到
+    void train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile);  // mixType_ 1用，應該不會再用到
 
 public:
     MixedTechChooseTrainFile mixedTechChooseTrainFile_;
@@ -2183,7 +2193,7 @@ TrainMixed::TrainMixed(CompanyInfo *company, vector<TechTable> *tablesPtr, vecto
     }
 }
 
-void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {  // mixType_ == 1 用，應該不會再用到
+void TrainMixed::train_mixed_strategies(MixedTechChooseTrainFile &mixedTechChooseTrainFile) {  // mixType_ 1用，應該不會再用到
     eachIntervalBestP.resize(window_->intervalSize_ / 2);
     Particle p;
     p.init(company_, 0);
@@ -2216,7 +2226,7 @@ protected:
 
     Semaphore sem_;
 
-    void set_tables(vector<int> additionTable = {});  // 讀 tech file
+    void set_tables(vector<int> additionTable = {});  // 讀tech file
     void print_date_train_file(string &trainFileData, string startDate, string endDate);  // 輸出指定日期的訓練資料
     void train_a_company();
     void train_a_window(TrainWindow window);
@@ -2279,14 +2289,14 @@ Train::Train(CompanyInfo &company) : company_(&company), sem_(company.info_->win
     train_a_company();
 }
 
-void Train::set_tables(vector<int> additionTable) {  // 讀 tech file
+void Train::set_tables(vector<int> additionTable) {  // 讀tech file
     vector<int> tmpTechIndexes = company_->info_->techIndexs_;
     for (auto additionTech : additionTable) {
         tmpTechIndexes.push_back(additionTech);
     }
     sort(tmpTechIndexes.begin(), tmpTechIndexes.end());
 
-    auto get_table = [company_ = this->company_](vector<TechTable> &tables, int i, Semaphore &sem) {  // 用來讀 TechTable
+    auto get_table = [company_ = this->company_](vector<TechTable> &tables, int i, Semaphore &sem) {  // 讀TechTable
         sem.wait();
         tables[i] = TechTable(company_, i);
         sem.notify();
@@ -2297,7 +2307,7 @@ void Train::set_tables(vector<int> additionTable) {  // 讀 tech file
     for (auto i : tmpTechIndexes) {
         if (company_->info_->companyThreadNum_ * tmpTechIndexes.size() < thread::hardware_concurrency()) {
             threads.push_back(thread(get_table, ref(tables_), i, ref(sem)));
-            this_thread::sleep_for(0.1s);  // 不 sleep 的話 TechTable 天數不同會有 error
+            this_thread::sleep_for(0.1s);  // 不sleep的話TechTable天數不同會有error
         } else {
             tables_[i] = TechTable(company_, i);
         }
@@ -2314,15 +2324,15 @@ void Train::set_tables(vector<int> additionTable) {  // 讀 tech file
         }
     }
 
-    if (company_->info_->mixedTech_ && company_->info_->mixType_) {
-        tables_[company_->info_->techIndex_].date_ = tables_[company_->info_->techIndexs_[0]].date_;
-        tables_[company_->info_->techIndex_].price_ = tables_[company_->info_->techIndexs_[0]].price_;
+    if (tables_[company_->info_->techIndex_].company_ == nullptr) {
+        tables_[company_->info_->techIndex_].date_ = tables_[company_->info_->techIndexs_.front()].date_;
+        tables_[company_->info_->techIndex_].price_ = tables_[company_->info_->techIndexs_.front()].price_;
     }
 
     tablesPtr_ = &tables_;
 }
 
-void Train::print_date_train_file(string &trainData, string startDate, string endDate) {  // // 輸出指定日期的訓練資料
+void Train::print_date_train_file(string &trainData, string startDate, string endDate) {  // 輸出指定日期的訓練資料
     string title = company_->info_->techType_ + "_";
     title += company_->companyName_ + "_";
     title += company_->info_->algoType_ + "_";
@@ -2456,13 +2466,14 @@ protected:
     void set_strategies(vector<vector<string>> &thisTrainFile);
 
 public:
-    Test(CompanyInfo *company, string trainOrTest, vector<int> additionTable = {});
+    Test(CompanyInfo *company, string algoOrTrad, vector<int> additionTable = {});
     Test(CompanyInfo *company);
 };
 
 Test::Test(CompanyInfo *company) : Train(company){};
 
 Test::Test(CompanyInfo *company, string algoOrTrad, vector<int> additionTable) : Train(company), algoOrTrad_(algoOrTrad) {
+    cout << "test " << company_->info_->techType_ << endl;
     set_tables();
     set_particle();
     set_train_test_file_path();
@@ -2480,11 +2491,7 @@ Test::Test(CompanyInfo *company, string algoOrTrad, vector<int> additionTable) :
 }
 
 void Test::set_particle() {
-    // if (!company_->info_->mixedTech_) {
     p_.init(company_, company_->info_->techIndex_);
-    // } else {
-        // p_.init(company_, 0);
-    // }
     p_.tables_ = &tables_;
 }
 
@@ -2530,7 +2537,7 @@ void Test::set_strategies(vector<vector<string>> &thisTrainFile) {
     p_.set_strategy(buyIndex, buyStrategy, sellIndex, sellStrategy);
 }
 
-class BH {  // 計算 B&H
+class BH {  // 計算B&H
 public:
     double BHRoR;
     BH(CompanyInfo &company, string startDate, string endDate) {
@@ -2561,6 +2568,7 @@ public:
 };
 
 Tradition::Tradition(CompanyInfo *company) : Train(company) {
+    cout << "train tradition " << company_->info_->techType_ << endl;
     if (!company_->info_->mixedTech_ || company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {
         set_tables();
         set_tradition_strategy();
@@ -2592,7 +2600,7 @@ Tradition::Tradition(CompanyInfo *company) : Train(company) {
 }
 
 void Tradition::set_tradition_strategy() {
-    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果 mixType_ == 2，要把兩種指標傳統策略混合
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // 如果mixType 2，要把兩種指標傳統策略混合
         for (auto buyStrategy : allTraditionStrategy_[company_->info_->techIndexs_[0]]) {
             for (auto sellStrategy : allTraditionStrategy_[company_->info_->techIndexs_[1]]) {
                 vector<int> tmpStrategy;
@@ -2624,7 +2632,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
     cout << window.windowName_ << endl;
     string outputPath = company_->paths_.trainTraditionFilePaths_[company_->info_->techIndex_] + window.windowName_ + "/";
     create_directories(outputPath);
-    if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // mixeType除了2以外都用這種mix方式
+    if (company_->info_->mixedTech_ && company_->info_->mixType_ != 2) {  // mixType_除了2以外都用這種mix方式
         train_mixed(outputPath, window, company_->paths_.trainTraditionFilePaths_);
     } else {
         for (auto intervalIter = window.interval_.begin(); intervalIter != window.interval_.end(); intervalIter += 2) {
@@ -2632,7 +2640,7 @@ void Tradition::train_a_tradition_window(TrainWindow &window) {
                 particles_[strategyIndex].reset();
                 if (!company_->info_->mixedTech_) {  // 只用一種指標，這樣設定買賣策略
                     particles_[strategyIndex].set_strategy(company_->info_->techIndex_, traditionStrategy_[strategyIndex], company_->info_->techIndex_, traditionStrategy_[strategyIndex]);
-                } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // mixType 2需要分辨設定買賣策略
+                } else if (company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {  // mixType_ 2需要分辨設定買賣策略
                     vector<int> buystrategy = vector<int>(traditionStrategy_[strategyIndex].begin(), traditionStrategy_[strategyIndex].begin() + particles_[strategyIndex].buyVariNum_);
                     vector<int> sellstrategy = vector<int>(traditionStrategy_[strategyIndex].begin() + particles_[strategyIndex].buyVariNum_, traditionStrategy_[strategyIndex].end());
                     particles_[strategyIndex].set_strategy(company_->info_->techIndexs_[0], buystrategy, company_->info_->techIndexs_[1], sellstrategy);
@@ -2955,19 +2963,14 @@ void CalARR::CalOneCompanyARR::set_filePath() {
 void CalARR::CalOneCompanyARR::cal_windows_ARR(TrainWindow &window) {
     tmpWinodwARR_.algoARR_ = cal_one_ARR(allRoRData_.algoRoRoutData_, window, trainOrTestPaths_.front(), false);
     tmpWinodwARR_.traditionARR_ = cal_one_ARR(allRoRData_.traditionRoRoutData_, window, trainOrTestPaths_.back(), true);
-    // double BH_DRR = 0;
-    // double BH_RoR = 0;
     if (trainOrTestIndex_ == 0) {
         string trainStartDate = company_.date_[window.interval_.front() + company_.tableStartRow_];
         string trainEndDate = company_.date_[window.interval_.back() + company_.tableStartRow_];
         BH bh(company_, trainStartDate, trainEndDate);
         tmpWinodwARR_.BHARR_ = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front() + 1) * company_.oneYearDays_) - 1.0;
-        // BH_RoR = bh.BHRoR;
-        // BH_DRR = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front() + 1)) - 1.0;
     }
     tmpWinodwARR_.windowName_ = window.windowName_;
     thisCompanyWindowARR_.windowsARR_.push_back(tmpWinodwARR_);
-    // cout << window.windowName_ + "," << window.interval_.back() - window.interval_.front() + 1 << "," << set_precision(tmpWinodwARR_.BHARR_) << "," << set_precision(BH_RoR) << "," << set_precision(BH_DRR) << endl;
 }
 
 double CalARR::CalOneCompanyARR::cal_one_ARR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition) {
@@ -3389,21 +3392,20 @@ private:
                 Test testTradition(&company, "tradition");
                 break;
             }
+            case 4: {
+                break;
+            }
             case 10: {
                 cout << " mode 10" << endl;
                 // company.output_tech_file(company.info_->techIndex_);  // 輸出技術指標資料
                 // TechTable table(&company, company.info_->techIndex_);  // 輸出讀進來的技術指標資料到一份csv
                 // Train train(company, "2011-12-01", "2011-12-30");  // 訓練特定日期
-                // Particle(&company, true, vector<int>{5, 20, 5, 20}).instant_trade("2020-01-02", "2021-06-30");
-                // Particle(&company, true, vector<int>{70, 44, 85, 8}).instant_trade("2011-12-01", "2011-12-30");
-                // Particle(&company, true, vector<int>{5, 10, 5, 10}).instant_trade("2020-01-02", "2020-05-29", true);
-                // Particle(&company, true, vector<int>{14, 30, 70}).instant_trade("2012-01-03", "2020-12-31", true);
-                // Test test(company, company.info_->setWindow_, false, true, vector<int>{0});
-                // Particle(&company, company.info_->techIndex_, true, vector<int>{10, 12, 173, 162}).instant_trade("2012-09-04", "2012-09-28", true);
-                // TrainLoop loop(company);
-                // HoldFile holdFile(&company, "train", "algo");
-                // HoldFile holFile1(&company, "test", "algo");
-                // ResetFile resetFile(&company);
+                // Particle(&company, true, company.info_->instantTrade).instant_trade("2020-01-02", "2021-06-30");  // 輸入日期區間直接進行交易
+                // Test test(company, "algo", vector<int>{0});  // 在測試期時加入別的指標，可以在測試期時加上其他指標的條件
+                // TrainLoop loop(company);  // 測試delta用
+                // HoldFile holdFile(&company, "train", "algo");  // algo訓練期持有區間
+                // HoldFile holFile1(&company, "test", "algo");  // algo測試期持有區間
+                // ResetFile resetFile(&company);  // 應該不會再用到，更改輸出檔案的排版，危險小心使用
                 break;
             }
         }
@@ -3463,17 +3465,17 @@ int main(int argc, const char *argv[]) {
                 if (check != 'y')
                     exit(0);
             }
-            for (; _info.mode_ < 2; _info.mode_++) {
+            for (; _info.mode_ < 4; _info.mode_++) {
             RunMode runMode(_info, companyPricePaths);
             }
         } 
         else {
-            // CalARR calARR(companyPricePaths, "train");
-            // CalARR calARR1(companyPricePaths, "test");
-            // MergeARRFile mergeFile;
-            // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);
-            // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");
-            // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");
+            // CalARR calARR(companyPricePaths, "train");  // 輸出訓練期所有ARR
+            // CalARR calARR1(companyPricePaths, "test");  // 輸出測試期所有ARR
+            // MergeARRFile mergeFile;  // 合併檔案
+            // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);  // 根據ARR或是視窗名稱排序ARR file
+            // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo訓練期每間公司最好的持有區間
+            // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo測試期每間公司最好的持有區間
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
