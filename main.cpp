@@ -26,7 +26,7 @@ using namespace filesystem;  // C++17以上才有的library
 
 class Info {  // 放各種參數，要改參數大部分都在這邊
 public:
-    int mode_ = 10;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能, 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能
+    int mode_ = 10;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
     string setCompany_ = "AAPL";  // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
     string setWindow_ = "Y2Y";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
 
@@ -34,7 +34,7 @@ public:
     int mixType_ = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
     bool mixedTech_;
     int techIndex_;
-    vector<int> instantTrade = {};  // instant_trade用的指標，配合techIndexs_使用，如SMA會是{5, 20, 5, 20}，RSI{14, 30, 70}, HI-SR{5, 20, 14, 30, 70}, HI-RS{14, 30, 70, 5, 20}
+    vector<int> instantTrade = {};  // instant_trade用的指標的參數，配合techIndexs_使用，如SMA會是{5, 20, 5, 20}，RSI{14, 30, 70}, HI-SR{5, 20, 14, 30, 70}, HI-RS{14, 30, 70, 5, 20}
 
     vector<string> allTech_ = {"SMA", "WMA", "EMA", "RSI"};
     string techType_;
@@ -3181,7 +3181,7 @@ void SortARRFileBy::sortByARR(vector<vector<string>> &inputFile, equalIterType &
     }
 }
 
-class FindBestHold {
+class FindBestHold {  // 讀ARR file然後找出每個公司最好滑動視窗的持有區間
 public:
     Info *info_;
     string trainOrTest_;
@@ -3368,7 +3368,7 @@ private:
 
     Semaphore sem_;
 
-    void run_mode(CompanyInfo &company) {
+    void run_mode(CompanyInfo &company) {  // 程式主要功能1
         sem_.wait();
         cout << company.companyName_;
         switch (company.info_->mode_) {
@@ -3465,17 +3465,19 @@ int main(int argc, const char *argv[]) {
                 if (check != 'y')
                     exit(0);
             }
-            for (; _info.mode_ < 4; _info.mode_++) {
+            // for (; _info.mode_ < 4; _info.mode_++) {  // 小於2跑訓練期&測試期，小於4可以跑完全部實驗
             RunMode runMode(_info, companyPricePaths);
-            }
+            // }
         } 
-        else {
+        else {  // 程式主要功能2
             // CalARR calARR(companyPricePaths, "train", _info);  // 輸出訓練期所有ARR
             // CalARR calARR1(companyPricePaths, "test", _info);  // 輸出測試期所有ARR
-            // MergeARRFile mergeFile;  // 合併檔案
-            // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);  // 根據ARR或是視窗名稱排序ARR file
             // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo訓練期每間公司最好的持有區間
             // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo測試期每間公司最好的持有區間
+            
+            // 以下兩個不太用到
+            // MergeARRFile mergeFile;  // 合併檔案
+            // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);  // 根據ARR或是視窗名稱排序ARR file
         }
     } catch (exception &e) {
         cout << "exception: " << e.what() << endl;
