@@ -141,12 +141,12 @@ public:
         char delimiter;
         string slidingWindowEx;
         for (auto windowName : slidingWindows_) {
-            if (isalpha(windowName.front()) && windowName != "A2A") {  //做10個傳統滑動視窗
+            if (isalpha(windowName.front()) && windowName != "A2A") {  // 做10個傳統滑動視窗
                 vector<string> trainTestPair = cut_string(windowName, '2');
                 if (trainTestPair.size() == 2) {
                     for_each(trainTestPair.begin(), trainTestPair.end(), [&](string windowComp) {
                         int totalComponentLength = 0;
-                        for_each(windowComp.begin(), windowComp.end(), [&](char component) {  //計算訓練期及測試期長度
+                        for_each(windowComp.begin(), windowComp.end(), [&](char component) {  // 計算訓練期及測試期長度
                             totalComponentLength += componentLength.at(component);
                         });
                         trainTest.push_back(totalComponentLength);
@@ -154,11 +154,11 @@ public:
                     });
                     slidingWindowEx.pop_back();
                     tmp = {slidingWindowEx, 'M', trainTest[0], trainTest[1]};
-                } else if (trainTestPair.size() == 1) {  //做*滑動視窗
+                } else if (trainTestPair.size() == 1) {  // 做*滑動視窗
                     slidingWindowEx += to_string(componentLength.at(trainTestPair[0][0])) + "M";
                     tmp = {slidingWindowEx, 'S', componentLength.at(trainTestPair[0][0]), componentLength.at(trainTestPair[0][0])};
                 }
-            } else {  //做A2A及其餘自訂滑動視窗
+            } else {  // 做A2A及其餘自訂滑動視窗
                 trainTest = find_train_and_test_len(windowName, delimiter);
                 tmp = {windowName, delimiter, trainTest[0], trainTest[1]};
             }
@@ -3398,7 +3398,7 @@ private:
             case 10: {
                 cout << " mode 10" << endl;
                 // company.output_tech_file(company.info_->techIndex_);  // 輸出技術指標資料
-                // TechTable table(&company, company.info_->techIndex_);  // 輸出讀進來的技術指標資料到一份csv
+                // TechTable(&company, company.info_->techIndex_).output_techTable();  // 輸出讀進來的技術指標資料到一份csv
                 // Train train(company, "2011-12-01", "2011-12-30");  // 訓練特定日期
                 // Particle(&company, true, company.info_->instantTrade).instant_trade("2020-01-02", "2021-06-30");  // 輸入日期區間直接進行交易
                 // Test test(company, "algo", vector<int>{0});  // 在測試期時加入別的指標，可以在測試期時加上其他指標的條件
@@ -3474,7 +3474,7 @@ int main(int argc, const char *argv[]) {
             // CalARR calARR1(companyPricePaths, "test", _info);  // 輸出測試期所有ARR
             // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo訓練期每間公司最好的持有區間
             // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo測試期每間公司最好的持有區間
-            
+
             // 以下兩個不太用到
             // MergeARRFile mergeFile;  // 合併檔案
             // SortARRFileBy ARR(&_info, "train_ARR_name_sorted_SMA_2", 1);  // 根據ARR或是視窗名稱排序ARR file
