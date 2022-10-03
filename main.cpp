@@ -27,8 +27,8 @@ using namespace filesystem;  // C++17以上才有的library
 class Info {  // 放各種參數，要改參數大部分都在這邊
 public:
     int mode_ = 10;  // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
-    string setCompany_ = "AAPL";  // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
-    string setWindow_ = "Y2Y";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
+    string setCompany_ = "all";  // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
+    string setWindow_ = "all";  // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
 
     vector<int> techIndexs_ = {0};  // 0: SMA, 1: WMA, 2: EMA, 3: RSI, if mixType_ 2, 先後順序決定買賣指標(買, 賣)
     int mixType_ = 0;  // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
@@ -44,14 +44,14 @@ public:
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
-    double delta_ = 0.00016;
-    int expNum_ = 50;  // SMA: 50, RSI: 3
-    int genNum_ = 10000;
-    int particleNum_ = 10;
+    double delta_ = 0.00016;  // 旋轉角度
+    int expNum_ = 50;  // 實驗次數，SMA: 50, RSI: 3
+    int genNum_ = 10000;  // 迭代次數
+    int particleNum_ = 10;  // 粒子數量
     double iniFundLV_ = 10000000;  // 初始資金
 
-    int companyThreadNum_ = 0;  // 若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
-    int windowThreadNum_ = 0;  // 若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
+    int companyThreadNum_ = 0;  // 公司執行緒數量，若有很多公司要跑，可以視情況增加thread數量，一間一間公司跑設0
+    int windowThreadNum_ = 0;  // 滑動視窗執行緒數量，若只跑一間公司，可以視情況增加thread數量，一個一個視窗跑設0，若有開公司thread，這個要設為0，避免產生太多thread
 
     bool debug_ = false;  // 若要debug則改成true，會印出每個粒子的資訊
 
@@ -2095,7 +2095,7 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
         trainFilePaths.push_back(techTrainFilePath[5]);
     }
 
-    int trainFilePathsSize = trainFilePaths.size();
+    int trainFilePathsSize = (int)trainFilePaths.size();
 
     vector<vector<path>> diffTechTrainFilePath;
     for (auto trainPath : trainFilePaths) {
@@ -2303,7 +2303,7 @@ void Train::set_tables(vector<int> additionTable) {  // 讀tech file
     };
     tables_.resize(company_->info_->allTech_.size());
     vector<thread> threads;
-    Semaphore sem(tmpTechIndexes.size());
+    Semaphore sem((int)tmpTechIndexes.size());
     for (auto i : tmpTechIndexes) {
         if (company_->info_->companyThreadNum_ * tmpTechIndexes.size() < thread::hardware_concurrency()) {
             threads.push_back(thread(get_table, ref(tables_), i, ref(sem)));
@@ -2569,7 +2569,7 @@ public:
 
 Tradition::Tradition(CompanyInfo *company) : Train(company) {
     cout << "train tradition " << company_->info_->techType_ << endl;
-    if (!company_->info_->mixedTech_ || company_->info_->mixedTech_ && company_->info_->mixType_ == 2) {
+    if (!company_->info_->mixedTech_ || (company_->info_->mixedTech_ && company_->info_->mixType_ == 2)) {
         set_tables();
         set_tradition_strategy();
         create_particles();
@@ -3397,15 +3397,11 @@ private:
             }
             case 10: {
                 cout << " mode 10" << endl;
-                // company.output_tech_file(company.info_->techIndex_);  // 輸出技術指標資料
-                // TechTable(&company, company.info_->techIndex_).output_techTable();  // 輸出讀進來的技術指標資料到一份csv
-                // Train train(company, "2011-12-01", "2011-12-30");  // 訓練特定日期
-                // Particle(&company, true, company.info_->instantTrade).instant_trade("2020-01-02", "2021-06-30");  // 輸入日期區間直接進行交易
-                // Test test(company, "algo", vector<int>{0});  // 在測試期時加入別的指標，可以在測試期時加上其他指標的條件
-                // TrainLoop loop(company);  // 測試delta用
-                // HoldFile holdFile(&company, "train", "algo");  // algo訓練期持有區間
-                // HoldFile holFile1(&company, "test", "algo");  // algo測試期持有區間
-                // ResetFile resetFile(&company);  // 應該不會再用到，更改輸出檔案的排版，危險小心使用
+                company.output_tech_file(company.info_->techIndex_);  // 輸出技術指標資料
+                TechTable(&company, company.info_->techIndex_).output_techTable();  // 輸出讀進來的技術指標資料到一份csv
+                Train train(company, "2011-12-01", "2011-12-30");  // 訓練特定日期
+                Particle(&company, true, company.info_->instantTrade).instant_trade("2020-01-02", "2021-06-30");  // 輸入日期區間直接進行交易
+                TrainLoop loop(company);  // 測試delta用
                 break;
             }
         }
