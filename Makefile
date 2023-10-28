@@ -1,2 +1,2 @@
 all:
-	g++ --std=c++17 -O3 -o main main.cpp functions.h
+	g++ --std=c++17 -O3 -o main main.cc functions.h
