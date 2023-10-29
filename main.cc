@@ -26,10 +26,10 @@ using namespace filesystem; // C++17以上才有的library
 class Info
 { // 放各種參數，要改參數大部分都在這邊
 public:
-    int mode_ = 11; // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
+    int mode_ = 0; // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
 
     string setCompany_ = "AAPL"; // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
-    string setWindow_ = "all";   // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
+    string setWindow_ = "1W1";   // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
 
     vector<int> techIndexs_ = {3, 3}; // 0: SMA, 1: WMA, 2: EMA, 3: RSI, if mixType_ 2, 先後順序決定買賣指標(買, 賣)
     int mixType_ = 2;                 // 0: 單純選好的指數, 1: 指數裡選好的買好的賣, 2: 用GN跑不同指標買賣, 3: 從2跑的選出報酬率高的，實驗只會用到2跟3
@@ -41,7 +41,7 @@ public:
     string techType_;
     int mixedTechNum_;
 
-    int algoIndex_ = 2; // 根據下面演算法的index選擇要跑什麼
+    int algoIndex_ = 3; // 根據下面演算法的index選擇要跑什麼
     vector<string> allAlgo_ = {"QTS", "GQTS", "GNQTS", "KNQTS"};
     string algoType_;
 
@@ -132,7 +132,7 @@ public:
                 techType_ = "HI-all";
             }
             // ===================
-            allTech_.push_back(techType_);
+            allTech_.emplace_back(techType_);
             if (mixType_ == 3) // 如果mixType_ 3，需要把mix的名稱放進去，company生路徑
             {
                 for (int i = 0; i < 2; i++)
@@ -148,7 +148,7 @@ public:
                         mixeType2 = "HI-RS";
                     }
                     // ===================
-                    allTech_.push_back(mixeType2);
+                    allTech_.emplace_back(mixeType2);
                     reverse(techIndexs_.begin(), techIndexs_.end());
                 }
             }
@@ -178,7 +178,7 @@ public:
                         {
                             totalComponentLength += componentLength.at(component);
                         });
-                        trainTest.push_back(totalComponentLength);
+                        trainTest.emplace_back(totalComponentLength);
                         slidingWindowEx += to_string(totalComponentLength) + "M";
                     });
                     slidingWindowEx.pop_back();
@@ -296,30 +296,30 @@ void CompanyInfo::set_paths(Path &paths)
 { // 設定各種路徑
     for (auto tech : info_->allTech_)
     {
-        paths.techOuputPaths_.push_back(info_->techFolder_ + tech + "/" + companyName_ + "/");
+        paths.techOuputPaths_.emplace_back(info_->techFolder_ + tech + "/" + companyName_ + "/");
 
-        paths.resultOutputPaths_.push_back(info_->rootFolder_ + "result_" + tech + "/");
+        paths.resultOutputPaths_.emplace_back(info_->rootFolder_ + "result_" + tech + "/");
 
         string companyRootFolder = info_->rootFolder_ + "result_" + tech + "/" + companyName_ + "/";
-        paths.companyRootPaths_.push_back(companyRootFolder);
+        paths.companyRootPaths_.emplace_back(companyRootFolder);
 
-        paths.trainFilePaths_.push_back(companyRootFolder + "train/");
-        paths.testFilePaths_.push_back(companyRootFolder + "test/");
+        paths.trainFilePaths_.emplace_back(companyRootFolder + "train/");
+        paths.testFilePaths_.emplace_back(companyRootFolder + "test/");
 
-        paths.trainTraditionFilePaths_.push_back(companyRootFolder + "trainTradition/");
-        paths.testTraditionFilePaths_.push_back(companyRootFolder + "testTradition/");
+        paths.trainTraditionFilePaths_.emplace_back(companyRootFolder + "trainTradition/");
+        paths.testTraditionFilePaths_.emplace_back(companyRootFolder + "testTradition/");
 
-        paths.trainHoldFilePaths_.push_back(companyRootFolder + "trainHold/");
-        paths.testHoldFilePaths_.push_back(companyRootFolder + "testHold/");
+        paths.trainHoldFilePaths_.emplace_back(companyRootFolder + "trainHold/");
+        paths.testHoldFilePaths_.emplace_back(companyRootFolder + "testHold/");
 
-        paths.trainTraditionHoldFilePaths_.push_back(companyRootFolder + "trainTraditionHold/");
-        paths.testTraditionHoldFilePaths_.push_back(companyRootFolder + "testTraditionHold/");
+        paths.trainTraditionHoldFilePaths_.emplace_back(companyRootFolder + "trainTraditionHold/");
+        paths.testTraditionHoldFilePaths_.emplace_back(companyRootFolder + "testTraditionHold/");
 
-        paths.trainBestHold_.push_back(companyRootFolder + "trainBestHold/");
-        paths.testBestHold_.push_back(companyRootFolder + "testBestHold/");
+        paths.trainBestHold_.emplace_back(companyRootFolder + "trainBestHold/");
+        paths.testBestHold_.emplace_back(companyRootFolder + "testBestHold/");
 
-        paths.trainTraditionBestHold_.push_back(companyRootFolder + "trainTraditionBestHold/");
-        paths.testTraditionBestHold_.push_back(companyRootFolder + "testTraditionBestHold/");
+        paths.trainTraditionBestHold_.emplace_back(companyRootFolder + "trainTraditionBestHold/");
+        paths.testTraditionBestHold_.emplace_back(companyRootFolder + "testTraditionBestHold/");
     }
     if (info_->debug_)
     {
@@ -428,7 +428,7 @@ void CompanyInfo::store_tech_to_vector(int techIndex)
 {
     cout << "calculating " << companyName_ << " " << info_->techType_ << endl;
     vector<double> tmp;
-    techTable_.push_back(tmp);
+    techTable_.emplace_back(tmp);
     (this->*cal_tech_[techIndex])(tmp); // or (*this.*cal_tech_[info_->techIndex_])(tmp);
     // outside the class (company.*(company.cal_tech_[company.info_.techIndex_]))(tmp);
     cout << "done calculating" << endl;
@@ -445,9 +445,9 @@ void CompanyInfo::cal_SMA(vector<double> &tmp)
             {
                 MARangePriceSum += price_[i];
             }
-            tmp.push_back(MARangePriceSum / period);
+            tmp.emplace_back(MARangePriceSum / period);
         }
-        techTable_.push_back(tmp);
+        techTable_.emplace_back(tmp);
         tmp.clear();
     }
 }
@@ -465,9 +465,9 @@ void CompanyInfo::cal_WMA(vector<double> &tmp)
                 weightedPriceSum += price_[tmpDateRow] * weight;
                 totalWeight += weight;
             }
-            tmp.push_back(weightedPriceSum / totalWeight);
+            tmp.emplace_back(weightedPriceSum / totalWeight);
         }
-        techTable_.push_back(tmp);
+        techTable_.emplace_back(tmp);
         tmp.clear();
     }
 }
@@ -488,9 +488,9 @@ void CompanyInfo::cal_EMA(vector<double> &tmp)
             {
                 EMA = price_[dateRow] * alpha + (1.0 - alpha) * tmp[dateRow - 1];
             }
-            tmp.push_back(EMA);
+            tmp.emplace_back(EMA);
         }
-        techTable_.push_back(tmp);
+        techTable_.emplace_back(tmp);
         tmp.clear();
     }
 }
@@ -519,7 +519,7 @@ void CompanyInfo::cal_RSI(vector<double> &tmp)
         avgGain = gain / RSIPeriod;
         avgLoss = loss / RSIPeriod;
         RSI = 100.0 - (100.0 / (1 + (avgGain / avgLoss)));
-        tmp.push_back(RSI);
+        tmp.emplace_back(RSI);
         double preAvgGain = avgGain, preAvgLoss = avgLoss;
         for (int i = RSIPeriod; i < totalDays_ - 1; i++)
         {
@@ -539,9 +539,9 @@ void CompanyInfo::cal_RSI(vector<double> &tmp)
             {
                 RSI = 100;
             }
-            tmp.push_back(RSI);
+            tmp.emplace_back(RSI);
         }
-        techTable_.push_back(tmp);
+        techTable_.emplace_back(tmp);
         tmp.clear();
     }
 }
@@ -790,8 +790,8 @@ TestWindow::TestWindow(CompanyInfo &company, string window) : company_(company),
     }
     else
     {
-        interval_.push_back(company_.testStartRow_);
-        interval_.push_back(company_.testEndRow_);
+        interval_.emplace_back(company_.testStartRow_);
+        interval_.emplace_back(company_.testEndRow_);
     }
     for (auto &i : interval_)
     {
@@ -840,7 +840,7 @@ void TestWindow::find_M_test()
             monthCnt++;
             if (monthCnt == testLength_)
             {
-                startRow.push_back(dateRow);
+                startRow.emplace_back(dateRow);
                 monthCnt = 0;
             }
         }
@@ -852,7 +852,7 @@ void TestWindow::find_M_test()
             monthCnt++;
             if (monthCnt == testLength_ || dateRow == company_.testEndRow_)
             {
-                endRow.push_back(dateRow);
+                endRow.emplace_back(dateRow);
                 monthCnt = 0;
             }
         }
@@ -865,7 +865,7 @@ void TestWindow::find_W_test()
 {
     vector<int> startRow, endRow;
     int smallWeekDay = -1, bigWeekDay = -1;
-    startRow.push_back(company_.testStartRow_);
+    startRow.emplace_back(company_.testStartRow_);
     for (int dateRow = company_.testStartRow_ + 1, startRowWeekCnt = 0, endRowWeekCnt = 0; dateRow <= company_.testEndRow_; dateRow++)
     {
         smallWeekDay = cal_weekday(company_.date_[dateRow - 1]);
@@ -878,7 +878,7 @@ void TestWindow::find_W_test()
     }
     if (endRow.back() != company_.testEndRow_)
     {
-        endRow.push_back(company_.testEndRow_);
+        endRow.emplace_back(company_.testEndRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
@@ -891,7 +891,7 @@ void TestWindow::push_week(int smallWeekDay, int bigWeekDay, int smallDateRow, i
         weekCnt++;
         if (weekCnt == testLength_)
         {
-            weekVec.push_back(dateRow);
+            weekVec.emplace_back(dateRow);
             weekCnt = 0;
         }
     }
@@ -907,15 +907,15 @@ void TestWindow::find_D_test()
     vector<int> startRow, endRow;
     for (int dateRow = company_.testStartRow_; dateRow <= company_.testEndRow_; dateRow += testLength_)
     {
-        startRow.push_back(dateRow);
+        startRow.emplace_back(dateRow);
     }
     for (int dateRow = company_.testStartRow_ + testLength_ - 1; dateRow <= company_.testEndRow_; dateRow += testLength_)
     {
-        endRow.push_back(dateRow);
+        endRow.emplace_back(dateRow);
     }
     if (endRow.back() != company_.testEndRow_)
     {
-        endRow.push_back(company_.testEndRow_);
+        endRow.emplace_back(company_.testEndRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
@@ -1027,12 +1027,12 @@ void TrainWindow::find_regular_M_train(vector<int> &endRow, vector<int> &startRo
                 monthCnt++;
                 if (monthCnt == trainLength_)
                 {
-                    startRow.push_back(dateRow);
+                    startRow.emplace_back(dateRow);
                     break;
                 }
             }
         }
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
+        endRow.emplace_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
     }
 }
 
@@ -1047,12 +1047,12 @@ void TrainWindow::find_star_train(vector<int> &endRow, vector<int> &startRow)
                 monthCnt++;
                 if (monthCnt == 12 && intervalIndex % 2 == 0)
                 {
-                    startRow.push_back(dateRow);
+                    startRow.emplace_back(dateRow);
                     break;
                 }
                 else if (monthCnt == 12 && intervalIndex % 2 == 1)
                 {
-                    endRow.push_back(dateRow - 1);
+                    endRow.emplace_back(dateRow - 1);
                     break;
                 }
             }
@@ -1075,7 +1075,7 @@ void TrainWindow::find_W_train()
                 startRowWeekCnt++;
                 if (startRowWeekCnt == trainLength_)
                 {
-                    startRow.push_back(dateRow);
+                    startRow.emplace_back(dateRow);
                     break;
                 }
             }
@@ -1086,7 +1086,7 @@ void TrainWindow::find_W_train()
             bigWeekDay = cal_weekday(company_.date_[dateRow + 1]);
             if (check_week(smallWeekDay, bigWeekDay, dateRow, dateRow + 1, dateRow))
             {
-                endRow.push_back(dateRow);
+                endRow.emplace_back(dateRow);
                 break;
             }
         }
@@ -1100,8 +1100,8 @@ void TrainWindow::find_D_train()
     vector<int> startRow, endRow;
     for (int intervalIndex = 0; intervalIndex < intervalSize_; intervalIndex += 2)
     {
-        startRow.push_back(TestWindow::interval_[intervalIndex] - trainLength_ + tableStartRow_);
-        endRow.push_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
+        startRow.emplace_back(TestWindow::interval_[intervalIndex] - trainLength_ + tableStartRow_);
+        endRow.emplace_back(TestWindow::interval_[intervalIndex] - 1 + tableStartRow_);
     }
     check_startRowSize_endRowSize((int)startRow.size(), (int)endRow.size());
     interval_ = save_startRow_EndRow(startRow, endRow);
@@ -2106,11 +2106,11 @@ void TrainAPeriod::create_particles()
     p.actualDelta_ = actualDelta_;
     for (int i = 0; i < company_.info_->particleNum_; i++)
     {
-        particles_.push_back(p);
+        particles_.emplace_back(p);
     }
     for (int i = 0; i < 5; i++)
     {
-        globalP_.push_back(p);
+        globalP_.emplace_back(p);
     }
 }
 
@@ -2502,20 +2502,20 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
 {
     vector<string> trainFilePaths;
     // for (auto &techIndex : company_->info_->techIndexs_) {
-    //     trainFilePaths.push_back(techTrainFilePath[techIndex]);
+    //     trainFilePaths.emplace_back(techTrainFilePath[techIndex]);
     // }
     // if (company_->info_->mixType_ == 3) {  // 如果是mixType 3，需要把mix的路徑放進去
-    //     trainFilePaths.push_back(techTrainFilePath[5]);
-    //     trainFilePaths.push_back(techTrainFilePath[6]);
+    //     trainFilePaths.emplace_back(techTrainFilePath[5]);
+    //     trainFilePaths.emplace_back(techTrainFilePath[6]);
     // }
 
     // 表現最好的組合
     if (company_->info_->mixType_ == 3)
     { // 如果是mixType 3，需要把mix的路徑放進去
-        trainFilePaths.push_back(techTrainFilePath[6]);
-        trainFilePaths.push_back(techTrainFilePath[3]);
-        trainFilePaths.push_back(techTrainFilePath[0]);
-        trainFilePaths.push_back(techTrainFilePath[5]);
+        trainFilePaths.emplace_back(techTrainFilePath[6]);
+        trainFilePaths.emplace_back(techTrainFilePath[3]);
+        trainFilePaths.emplace_back(techTrainFilePath[0]);
+        trainFilePaths.emplace_back(techTrainFilePath[5]);
     }
 
     int trainFilePathsSize = (int)trainFilePaths.size();
@@ -2523,7 +2523,7 @@ MixedTechChooseTrainFile::MixedTechChooseTrainFile(CompanyInfo *company, TrainWi
     vector<vector<path>> diffTechTrainFilePath;
     for (auto trainPath : trainFilePaths)
     {
-        diffTechTrainFilePath.push_back(get_path(trainPath + window->windowName_));
+        diffTechTrainFilePath.emplace_back(get_path(trainPath + window->windowName_));
     }
     vector<vector<vector<string>>> aPeriodTrainFiles(trainFilePathsSize);
     for (int colIndex = 0; colIndex < window_->intervalSize_ / 2; colIndex++)
@@ -2556,7 +2556,7 @@ void MixedTechChooseTrainFile::find_good_train_file(vector<vector<path>> &diffTe
     vector<double> everyRoR;
     for (auto &trainFile : aPeriodTrainFiles)
     {
-        everyRoR.push_back(stod(trainFile[10][1]));
+        everyRoR.emplace_back(stod(trainFile[10][1]));
     }
     bestRoRIndex = distance(everyRoR.begin(), max_element(everyRoR.begin(), everyRoR.end()));
     goodTrainFiles_[colIndex] = diffTechTrainFilePath[bestRoRIndex][colIndex];
@@ -2576,7 +2576,7 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
         tmp.sell_.techIndex_ = find_index_of_string_in_vec(company_->info_->allTech_, tech);
         tmp.sell_.decimal_ = change_vec_string_to_int((*iter)[15]);
 
-        strategies.push_back(tmp);
+        strategies.emplace_back(tmp);
     }
     vector<Strategy> tmps;
     for (auto iIter = strategies.begin(); iIter != strategies.end(); iIter++)
@@ -2585,12 +2585,12 @@ void MixedTechChooseTrainFile::find_mixed_startegies(vector<vector<vector<string
         {
             tmp.buy_ = (*iIter).buy_;
             tmp.sell_ = (*jIter).sell_;
-            tmps.push_back(tmp);
+            tmps.emplace_back(tmp);
         }
     }
     tmps.insert(tmps.begin() + 1, *(tmps.end() - 1));
     tmps.pop_back();
-    mixedStrategies_.push_back(tmps);
+    mixedStrategies_.emplace_back(tmps);
 }
 
 class TrainMixed
@@ -2753,7 +2753,7 @@ void Train::set_tables(vector<int> additionTable)
     vector<int> tmpTechIndexes = company_->info_->techIndexs_;
     for (auto additionTech : additionTable)
     {
-        tmpTechIndexes.push_back(additionTech);
+        tmpTechIndexes.emplace_back(additionTech);
     }
     sort(tmpTechIndexes.begin(), tmpTechIndexes.end());
 
@@ -2769,7 +2769,7 @@ void Train::set_tables(vector<int> additionTable)
     {
         if (company_->info_->companyThreadNum_ * tmpTechIndexes.size() < thread::hardware_concurrency())
         {
-            threads.push_back(thread(get_table, ref(tables_), i, ref(sem)));
+            threads.emplace_back(thread(get_table, ref(tables_), i, ref(sem)));
             this_thread::sleep_for(0.1s); // 不sleep的話TechTable天數不同會有error
         }
         else
@@ -2822,7 +2822,7 @@ void Train::train_a_company()
         TrainWindow window(*company_, windowName);
         if (window.interval_[0] >= 0)
         {
-            windowThreads.push_back(thread(&Train::train_a_window, this, window));
+            windowThreads.emplace_back(thread(&Train::train_a_window, this, window));
         }
         else
         {
@@ -2936,7 +2936,7 @@ TrainLoop::TrainLoop(CompanyInfo &company) : company_(company), tables_({TechTab
     company_.paths_.trainFilePaths_[company_.info_->techIndex_].clear();
     for (int loop = 0; loop < company_.info_->testDeltaLoop_; loop++)
     {
-        loopThread.push_back(thread([&]()
+        loopThread.emplace_back(thread([&]()
                                     { Train(company_, tables_, sem_); }));
         this_thread::sleep_for(0.5s);
         company_.info_->delta_ -= company_.info_->testDeltaGap_;
@@ -3150,7 +3150,7 @@ void Tradition::set_tradition_strategy()
                 {
                     tmpStrategy = vector<int>(tmpStrategy.begin(), tmpStrategy.end() - 2);
                 }
-                traditionStrategy_.push_back(tmpStrategy);
+                traditionStrategy_.emplace_back(tmpStrategy);
             }
         }
     }
@@ -3167,7 +3167,7 @@ void Tradition::create_particles()
     p.tables_ = &tables_;
     for (int i = 0; i < traditionStrategyNum_; i++)
     {
-        particles_.push_back(p);
+        particles_.emplace_back(p);
     }
 }
 
@@ -3527,7 +3527,7 @@ vector<string> CalARR::remove_A2A_and_sort()
     auto A2Aiter = find(windowSort.begin(), windowSort.end(), "A2A");
     if (A2Aiter != windowSort.end())
         windowSort.erase(A2Aiter);
-    windowSort.push_back("B&H");
+    windowSort.emplace_back("B&H");
     sort(windowSort.begin(), windowSort.end());
     return windowSort;
 }
@@ -3553,9 +3553,9 @@ CalARR::CalOneCompanyARR::CalOneCompanyARR(CompanyInfo &company, vector<CompanyW
             }
         }
     }
-    thisCompanyWindowARR_.windowsARR_.push_back(cal_BH_ARR());
+    thisCompanyWindowARR_.windowsARR_.emplace_back(cal_BH_ARR());
     rank_algo_and_tradition_window(thisCompanyWindowARR_.windowsARR_);
-    allCompanyWindowsARR_.push_back(thisCompanyWindowARR_);
+    allCompanyWindowsARR_.emplace_back(thisCompanyWindowARR_);
 }
 
 void CalARR::CalOneCompanyARR::set_filePath()
@@ -3582,7 +3582,7 @@ void CalARR::CalOneCompanyARR::cal_windows_ARR(TrainWindow &window)
         tmpWinodwARR_.BHARR_ = pow(bh.BHRoR + 1.0, 1.0 / (double)(window.interval_.back() - window.interval_.front() + 1) * company_.oneYearDays_) - 1.0;
     }
     tmpWinodwARR_.windowName_ = window.windowName_;
-    thisCompanyWindowARR_.windowsARR_.push_back(tmpWinodwARR_);
+    thisCompanyWindowARR_.windowsARR_.emplace_back(tmpWinodwARR_);
 }
 
 double CalARR::CalOneCompanyARR::cal_one_ARR(string &RoRoutData, TrainWindow &window, string &stratgyFilePath, bool tradition)
@@ -3682,17 +3682,17 @@ void CalARR::CalOneCompanyARR::rank_algo_and_tradition_window(vector<WindowARR> 
     sort_by_window_name(windowsARR); // 將視窗按照名字排序
     for (auto &windowARR : windowsARR)
     {
-        tmpRank.traditionWindowRank_.push_back(windowARR.rank_);
+        tmpRank.traditionWindowRank_.emplace_back(windowARR.rank_);
     }
     sort_by_algo_ARR(windowsARR); // 將視窗按照用演算法的ARR排序
     rank_window(windowsARR);
     sort_by_window_name(windowsARR); // 將視窗按照名字排序
     for (auto &windowARR : windowsARR)
     {
-        tmpRank.algoWindowRank_.push_back(windowARR.rank_);
+        tmpRank.algoWindowRank_.emplace_back(windowARR.rank_);
     }
     sort_by_algo_ARR(windowsARR);
-    allCompanyWindowRank_.push_back(tmpRank);
+    allCompanyWindowRank_.emplace_back(tmpRank);
 }
 
 void CalARR::CalOneCompanyARR::sort_by_tradition_ARR(vector<WindowARR> &windowsARR)
@@ -3733,7 +3733,7 @@ MergeARRFile::MergeARRFile(Info *info) : info_(info)
         vector<vector<vector<string>>> files;
         for (auto &techIndex : info_->techIndexs_)
         {
-            files.push_back(read_data(info_->rootFolder_ + info_->allTech_[techIndex] + "_test_ARR.csv"));
+            files.emplace_back(read_data(info_->rootFolder_ + info_->allTech_[techIndex] + "_test_ARR.csv"));
         }
         vector<vector<string>> newFile = read_data(info_->rootFolder_ + info_->techType_ + "_test_ARR.csv");
         for (auto &file : files)
@@ -3742,7 +3742,7 @@ MergeARRFile::MergeARRFile(Info *info) : info_(info)
             {
                 for (size_t col = 0; col < file[row].size(); col++)
                 {
-                    newFile[row].push_back(file[row][col]);
+                    newFile[row].emplace_back(file[row][col]);
                 }
             }
         }
@@ -3816,10 +3816,10 @@ SortARRFileBy::equalIterType SortARRFileBy::findEqualSign(vector<vector<string>>
     {
         if ((*iter).front().front() == '=')
         {
-            equalSignIter.push_back(iter);
+            equalSignIter.emplace_back(iter);
         }
     }
-    equalSignIter.push_back(inputFile.end());
+    equalSignIter.emplace_back(inputFile.end());
     return equalSignIter;
 }
 
@@ -3871,7 +3871,7 @@ FindBestHold::FindBestHold(Info *info, string ARRFileName, string algoOrTrad) : 
     auto [bestIter1, bestIter2] = tuple{companyBestWindow1.begin(), companyBestWindow2.begin()};
     for (; bestIter1 != companyBestWindow1.end(); bestIter1++, bestIter2++)
     {
-        (*bestIter1).push_back((*bestIter2)[1]);
+        (*bestIter1).emplace_back((*bestIter2)[1]);
     }
     copyBestHold(companyBestWindow1);
 }
@@ -3884,17 +3884,17 @@ vector<vector<string>> FindBestHold::findBestWindow(vector<vector<string>> &ARRF
         if ((*rowIter)[0].front() == '=')
         {
             vector<string> toPush;
-            toPush.push_back((*rowIter)[0]);
+            toPush.emplace_back((*rowIter)[0]);
             toPush[0].erase(remove(toPush[0].begin(), toPush[0].end(), '='), toPush[0].end());
             for (int addRow = 1; addRow < 5; addRow++)
             {
                 if ((*(rowIter + addRow))[0] != "B&H")
                 {
-                    toPush.push_back((*(rowIter + addRow))[0]);
+                    toPush.emplace_back((*(rowIter + addRow))[0]);
                     break;
                 }
             }
-            companyBestWindow.push_back(toPush);
+            companyBestWindow.emplace_back(toPush);
         }
     }
     return companyBestWindow;
@@ -4025,11 +4025,11 @@ int ResetFile::reset_file(path fileName)
 
     //     vector<int> stratey;
     //     for (int i = 0; i < variNum_; i++) {
-    //         stratey.push_back(stoi(file[i + 12][1]));
+    //         stratey.emplace_back(stoi(file[i + 12][1]));
     //     }
     //     vector<string> s;
     //     for (auto i : stratey) {
-    //         s.push_back(to_string(i));
+    //         s.emplace_back(to_string(i));
     //     }
 
     //     file.erase(iter + 12, iter + 12 + variNum_);
@@ -4117,11 +4117,11 @@ public:
         vector<CompanyInfo> companiesInfo;
         for (auto companyPricePath : companyPricePaths)
         {
-            companiesInfo.push_back(CompanyInfo(companyPricePath, _info));
+            companiesInfo.emplace_back(CompanyInfo(companyPricePath, _info));
         }
         for (auto &company : companiesInfo)
         {
-            companyThread.push_back(thread(&RunMode::run_mode, this, ref(company)));
+            companyThread.emplace_back(thread(&RunMode::run_mode, this, ref(company)));
             this_thread::sleep_for(0.1s);
         }
         for (auto &thread : companyThread)
@@ -4150,7 +4150,7 @@ static vector<path> set_company_price_paths(const Info &info)
             vector<path> tmp;
             for (auto companyName : setCcompany)
             {
-                tmp.push_back(companiesPricePath[find_Index(companyName)]);
+                tmp.emplace_back(companiesPricePath[find_Index(companyName)]);
             }
             companiesPricePath = tmp;
         }

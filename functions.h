@@ -80,10 +80,10 @@ inline vector<vector<string>> read_data(path filePath)
                 {
                     cell.pop_back();
                 }
-                oneRow.push_back(cell);
+                oneRow.emplace_back(cell);
             }
         }
-        data.push_back(oneRow);
+        data.emplace_back(oneRow);
         row.clear();
         cell.clear();
         oneRow.clear();
@@ -157,18 +157,18 @@ inline vector<int> find_train_and_test_len(string window, char &delimiter)
     stringstream toCut(window);
     while (getline(toCut, segment, delimiter))
     {
-        segmentList.push_back(segment);
+        segmentList.emplace_back(segment);
     }
     vector<int> TrainTest;
     for (auto i : segmentList)
     {
         if (i.length() == 0)
         {
-            TrainTest.push_back(0);
+            TrainTest.emplace_back(0);
         }
         else
         {
-            TrainTest.push_back(stoi(i));
+            TrainTest.emplace_back(stoi(i));
         }
     }
     return TrainTest;
@@ -182,7 +182,7 @@ inline vector<string> cut_string(string input, char delimiter = ' ')
     stringstream toCut(input);
     while (getline(toCut, segment, delimiter))
     {
-        segmentList.push_back(segment);
+        segmentList.emplace_back(segment);
     }
     return segmentList;
 }
@@ -208,8 +208,8 @@ inline vector<int> save_startRow_EndRow(vector<int> &startRow, vector<int> &endR
     vector<int> interval;
     for (int i = 0; i < startRow.size(); i++)
     {
-        interval.push_back(startRow[i]);
-        interval.push_back(endRow[i]);
+        interval.emplace_back(startRow[i]);
+        interval.emplace_back(endRow[i]);
     }
     return interval;
 }
@@ -315,7 +315,7 @@ inline vector<int> change_vec_string_to_int(vector<string> aStrategyStrings)
         vector<int> aStrategyInt;
         for (auto s : aStrategyStrings)
         {
-            aStrategyInt.push_back(stoi(s));
+            aStrategyInt.emplace_back(stoi(s));
         }
         return aStrategyInt;
     }
