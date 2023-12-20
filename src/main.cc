@@ -26,7 +26,7 @@ using namespace filesystem; // C++17以上才有的library
 class Info
 { // 放各種參數，要改參數大部分都在這邊
 public:
-    int mode_ = 0; // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
+    int mode_ = 11; // 0: 訓練期, 1: 測試期, 2: 傳統訓練期, 3: 傳統測試期, 4: 暴力法, 10: 其他自選功能(line 3398), 11: 主要用來輸出公司中每個視窗的ARR，還有一些自選功能(line 3472)
 
     string setCompany_ = "AAPL"; // "all": 跑全部公司, "AAPL,V,WBA": 跑這幾間公司, "AAPL to JPM": 跑這兩個公司(包含)之間的所有公司
     string setWindow_ = "1W1";   // "all": 跑全部視窗, "M2M,10D10,1W1": 跑這幾個視窗, "Y2Y to M2M": 跑這兩個視窗(包含)之間的所有視窗
@@ -4188,8 +4188,8 @@ int main(int argc, const char *argv[])
         }
         else // 程式主要功能2
         {
-            // CalARR calARR(companyPricePaths, "train", _info);  // 輸出訓練期所有ARR
-            // CalARR calARR1(companyPricePaths, "test", _info); // 輸出測試期所有ARR
+            CalARR calARR(companyPricePaths, "train", _info);  // 輸出訓練期所有ARR
+            CalARR calARR1(companyPricePaths, "test", _info); // 輸出測試期所有ARR
             // FindBestHold findBestHold(&_info, "train_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo訓練期每間公司最好的持有區間
             // FindBestHold findBestHold1(&_info, "test_ARR_ARR_sorted_SMA_RSI_3", "algo");  // 找出algo測試期每間公司最好的持有區間
 
